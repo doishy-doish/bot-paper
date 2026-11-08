@@ -44,8 +44,10 @@ if (state.equity.length && state.equity[state.equity.length - 1].date === today)
 }
 for (const sym of SYMBOLS) {
   const hist = await closes(sym);
-  if (!hist) { console.log(sym + ": no data"); continue; }
-  const px = hist[hist.length - 1].close, sig = signal(hist), held = !!state.positions[sym];
+  if (!hist || hist.length < 202) { console.log(sym + ": no data"); continue; }
+  const bar = hist[hist.length - 1];          // fill bar (fresh close)
+  const px = bar.close, held = !!state.positions[sym];
+  const sig = signal(hist.slice(0, -1));      // signal on CONFIRMED bars only (t+1)
   if (sig === 1 && !held && state.cash >= SLOT) {
     state.positions[sym] = {entryPx: px, entryDate: hist[hist.length - 1].date, qty: SLOT / px};
     state.cash -= SLOT; console.log(sym + ": ENTER @" + px.toFixed(1));
