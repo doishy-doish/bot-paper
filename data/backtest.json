@@ -28,13 +28,13 @@
    "trades": 36
   },
   "2024": {
-   "gross_y": 469.1977,
-   "net_y": 375.3582,
+   "gross_y": 469.1981,
+   "net_y": 375.3585,
    "trades": 33
   },
   "2025": {
-   "gross_y": 1246.2968,
-   "net_y": 997.0374,
+   "gross_y": 1246.2959,
+   "net_y": 997.0367,
    "trades": 37
   },
   "2026": {
@@ -49,5 +49,11 @@
  "dd_gate": 0.15,
  "min_trades": 100,
  "ran_at": "2026-11-08",
- "capped_trades": 8
+ "capped_trades": 8,
+ "mean_net": 0.06741,
+ "std_net": 0.28463,
+ "winrate": 0.3869,
+ "longs": 199,
+ "shorts": 0,
+ "avg_abs_net": 0.18086
 }
