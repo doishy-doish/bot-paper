@@ -26,6 +26,19 @@ def main():
     ap.add_argument("--ref-summary", required=True)
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
+    # Self-reporting: ANY uncaught exception lands in the artifact as
+    # DRIVER-ERROR (log-zips are hard to fetch; the artifact is the channel).
+    def _hook(t, v, tb):
+        try:
+            import traceback as _t
+            json.dump({"verdict": "DRIVER-ERROR",
+                       "traceback": "".join(_t.format_exception(t, v, tb)),
+                       "pre_registered_rule": "no parameter changes either way"},
+                      open(a.out, "w"), indent=1)
+        except Exception:
+            pass
+        sys.__excepthook__(t, v, tb)
+    sys.excepthook = _hook
     print("PRE-REGISTERED RULE: this replay changes no parameters. "
           "MATCH = runner gold; MISMATCH = runner bug. Never tuning input.")
 
