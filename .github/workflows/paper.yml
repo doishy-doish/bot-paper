@@ -1,0 +1,44 @@
+name: paper-r1r2
+# FORWARD paper pair — frozen R1+R2. NOT YET SYNCED (launch on 'go' only).
+on:
+  schedule:
+    - cron: "30 10 * * 1-5"
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  paper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install yfinance pandas numpy
+      - run: |
+          if [ -f data/paper_state_r1.json ]; then node scripts/scramble.mjs decrypt data/paper_state_r1.json --out paper_state_r1.dec.json; fi
+          if [ -f data/paper_state_r2.json ]; then node scripts/scramble.mjs decrypt data/paper_state_r2.json --out paper_state_r2.dec.json; fi
+          if [ -f data/paper_ledger_r1.jsonl ]; then node scripts/scramble.mjs decrypt data/paper_ledger_r1.jsonl --out paper_ledger_r1.jsonl; fi
+          if [ -f data/paper_ledger_r2.jsonl ]; then node scripts/scramble.mjs decrypt data/paper_ledger_r2.jsonl --out paper_ledger_r2.jsonl; fi
+          python src/bot/paper/paper.py r1
+          python src/bot/paper/paper.py r2
+        env:
+          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
+      - run: |
+          node scripts/scramble.mjs encrypt paper_state_r1.dec.json paper_state_r2.dec.json paper_ledger_r1.jsonl paper_ledger_r2.jsonl
+          mkdir -p data
+          cp paper_state_r1.dec.json data/paper_state_r1.json
+          cp paper_state_r2.dec.json data/paper_state_r2.json
+          cp paper_ledger_r1.jsonl data/paper_ledger_r1.jsonl
+          cp paper_ledger_r2.jsonl data/paper_ledger_r2.jsonl
+          rm -f paper_state_r1.dec.json paper_state_r2.dec.json
+        env:
+          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
+      - run: |
+          git config user.name "paper-tick"
+          git config user.email "paper-tick@users.noreply.github.com"
+          git add data/paper_state_r1.json data/paper_state_r2.json data/paper_ledger_r1.jsonl data/paper_ledger_r2.jsonl
+          git diff --cached --quiet || git commit -m "paper-r1r2 $(date -u +%F)"
+          git pull --rebase
+          git push
