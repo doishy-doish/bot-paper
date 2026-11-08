@@ -58,15 +58,16 @@ def main():
     sp, lp = f"paper_state_{cfg}.dec.json", f"paper_ledger_{cfg}.jsonl"
     st = {"cash": 100000.0, "positions": [], "staged": [], "pending_exits": [],
           "closed": [], "chain": "GENESIS", "frozen": None, "day": 0,
-          "killed": None, "capped": 0}
+          "killed": None, "capped": 0, "nav": 100000.0, "nav_peak": 100000.0}
     try:
         with open(sp) as f:
             st = json.load(f)
     except FileNotFoundError:
         print(f"genesis {cfg}: day 1 (Rs 100000, empty book)")
-    for k in ("pending_exits", "capped"):
+    for k, v in (("pending_exits", []), ("capped", 0),
+                 ("nav", 100000.0), ("nav_peak", 100000.0)):
         if k not in st:
-            st[k] = [] if k == "pending_exits" else 0
+            st[k] = v
     fh = sha(F)
     if st.get("frozen") in (None, fh):
         st["frozen"] = fh
@@ -130,8 +131,9 @@ def main():
         px = pxat(opens, o["symbol"], last)
         if px is None:
             continue  # halted: drop single-day stale stage (re-signal tomorrow if set up)
+        notion = st["nav"] / F["slots"]
         st["positions"].append({"symbol": o["symbol"], "entry_date": d,
-                                "entry_px": px, "age": 0})
+                                "entry_px": px, "age": 0, "notional": notion})
         sq = o.get("sig_close")
         st.setdefault("ledger", []).append({"t": "fill", "d": d, "s": o["symbol"],
             "px": round(px, 4),
@@ -222,25 +224,31 @@ def main():
     n = len(st["closed"])
     import statistics as S
     mu = sum(st["closed"]) / n if n else 0.0
-    sd = S.pstdev(st["closed"]) if n > 1 else 0.0
-    dd = 0.0
-    peak, run = 0.0, 0.0
-    for x in st["closed"]:
-        run += x
-        peak = max(peak, run)
-        dd = max(dd, peak - run)
+    # Portfolio NAV at today's close (cash + open-position MTM), the same
+    # ledger semantics as the backtest slot book. The kill bar is drawn on
+    # THIS, never on the raw cumsum of per-trade nets (which runs ~slots x
+    # hotter and false-triggers on healthy books — caught by parity replay).
+    mtm = 0.0
+    for p in st["positions"]:
+        cl = pxat(closes, p["symbol"], last)
+        if cl is None:
+            continue
+        mtm += (cl / p["entry_px"] - 1.0) * p.get("notional", st["nav"] / F["slots"])
+    st["nav"] = st["cash"] + mtm
+    st["nav_peak"] = max(st["nav_peak"], st["nav"])
+    dd = (st["nav_peak"] - st["nav"]) / st["nav_peak"]
     kill = None
     if n >= 20 and mu < 0.0015:
         kill = f"expectancy {mu:+.4f} < +0.15% over {n}"
     if dd > 0.15:
-        kill = f"drawdown {dd:.2%} > 15%"
+        kill = f"drawdown {dd:.2%} > 15% (NAV {st['nav']:,.0f} vs peak {st['nav_peak']:,.0f})"
     if kill and not st.get("killed"):
         st["killed"] = kill + f" on {d}"
         with open(sp, "w") as f:
             json.dump(st, f, indent=1)
     pend = f" pend_exit={len(st['pending_exits'])}"
     print(f"paper-{cfg} day {st['day']} ({d}): pos={len(st['positions'])} staged={len(staged)} "
-          f"closed={n} mean={mu:+.5f} dd={dd:.3f} capped={st['capped']} chain={st['chain'][:12]}"
+          f"closed={n} mean={mu:+.5f} dd={dd:.3f} nav={st['nav']:,.0f} capped={st['capped']} chain={st['chain'][:12]}"
           + pend + (f" KILL-FROZEN: {kill}" if kill else ""))
 
 if __name__ == "__main__":
