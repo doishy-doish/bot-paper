@@ -1,0 +1,19 @@
+name: paper-tick
+on:
+  schedule:
+    - cron: "45 10 * * 1-5"
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node scripts/tick.mjs
+      - run: |
+          git config user.name "paper-tick"
+          git config user.email "paper-tick@users.noreply.github.com"
+          git add data/paper.json
+          git diff --cached --quiet || git commit -m "tick $(date -u +%F)"
+          git push
