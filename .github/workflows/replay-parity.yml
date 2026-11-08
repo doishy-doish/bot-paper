@@ -1,0 +1,36 @@
+name: replay-parity
+# TEMPORARY K-neutral parity check (NOT a trial, deleted after verdict).
+# Runs the ACTUAL paper.main() day-loop over 2021->today via replay_check.py
+# and diffs trade-by-trade vs a fresh backtest R1 leg on the same fetch.
+# Pre-registered rule: outcome changes NOTHING about parameters.
+# MATCH = runner gold; MISMATCH = runner bug (spec fidelity, never tuning).
+# Dispatch manually on Sundays only (static yfinance data -> exact comparison).
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install yfinance pandas numpy
+      - run: |
+          git clone --depth 1 "https://x-access-token:${BRAIN_PAT}@github.com/doishy-doish/bot-paper-brain.git" /tmp/brain
+        env:
+          BRAIN_PAT: ${{ secrets.BRAIN_PAT }}
+      - run: python /tmp/brain/scripts/backtest.py --quiet --mean-rev-sharp --drop 6.5 --trials 56 --out /tmp/r1.json
+      - run: |
+          cp results_trades.csv /tmp/r1_trades.csv
+          rm -rf /tmp/brain results_trades.csv
+          wc -l /tmp/r1_trades.csv
+      - run: python src/bot/paper/replay_check.py --ref-trades /tmp/r1_trades.csv --ref-summary /tmp/r1.json --out /tmp/replay_summary.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: replay-parity
+          path: /tmp/replay_summary.json
+          if-no-files-found: error
