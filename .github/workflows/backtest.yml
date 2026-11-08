@@ -53,6 +53,9 @@ jobs:
           - {name: backtest_mr_s7, flags: "--mean-rev-sharp --slots 7 --take 3.5 --stop 7 --trials 28", expect_key: "mr_variant", expect_window: ""}
           - {name: backtest_mr_s10, flags: "--mean-rev-sharp --slots 7 --take 3.5 --stop 10 --trials 28", expect_key: "mr_variant", expect_window: ""}
           - {name: backtest_mr_atr, flags: "--mean-rev-sharp --slots 7 --take 3.5 --atr-stop 2 --trials 28", expect_key: "mr_variant", expect_window: ""}
+          - {name: backtest_mr_c1, flags: "--mean-rev-sharp --take 3 --hold 7 --trials 31 --start 2015-01-01 --end 2021-01-01", expect_key: "mr_variant", expect_window: "2015-01-01"}
+          - {name: backtest_mr_c2, flags: "--mean-rev-sharp --slots 7 --take 3.5 --drop 6 --trials 31 --start 2015-01-01 --end 2021-01-01", expect_key: "mr_variant", expect_window: "2015-01-01"}
+          - {name: backtest_mr_c3, flags: "--mean-rev-sharp --slots 7 --drop 6 --take 3.5 --hold 7 --stop 6 --trials 31 --start 2015-01-01 --end 2021-01-01", expect_key: "mr_variant", expect_window: "2015-01-01"}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -100,13 +103,13 @@ jobs:
           mkdir -p data
           for f in artifacts/*/*.json; do cp "$f" "data/$(basename $f)"; done
           ls data/
-      - run: node scripts/scramble.mjs encrypt data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json data/backtest_mr.json data/backtest_mr_sharp.json data/backtest_valid.json data/backtest_mr_sharp_valid.json data/backtest_mr_k5.json data/backtest_mr_k6.json data/backtest_mr_k7.json data/backtest_mr_k8.json data/backtest_mr_dyn.json data/backtest_mr_cash.json data/backtest_mr_t4.json data/backtest_mr_t5.json data/backtest_mr_t3h7.json data/backtest_mr_t4h7.json data/backtest_mr_trail.json data/backtest_mr_flat3.json data/backtest_mr_d4.json data/backtest_mr_d6.json data/backtest_mr_d7.json data/backtest_mr_dd2.json data/backtest_mr_s6.json data/backtest_mr_s7.json data/backtest_mr_s10.json data/backtest_mr_atr.json
+      - run: node scripts/scramble.mjs encrypt data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json data/backtest_mr.json data/backtest_mr_sharp.json data/backtest_valid.json data/backtest_mr_sharp_valid.json data/backtest_mr_k5.json data/backtest_mr_k6.json data/backtest_mr_k7.json data/backtest_mr_k8.json data/backtest_mr_dyn.json data/backtest_mr_cash.json data/backtest_mr_t4.json data/backtest_mr_t5.json data/backtest_mr_t3h7.json data/backtest_mr_t4h7.json data/backtest_mr_trail.json data/backtest_mr_flat3.json data/backtest_mr_d4.json data/backtest_mr_d6.json data/backtest_mr_d7.json data/backtest_mr_dd2.json data/backtest_mr_s6.json data/backtest_mr_s7.json data/backtest_mr_s10.json data/backtest_mr_atr.json data/backtest_mr_c1.json data/backtest_mr_c2.json data/backtest_mr_c3.json
         env:
           SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
       - run: |
           git config user.name "paper-tick"
           git config user.email "paper-tick@users.noreply.github.com"
-          git add data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json data/backtest_mr.json data/backtest_mr_sharp.json data/backtest_valid.json data/backtest_mr_sharp_valid.json data/backtest_mr_k5.json data/backtest_mr_k6.json data/backtest_mr_k7.json data/backtest_mr_k8.json data/backtest_mr_dyn.json data/backtest_mr_cash.json data/backtest_mr_t4.json data/backtest_mr_t5.json data/backtest_mr_t3h7.json data/backtest_mr_t4h7.json data/backtest_mr_trail.json data/backtest_mr_flat3.json data/backtest_mr_d4.json data/backtest_mr_d6.json data/backtest_mr_d7.json data/backtest_mr_dd2.json data/backtest_mr_s6.json data/backtest_mr_s7.json data/backtest_mr_s10.json data/backtest_mr_atr.json
+          git add data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json data/backtest_mr.json data/backtest_mr_sharp.json data/backtest_valid.json data/backtest_mr_sharp_valid.json data/backtest_mr_k5.json data/backtest_mr_k6.json data/backtest_mr_k7.json data/backtest_mr_k8.json data/backtest_mr_dyn.json data/backtest_mr_cash.json data/backtest_mr_t4.json data/backtest_mr_t5.json data/backtest_mr_t3h7.json data/backtest_mr_t4h7.json data/backtest_mr_trail.json data/backtest_mr_flat3.json data/backtest_mr_d4.json data/backtest_mr_d6.json data/backtest_mr_d7.json data/backtest_mr_dd2.json data/backtest_mr_s6.json data/backtest_mr_s7.json data/backtest_mr_s10.json data/backtest_mr_atr.json data/backtest_mr_c1.json data/backtest_mr_c2.json data/backtest_mr_c3.json
           git diff --cached --quiet || git commit -m "backtest $(date -u +%F)"
           git pull --rebase
           git push
