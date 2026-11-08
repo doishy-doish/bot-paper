@@ -1,0 +1,33 @@
+name: backtest
+on:
+  schedule:
+    - cron: "0 12 * * 0"
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install yfinance pandas numpy
+      - run: |
+          git clone --depth 1 "https://x-access-token:${BRAIN_PAT}@github.com/doishy-doish/bot-paper-brain.git" /tmp/brain
+        env:
+          BRAIN_PAT: ${{ secrets.BRAIN_PAT }}
+      - run: |
+          mkdir -p data
+          python /tmp/brain/scripts/backtest.py --null --out data/backtest_null.json
+          python /tmp/brain/scripts/backtest.py --out data/backtest.json
+          rm -rf /tmp/brain
+      - run: |
+          git config user.name "paper-tick"
+          git config user.email "paper-tick@users.noreply.github.com"
+          git add data/backtest.json data/backtest_null.json
+          git diff --cached --quiet || git commit -m "backtest $(date -u +%F)"
+          git push
