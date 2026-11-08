@@ -10,7 +10,7 @@ backtest_symbol order engine):
     overnight continuation after the signal close (past-data replay 2026-11-08:
     intraday-limit exits printed mean -0.08%/trade vs backtest +0.77% on the
     same bars; close/next-open replay recovers +0.75%).
-Usage: python paper.py [r1|r2]  (default r1). State: paper_state_{cfg}.dec.json.
+Usage: python paper.py [r1|r2|t18]  (default r1). State: paper_state_{cfg}.dec.json.
 Holiday guard: latest bar must be today-IST or the script logs NO_SESSION and
 exits 0 without touching state. Kill-freeze: mean<+0.15% over >=20 closed OR
 DD>15% -> book frozen, logged daily.
@@ -22,6 +22,8 @@ CONFIGS = {
            "slots": 10, "friction": 0.003, "universe": "nifty50-49", "variant": "sharp-r1"},
     "r2": {"drop": -7.0, "drop_days": 3, "take": 3.0, "stop": 8.0, "hold": 5,
            "slots": 10, "friction": 0.003, "universe": "nifty50-49", "variant": "sharp-r2"},
+    "t18": {"drop": -6.5, "drop_days": 3, "take": 3.0, "stop": 10.0, "hold": 10,
+           "slots": 10, "friction": 0.003, "universe": "nifty50-49", "variant": "sharp-t18"},
 }
 UNIVERSE = [
     "RELIANCE.NS","TCS.NS","HDFCBANK.NS","ICICIBANK.NS","INFY.NS","ITC.NS",
@@ -52,7 +54,7 @@ def main():
     import yfinance as yf
     cfg = sys.argv[1] if len(sys.argv) > 1 else "r1"
     if cfg not in CONFIGS:
-        print(f"unknown config {cfg} (want r1|r2)")
+        print(f"unknown config {cfg} (want r1|r2|t18)")
         sys.exit(2)
     F = CONFIGS[cfg]
     sp, lp = f"paper_state_{cfg}.dec.json", f"paper_ledger_{cfg}.jsonl"
