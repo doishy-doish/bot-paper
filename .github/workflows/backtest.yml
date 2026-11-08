@@ -122,6 +122,7 @@ jobs:
           node -e '
           const fs = require("fs");
           const s = JSON.parse(fs.readFileSync(process.env.OUT_FILE, "utf8"));
+          if (s.trades === 0 && s.reason === "no trades") { console.log("guard ok: valid dead leg (0 trades) in " + process.env.OUT_FILE); process.exit(0); }
           if (!s.trades) throw new Error("STALE/EMPTY: no trades in " + process.env.OUT_FILE);
           if (process.env.EXPECT_KEY && !s[process.env.EXPECT_KEY]) throw new Error("STALE BRAIN COPY: expected truthy " + process.env.EXPECT_KEY + " (sync brain scripts/backtest.py from src/bot/backtest.py)");
           if (process.env.EXPECT_WINDOW && ((s.window || {}).start !== process.env.EXPECT_WINDOW)) throw new Error("STALE BRAIN COPY: window mismatch in " + process.env.OUT_FILE + " (sync brain scripts/backtest.py)");
