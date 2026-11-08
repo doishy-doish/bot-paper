@@ -111,18 +111,33 @@ def main():
             px_bad += 1
 
     # Mismatch forensics (only read if MISMATCH): which keys diverge, and why.
-    miss_in_rp = sorted(ref_keys - rp_keys)[:25]   # ref has, replay lacks
-    extra_in_rp = sorted(rp_keys - ref_keys)[:25]  # replay has, ref lacks
-    # For each missing replay entry: was the symbol's OPEN missing that day
-    # (halted -> replay drops the stage, backtest fills next valid bar)?
-    halt_info = []
-    for sym, fe, xe in miss_in_rp:
-        try:
-            o = float(opens_all.loc[fe, sym])
-            oo = "ok" if o == o else "NaN-open"
-        except Exception:
-            oo = "no-bar"
-        halt_info.append({"s": sym, "entry": fe, "open": oo})
+    # Self-reporting: failures land in the artifact, never kill the run.
+    miss_in_rp, extra_in_rp = [], []
+    forensics_err, halt_info, crowded = None, [], []
+    try:
+        _miss = sorted(ref_keys - rp_keys)[:25]
+        _extra = sorted(rp_keys - ref_keys)[:25]
+        pos_of = {}
+        for _k, _d in enumerate(opens_all.index):
+            pos_of.setdefault(_d.date().isoformat(), _k)
+        _ocol = {s: opens_all[s] for s in opens_all.columns}
+        for _sym, _fe, _xe in _miss:
+            try:
+                _kk = pos_of.get(_fe)
+                _o = float(_ocol[_sym].iloc[_kk]) if _kk is not None else float("nan")
+                _oo = "ok" if _o == _o else ("NaN-open" if _kk is not None else "no-bar")
+            except Exception:
+                _oo = "no-bar"
+            halt_info.append({"s": _sym, "entry": _fe, "open": _oo})
+        from collections import Counter
+        _rpd = Counter(fe for _, fe, _ in ref_keys)
+        crowded = sorted(((_d, _c) for _d, _c in _rpd.items() if _c >= 8),
+                         key=lambda _x: -_x[1])[:10]
+        miss_in_rp, extra_in_rp = _miss, _extra
+    except Exception:
+        import traceback as _tb
+        forensics_err = _tb.format_exc()
+        miss_in_rp, extra_in_rp = [], []
     # Entry crowding on missing-entry dates (slot overflow pattern?).
     from collections import Counter
     ref_per_day = Counter(fe for _, fe, _ in ref_keys)
@@ -164,7 +179,8 @@ def main():
            "forensics": {"missing_in_replay_sample": [list(k) for k in miss_in_rp],
                           "extra_in_replay_sample": [list(k) for k in extra_in_rp],
                           "halt_info": halt_info,
-                          "crowded_ref_days": crowded},
+                          "crowded_ref_days": crowded,
+                          "forensics_error": forensics_err},
            "bars": len(dates)}
     json.dump(out, open(a.out, "w"), indent=1)
     print(f"replay trades={n} mean={mean:+.5f} win={win:.4f} "
