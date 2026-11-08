@@ -161,7 +161,11 @@ def main():
         try:
             hist = [(float(closes[s].iloc[k]), float(vols[s].iloc[k]))
                     for k in range(len(closes) - 20, len(closes))]
-            hist = [(c, v) for c, v in hist if c == c and v == v and c > 0 and v > 0]
+            # NaN-check ONLY, exactly like the backtest's (closes*vols).rolling(20)
+            # (a zero-volume bar counts; requiring v>0 fail-shut whole windows —
+            # proven by parity forensics 2026-11-08: replay missed 2025-04-08-style
+            # panic entries the backtest took).
+            hist = [(c, v) for c, v in hist if c == c and v == v]
             if len(hist) >= 20:
                 m = sum(c * v for c, v in hist) / len(hist)
                 dv[s] = m
