@@ -120,8 +120,23 @@ def main():
     dw = abs(win - ref_sum["winrate"])
     match = (key_rate >= KEY_RATE_BAR and dn <= N_TOL
              and dm <= MEAN_TOL and dw <= WIN_TOL and px_bad == 0)
+    # Driver-health fields: discriminate "runner diverged" from "driver stalled".
+    # st["day"] increments ONLY when the IST-today guard passes, so it counts
+    # processed sessions directly.
+    by_year = {}
+    for s, fe, xe, _, _, _ in rp_trades:
+        by_year[xe[:4]] = by_year.get(xe[:4], 0) + 1
+    first_x = min((xe for _, _, xe, _, _, _ in rp_trades), default=None)
+    last_x = max((xe for _, _, xe, _, _, _ in rp_trades), default=None)
     out = {"verdict": "MATCH" if match else "MISMATCH",
            "pre_registered_rule": "no parameter changes either way",
+           "driver": {"sessions_processed": st.get("day"),
+                      "bars_available": len(dates),
+                      "open_positions": len(st.get("positions", [])),
+                      "pending_exits": len(st.get("pending_exits", [])),
+                      "killed": st.get("killed"), "capped": st.get("capped", 0),
+                      "first_exit": first_x, "last_exit": last_x,
+                      "exits_by_year": by_year},
            "replay": {"trades": n, "mean_net": round(mean, 5),
                        "winrate": round(win, 4), "key_count": len(rp_keys)},
            "ref": {"trades": ref_sum["trades"], "mean_net": ref_sum["mean_net"],
