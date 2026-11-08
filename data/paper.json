@@ -1,0 +1,27 @@
+{
+ "cash": 70000,
+ "positions": {
+  "ICICIBANK.NS": {
+   "entryPx": 1565,
+   "entryDate": "2026-11-08",
+   "qty": 6.389776357827476
+  },
+  "TITAN.NS": {
+   "entryPx": 4990.5,
+   "entryDate": "2026-11-08",
+   "qty": 2.003807233744114
+  },
+  "SUNPHARMA.NS": {
+   "entryPx": 1915,
+   "entryDate": "2026-11-08",
+   "qty": 5.221932114882507
+  }
+ },
+ "trades": [],
+ "equity": [
+  {
+   "date": "2026-11-08",
+   "equity": 100000
+  }
+ ]
+}
