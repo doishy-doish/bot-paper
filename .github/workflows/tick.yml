@@ -17,10 +17,10 @@ jobs:
       - uses: actions/checkout@v4
       - run: node scripts/tick.mjs
         env:
-          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE_KEY }}
+          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
       - run: node scripts/scramble.mjs encrypt data/paper.json
         env:
-          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE_KEY }}
+          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
       - run: |
           git config user.name "paper-tick"
           git config user.email "paper-tick@users.noreply.github.com"
