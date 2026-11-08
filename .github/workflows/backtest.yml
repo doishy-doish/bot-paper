@@ -32,12 +32,14 @@ jobs:
           python /tmp/brain/scripts/backtest.py --quiet --momentum-rank --out data/backtest_mom.json
           python /tmp/brain/scripts/backtest.py --quiet --mean-rev --out data/backtest_mr.json
           python /tmp/brain/scripts/backtest.py --quiet --mean-rev-sharp --out data/backtest_mr_sharp.json
+          python /tmp/brain/scripts/backtest.py --quiet --start 2024-01-01 --trials 8 --out data/backtest_valid.json
+          python /tmp/brain/scripts/backtest.py --quiet --mean-rev-sharp --start 2024-01-01 --trials 8 --out data/backtest_mr_sharp_valid.json
           rm -rf /tmp/brain
           rm -f results_trades.csv
       - run: |
           node -e '
           const fs = require("fs");
-          for (const f of ["data/backtest.json", "data/backtest_null.json", "data/backtest_nifty.json", "data/backtest_vol.json", "data/backtest_mom.json", "data/backtest_mr.json", "data/backtest_mr_sharp.json"]) {
+          for (const f of ["data/backtest.json", "data/backtest_null.json", "data/backtest_nifty.json", "data/backtest_vol.json", "data/backtest_mom.json", "data/backtest_mr.json", "data/backtest_mr_sharp.json", "data/backtest_valid.json", "data/backtest_mr_sharp_valid.json"]) {
             if (!fs.existsSync(f)) throw new Error("missing " + f);
           }
           const n = JSON.parse(fs.readFileSync("data/backtest_nifty.json", "utf8"));
@@ -54,13 +56,20 @@ jobs:
             if (!r[key]) throw new Error("STALE BRAIN COPY: backtest.py ignored " + f + " flag (sync brain scripts/backtest.py from src/bot/backtest.py)");
             console.log("guard ok: " + f + " variant=" + r[key] + " trades=" + r.trades);
           }
+          for (const [f, key] of [["data/backtest_valid.json", null], ["data/backtest_mr_sharp_valid.json", "mr_variant"]]) {
+            const r = JSON.parse(fs.readFileSync(f, "utf8"));
+            if ((r.window || {}).start !== "2024-01-01") throw new Error("STALE BRAIN COPY: " + f + " missing --start 2024-01-01 (sync brain scripts/backtest.py)");
+            if (key && !r[key]) throw new Error("STALE BRAIN COPY: " + f + " missing flag");
+            if (r.trials !== 8) throw new Error("STALE BRAIN COPY: " + f + " trials=" + r.trials + " want 8");
+            console.log("guard ok: " + f + " window=" + r.window.start + " trades=" + r.trades);
+          }
           '
-      - run: node scripts/scramble.mjs encrypt data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json data/backtest_mr.json data/backtest_mr_sharp.json
+      - run: node scripts/scramble.mjs encrypt data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json data/backtest_mr.json data/backtest_mr_sharp.json data/backtest_valid.json data/backtest_mr_sharp_valid.json
         env:
           SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
       - run: |
           git config user.name "paper-tick"
           git config user.email "paper-tick@users.noreply.github.com"
-          git add data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json data/backtest_mr.json data/backtest_mr_sharp.json
+          git add data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json data/backtest_mr.json data/backtest_mr_sharp.json data/backtest_valid.json data/backtest_mr_sharp_valid.json
           git diff --cached --quiet || git commit -m "backtest $(date -u +%F)"
           git push
