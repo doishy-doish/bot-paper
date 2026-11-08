@@ -10,9 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.BRAIN_SSH_KEY }}
+      - run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$BRAIN_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
+        env:
+          BRAIN_SSH_KEY: ${{ secrets.BRAIN_SSH_KEY }}
       - run: |
           git clone --depth 1 git@github.com:doishy-doish/bot-paper-brain.git /tmp/brain
           mkdir -p scripts
