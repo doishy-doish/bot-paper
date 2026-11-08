@@ -115,9 +115,11 @@ def main():
         st["cash"] *= 1 + net / F["slots"]
         st["closed"].append(net)
         st["capped"] += 1 if capped else 0
+        sq = hit.get("sig_close")
         st.setdefault("ledger", []).append({"t": "exit", "d": d, "s": p["symbol"],
             "px": round(px, 4), "net": round(net, 5), "why": hit["why"],
-            "capped": capped})
+            "capped": capped,
+            "sig_px": sq, "gap": round(px / sq - 1.0, 5) if sq else None})
     st["positions"] = still_open
     st["pending_exits"] = [x for x in st["pending_exits"]
                            if any(p["symbol"] == x["symbol"] and p["entry_date"] == x["entry_date"]
@@ -130,8 +132,10 @@ def main():
             continue  # halted: drop single-day stale stage (re-signal tomorrow if set up)
         st["positions"].append({"symbol": o["symbol"], "entry_date": d,
                                 "entry_px": px, "age": 0})
+        sq = o.get("sig_close")
         st.setdefault("ledger", []).append({"t": "fill", "d": d, "s": o["symbol"],
-                                            "px": round(px, 4)})
+            "px": round(px, 4),
+            "sig_px": sq, "slip": round(px / sq - 1.0, 5) if sq else None})
     st["staged"] = []
 
     # ---- (b) exit SIGNALS on today's CLOSE (filled at NEXT open)
@@ -145,6 +149,7 @@ def main():
         if take_hit or stop_hit or expired:
             st["pending_exits"].append({"symbol": p["symbol"],
                                         "entry_date": p["entry_date"], "date": d,
+                                        "sig_close": round(cl, 4),
                                         "why": "stop" if stop_hit else ("take" if take_hit else "time")})
 
     # ---- (c) entry signals on today's CLOSE (dvol gate + depth rank, filled next open)
@@ -181,7 +186,7 @@ def main():
                 continue
             ret = px / then - 1.0
             if ret <= F["drop"] / 100.0 and s in dv and dv[s] >= thresh:
-                sigs.append((ret, s))
+                sigs.append((ret, s, px))
     sigs.sort()
     exiting = {x["symbol"] for x in st["pending_exits"]}
     held = {p["symbol"] for p in st["positions"]} | exiting
@@ -190,9 +195,9 @@ def main():
           if any(p["symbol"] == x["symbol"] and p["entry_date"] == x["entry_date"]
                  for p in st["positions"])]))
     staged = []
-    for _, s in sigs[:max(free, 0)]:
+    for _, s, sc in sigs[:max(free, 0)]:
         if s not in held:
-            staged.append({"symbol": s, "date": d})
+            staged.append({"symbol": s, "date": d, "sig_close": round(sc, 4)})
             held.add(s)
     st["staged"] = staged
     for p in st["positions"]:
