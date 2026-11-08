@@ -30,7 +30,8 @@ jobs:
           wc -l /tmp/r1_trades.csv
       - run: python src/bot/paper/replay_check.py --ref-trades /tmp/r1_trades.csv --ref-summary /tmp/r1.json --out /tmp/replay_summary.json
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: replay-parity
           path: /tmp/replay_summary.json
-          if-no-files-found: error
+          if-no-files-found: warn
