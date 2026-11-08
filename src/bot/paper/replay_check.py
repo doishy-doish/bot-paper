@@ -110,6 +110,24 @@ def main():
         if abs(float(r["exit_px"]) - xp) / max(float(r["exit_px"]), 1e-9) > 5e-4:
             px_bad += 1
 
+    # Mismatch forensics (only read if MISMATCH): which keys diverge, and why.
+    miss_in_rp = sorted(ref_keys - rp_keys)[:25]   # ref has, replay lacks
+    extra_in_rp = sorted(rp_keys - ref_keys)[:25]  # replay has, ref lacks
+    # For each missing replay entry: was the symbol's OPEN missing that day
+    # (halted -> replay drops the stage, backtest fills next valid bar)?
+    halt_info = []
+    for sym, fe, xe in miss_in_rp:
+        try:
+            o = float(opens_all.loc[fe, sym])
+            oo = "ok" if o == o else "NaN-open"
+        except Exception:
+            oo = "no-bar"
+        halt_info.append({"s": sym, "entry": fe, "open": oo})
+    # Entry crowding on missing-entry dates (slot overflow pattern?).
+    from collections import Counter
+    ref_per_day = Counter(fe for _, fe, _ in ref_keys)
+    crowded = sorted(((d, c) for d, c in ref_per_day.items() if c >= 8],
+                     key=lambda x: -x[1])[:10]
     nets = st["closed"]
     n = len(nets)
     mean = sum(nets) / max(n, 1)
@@ -143,6 +161,10 @@ def main():
                    "winrate": ref_sum["winrate"], "key_count": len(ref_keys)},
            "key_match_rate": round(key_rate, 4),
            "price_mismatches": px_bad,
+           "forensics": {"missing_in_replay_sample": [list(k) for k in miss_in_rp],
+                          "extra_in_replay_sample": [list(k) for k in extra_in_rp],
+                          "halt_info": halt_info,
+                          "crowded_ref_days": crowded},
            "bars": len(dates)}
     json.dump(out, open(a.out, "w"), indent=1)
     print(f"replay trades={n} mean={mean:+.5f} win={win:.4f} "
