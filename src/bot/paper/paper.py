@@ -189,7 +189,11 @@ def main():
             ret = px / then - 1.0
             if ret <= F["drop"] / 100.0 and s in dv and dv[s] >= thresh:
                 sigs.append((ret, s, px))
-    sigs.sort()
+    sigs.sort(key=lambda x: x[1])  # symbol order = backtest allocate_nav's
+    # (entry-date, symbol) tie-break, verbatim. NOT depth-ranked: R1 was
+    # validated with unranked placement (Batch 7 R5 tested ranking separately
+    # and starved). Depth-rank staging was a v2 deviation; parity replay
+    # measured it at 83% key agreement, exact prices on matches.
     exiting = {x["symbol"] for x in st["pending_exits"]}
     held = {p["symbol"] for p in st["positions"]} | exiting
     # Slots freed by tomorrow's exit fills are reusable by tomorrow's entry fills.
