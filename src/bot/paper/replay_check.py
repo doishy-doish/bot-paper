@@ -151,11 +151,6 @@ def main():
         import traceback as _tb
         forensics_err = _tb.format_exc()
         miss_in_rp, extra_in_rp = [], []
-    # Entry crowding on missing-entry dates (slot overflow pattern?).
-    from collections import Counter
-    ref_per_day = Counter(fe for _, fe, _ in ref_keys)
-    crowded = sorted(((d, c) for d, c in ref_per_day.items() if c >= 8],
-                     key=lambda x: -x[1])[:10]
     nets = st["closed"]
     n = len(nets)
     mean = sum(nets) / max(n, 1)
