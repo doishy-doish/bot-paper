@@ -25,8 +25,6 @@ jobs:
           python src/bot/paper/paper.py r2
         env:
           SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
-        env:
-          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
       - run: |
           ls paper_state_r1.dec.json paper_state_r2.dec.json paper_ledger_r1.jsonl paper_ledger_r2.jsonl 2>/dev/null || { echo "NO_SESSION — nothing produced, nothing to commit"; exit 0; }
           node scripts/scramble.mjs encrypt paper_state_r1.dec.json paper_state_r2.dec.json paper_ledger_r1.jsonl paper_ledger_r2.jsonl
