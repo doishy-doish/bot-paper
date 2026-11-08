@@ -86,7 +86,7 @@ jobs:
       - run: |
           git config user.name "paper-tick"
           git config user.email "paper-tick@users.noreply.github.com"
-          git pull --rebase
           git add data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json data/backtest_mr.json data/backtest_mr_sharp.json data/backtest_valid.json data/backtest_mr_sharp_valid.json
           git diff --cached --quiet || git commit -m "backtest $(date -u +%F)"
+          git pull --rebase
           git push
