@@ -1,0 +1,52 @@
+{
+ "verdict": "FAIL",
+ "null_mode": false,
+ "trades": 199,
+ "symbols": 49,
+ "years": [
+  2021,
+  2022,
+  2023,
+  2024,
+  2025,
+  2026
+ ],
+ "yearly": {
+  "2021": {
+   "gross_y": -0.4845,
+   "net_y": -0.4845,
+   "trades": 8
+  },
+  "2022": {
+   "gross_y": -0.9698,
+   "net_y": -0.9698,
+   "trades": 38
+  },
+  "2023": {
+   "gross_y": -0.8056,
+   "net_y": -0.8056,
+   "trades": 36
+  },
+  "2024": {
+   "gross_y": 906.6865,
+   "net_y": 725.3492,
+   "trades": 33
+  },
+  "2025": {
+   "gross_y": 3401.7833,
+   "net_y": 2721.4266,
+   "trades": 37
+  },
+  "2026": {
+   "gross_y": -0.0377,
+   "net_y": -0.0377,
+   "trades": 47
+  }
+ },
+ "max_drawdown": 0.9973,
+ "cagr_net": 4.9213,
+ "target": 0.2,
+ "dd_gate": 0.15,
+ "min_trades": 100,
+ "ran_at": "2026-11-08"
+}
