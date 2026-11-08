@@ -30,12 +30,14 @@ jobs:
           python /tmp/brain/scripts/backtest.py --quiet --nifty-filter --out data/backtest_nifty.json
           python /tmp/brain/scripts/backtest.py --quiet --vol-target --out data/backtest_vol.json
           python /tmp/brain/scripts/backtest.py --quiet --momentum-rank --out data/backtest_mom.json
+          python /tmp/brain/scripts/backtest.py --quiet --mean-rev --out data/backtest_mr.json
+          python /tmp/brain/scripts/backtest.py --quiet --mean-rev-sharp --out data/backtest_mr_sharp.json
           rm -rf /tmp/brain
           rm -f results_trades.csv
       - run: |
           node -e '
           const fs = require("fs");
-          for (const f of ["data/backtest.json", "data/backtest_null.json", "data/backtest_nifty.json", "data/backtest_vol.json", "data/backtest_mom.json"]) {
+          for (const f of ["data/backtest.json", "data/backtest_null.json", "data/backtest_nifty.json", "data/backtest_vol.json", "data/backtest_mom.json", "data/backtest_mr.json", "data/backtest_mr_sharp.json"]) {
             if (!fs.existsSync(f)) throw new Error("missing " + f);
           }
           const n = JSON.parse(fs.readFileSync("data/backtest_nifty.json", "utf8"));
@@ -47,13 +49,18 @@ jobs:
           const m = JSON.parse(fs.readFileSync("data/backtest_mom.json", "utf8"));
           if (!m.mom_rank) throw new Error("STALE BRAIN COPY: backtest.py ignored --momentum-rank (sync brain scripts/backtest.py from src/bot/backtest.py)");
           console.log("guard ok: mom_rank=true, trades=" + m.trades);
+          for (const [f, key] of [["data/backtest_mr.json", "mr_variant"], ["data/backtest_mr_sharp.json", "mr_variant"]]) {
+            const r = JSON.parse(fs.readFileSync(f, "utf8"));
+            if (!r[key]) throw new Error("STALE BRAIN COPY: backtest.py ignored " + f + " flag (sync brain scripts/backtest.py from src/bot/backtest.py)");
+            console.log("guard ok: " + f + " variant=" + r[key] + " trades=" + r.trades);
+          }
           '
-      - run: node scripts/scramble.mjs encrypt data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json
+      - run: node scripts/scramble.mjs encrypt data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json data/backtest_mr.json data/backtest_mr_sharp.json
         env:
           SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
       - run: |
           git config user.name "paper-tick"
           git config user.email "paper-tick@users.noreply.github.com"
-          git add data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json
+          git add data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json data/backtest_mr.json data/backtest_mr_sharp.json
           git diff --cached --quiet || git commit -m "backtest $(date -u +%F)"
           git push
