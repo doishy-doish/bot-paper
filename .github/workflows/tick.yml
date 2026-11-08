@@ -11,18 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          printf '%s\n' "$BRAIN_SSH_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
-        env:
-          BRAIN_SSH_KEY: ${{ secrets.BRAIN_SSH_KEY }}
-      - run: |
-          git clone --depth 1 git@github.com:doishy-doish/bot-paper-brain.git /tmp/brain
+          git clone --depth 1 "https://x-access-token:${BRAIN_PAT}@github.com/doishy-doish/bot-paper-brain.git" /tmp/brain
           mkdir -p scripts
           cp /tmp/brain/scripts/tick.mjs ./scripts/_brain_tick.mjs
           node ./scripts/_brain_tick.mjs
           rm -f ./scripts/_brain_tick.mjs
+        env:
+          BRAIN_PAT: ${{ secrets.BRAIN_PAT }}
       - run: |
           git config user.name "paper-tick"
           git config user.email "paper-tick@users.noreply.github.com"
