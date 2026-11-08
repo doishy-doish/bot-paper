@@ -1,59 +1,9 @@
 {
- "verdict": "FAIL",
- "null_mode": true,
- "trades": 4147,
- "symbols": 49,
- "years": [
-  2021,
-  2022,
-  2023,
-  2024,
-  2025,
-  2026
- ],
- "yearly": {
-  "2021": {
-   "gross_y": -1.0,
-   "net_y": -1.0,
-   "trades": 480
-  },
-  "2022": {
-   "gross_y": -0.8856,
-   "net_y": -0.8856,
-   "trades": 923
-  },
-  "2023": {
-   "gross_y": -1.0,
-   "net_y": -1.0,
-   "trades": 882
-  },
-  "2024": {
-   "gross_y": 5761.5468,
-   "net_y": 4609.2374,
-   "trades": 637
-  },
-  "2025": {
-   "gross_y": -1.0,
-   "net_y": -1.0,
-   "trades": 686
-  },
-  "2026": {
-   "gross_y": 16.2471,
-   "net_y": 12.9977,
-   "trades": 539
-  }
- },
- "max_drawdown": 1.0,
- "cagr_net": -0.996,
- "target": 0.2,
- "dd_gate": 0.15,
- "min_trades": 100,
- "ran_at": "2026-11-08",
- "capped_trades": 1,
- "mean_net": -0.00324,
- "std_net": 0.07305,
- "winrate": 0.4741,
- "longs": 2098,
- "shorts": 2049,
- "avg_abs_net": 0.04798
+ "enc": "AES-256-GCM-v1",
+ "nonce": "EkeDJf6xXHTgnkxA",
+ "data": "KEROpeXAGodBKHzBRJlmfBxKSnGPbNIh0OH2IesOQrwREjM3J0UKngOx5u67JMUgrUa0apg/Je1r0gA7kXPodtPRy3x0vvGLV9ErAFkcULa3+DYPrYmBQzCBZKMtrhpHvun/qz6gueqLgwnXpMgVoKPATDC0b7gN+2KSQ9IGUMhITLUl0OCe6us7WwH6BqmQbCGVso/ZNWyVxvSbhXxnkK2GACY2biQj6FY5WZU+sHOINJc6m5bOu+Lzd8cHqgqCJuRrMREdVGZz9948xuK8fUWShgl7snJX2eWNxvs505gtqCUikBVLDWYmLtxM+NjjC58MVvwT4fc5eVox96qCBT58kMjrooJqZHKLmzwWU6xJyBOfKyRragMIpe2CHA5EoDRvI37yo/gNa50URzuQXSLp6/nbU0fZuzuD3blDWTaLFe5qv890+Ks2cPJusSVlTTEjbvSwSD8kWFj5Hf15bbugT6hwwlTUgvQt5jTdaVM0/aykd0KiXGOVWzc34m+ytu/lHbfJ7XqaWh29kqme0NSRMda6nlYV6lco5ZWgC5StLqvV/xzdxkCAumukuOaM+XFac1cUmfwR0RS8GbgUfh9badUdYqIRdoJh1RxIArMBhQqfHAJo6BbJ3slAfIq/UTXXiVBSyHaS22ok3Qd+NpgTPtcVg0q+1GszLdDHQNdLxEfMiP+rUhBXVqGjVfxW8U83Qvpj0oyJ7jOMwpCf/2W4CNUYDXY6GnQsAffAr3IDM85PRb4hb7oideVOnp2IOPizmR894E0sdYvSclmrg2oRF/Gn/IHI9Dq6lXzqrru/jXU77BVqdvnYwYBaeuyxEjGVgdqN93lFg4eQ8hPzBxOvx9FsUYPP8xy+iEJEMr8eUaj6hvnFb+q3Fej8OtgbiCIXlgWQJFgOpIwSj20siOHzTZWR4FSv5ZDXHH9/stAaL2PY0Et8v2PdF1pGiRRfSThRNvBSKuSsq2i8zwhEocNQRot5xX47jIp74U8z+nbMUwf264KGn9r5r8NIPym/PemGAOuYrvgCw6Uaz7Kw7WNLoGVTCsL/beXxQbsRrzX5cR4tmBcvMnLeADjAWvmbaP3/ChABhMM/ThzqTRhSGvHPDfh8gdvqMMYbuYVW6f/sjueYkbsJQUxRBaaknwlwcC1iVYDfpq8pM/GLLIC5mriCS1avh7NWTnPxdzkNWbFV3DunPeo7PQHvWhG0CUeos9wlKiKUescY+m0w7cxuO6kvAD/UwlOaZ0Igb/uP",
+ "tag": "x6NDmULlI8o+U2+X/PXCCQ==",
+ "sha256": "64d0c6c890b38b4c9d35a4f41285d5e7630e47c17deb07e9a088bafb17c9d4a0",
+ "bytes": 942,
+ "date": "2026-11-08"
 }

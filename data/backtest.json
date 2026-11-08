@@ -1,59 +1,9 @@
 {
- "verdict": "FAIL",
- "null_mode": false,
- "trades": 199,
- "symbols": 49,
- "years": [
-  2021,
-  2022,
-  2023,
-  2024,
-  2025,
-  2026
- ],
- "yearly": {
-  "2021": {
-   "gross_y": -0.4845,
-   "net_y": -0.4845,
-   "trades": 8
-  },
-  "2022": {
-   "gross_y": -0.9698,
-   "net_y": -0.9698,
-   "trades": 38
-  },
-  "2023": {
-   "gross_y": -0.8056,
-   "net_y": -0.8056,
-   "trades": 36
-  },
-  "2024": {
-   "gross_y": 469.1981,
-   "net_y": 375.3585,
-   "trades": 33
-  },
-  "2025": {
-   "gross_y": 1246.2959,
-   "net_y": 997.0367,
-   "trades": 37
-  },
-  "2026": {
-   "gross_y": -0.1327,
-   "net_y": -0.1327,
-   "trades": 47
-  }
- },
- "max_drawdown": 0.9973,
- "cagr_net": 3.1206,
- "target": 0.2,
- "dd_gate": 0.15,
- "min_trades": 100,
- "ran_at": "2026-11-08",
- "capped_trades": 8,
- "mean_net": 0.06741,
- "std_net": 0.28463,
- "winrate": 0.3869,
- "longs": 199,
- "shorts": 0,
- "avg_abs_net": 0.18086
+ "enc": "AES-256-GCM-v1",
+ "nonce": "/3WiLI8e5F3gC53V",
+ "data": "YwsIaiUoi8wEhS1M8YX1x4KwSrfHwiYGIy2gtCrfaDAtVILridWdWRTGhx2Ib+2oErF+OF/0o2AvtmbDONyI62nMxIH4eq2P/sRfdP0EeU1oEd1blGdmgQxbYXa8NKWeHRATt19mDPNIOUk9Yj56Gcbpoy/8HM8iKmf6bohmNF9VNnVgvJdzr2oH8CV9HmGJVLBq6K0rhC4ZgWGZH2lzMoSCbOULnR4x12/vsqhsdTR01cC0Hmm1yeZeOsgS3DWxL/CY00oNeBS57Btnd3s+E5qxhAc0o3W6O3ufsQA62+AQc/Bc5QSKnCxaaM/UCCVwXxXlh/B8b8BqRHsoQMDObsLfbX8bwM5yjrZCaW2dxPdohcG3VV6MAmNmX8MVXI2LcsGGSLbMU8Y3EcaaiJG5w2XAgfCpJge6Ra+3ddx23gy/3jMrYFk41jOmHlPwI+V98O+D+uNIy4KyxUE6CFylerUCb84NW4Ev1htOFi5Y/hrsnxt4KWmyWE4HOKEsgxZSGp/agG3sxx4UNqRBWusyrsfk/D00jG6+72AXR7sT9r2kxUD/z4CZKcoQF1ZJSeLnUmBoBjM/km8iuD01fHjdkymtHT1lS0a11F1xn85BXdwMqubwiNkbCYri24Rz4ymA0MadLBQP9Xt1E2syZrTKdWDeFEyYZN0AoshWf9JiR101pj7KpGatjd14Q1kGaEa5cyySn5KPIFLlvk7wV5Enx5dBcD1T8IxpUv/yzABm+Vz8elq2+7TV4XRz4tIkCvS7TLODWW2lh41/r6NrepEpHueXoONcBfrnG5kGprEe8ODfoZKKMTZxztf44SJ3htd9TqXRZGjzpOQop6OxbHE1NGM42Rko5S3RcpSG8fE5txw2Yi3G/fqgvlNQyqZIwi19Rb5rvPOQ6KcDpWN4LzJvcLg6ttL5ngNlZWFc2+TBjJ5ocg2d2J1oh5xSmBDnYfBhFTFKWJK55cP3Yf5oD4d6h9GYaYoPufIw70gjp5ioPG9lq4eFEKeMQ/vzE1+8+t+R+Ut88QsXEifROAxLlBn1Qdbo97C8SETDrURTFuz/96ZLPYv6ME2hST/20spamjYc72O2iQdJaBla5ZSgL3ZMNqamgD4LFCN1t3IHilIuea8v4C1tg2Tu+LCW0cFoSvnUI15izqCn7gtmd5RxvCYKLEPtCHp8qJ9qzKx5oYe877fudWaRb08vyImMOTKNCYbOnHL8O+vK/zaJal02+iqFgKxMrtnE1GOEynyNUGQYE6FdmS7/d34=",
+ "tag": "Iga4JgcXTvAhWntmPjLSWA==",
+ "sha256": "ada92042e1512d0d2cb2bf70d9f69b367edb186a151d2c3c81e678d62e754b4b",
+ "bytes": 950,
+ "date": "2026-11-08"
 }
