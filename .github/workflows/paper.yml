@@ -25,6 +25,8 @@ jobs:
           python src/bot/paper/paper.py r2
         env:
           SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
+        env:
+          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
       - run: |
           ls paper_state_r1.dec.json paper_state_r2.dec.json paper_ledger_r1.jsonl paper_ledger_r2.jsonl 2>/dev/null || { echo "NO_SESSION — nothing produced, nothing to commit"; exit 0; }
           node scripts/scramble.mjs encrypt paper_state_r1.dec.json paper_state_r2.dec.json paper_ledger_r1.jsonl paper_ledger_r2.jsonl
@@ -37,6 +39,7 @@ jobs:
         env:
           SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
       - run: |
+          ls data/paper_state_r1.json 2>/dev/null || { echo "NO_SESSION — nothing to commit"; exit 0; }
           git config user.name "paper-tick"
           git config user.email "paper-tick@users.noreply.github.com"
           git add data/paper_state_r1.json data/paper_state_r2.json data/paper_ledger_r1.jsonl data/paper_ledger_r2.jsonl
