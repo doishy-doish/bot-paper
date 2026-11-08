@@ -28,24 +28,28 @@ jobs:
           python /tmp/brain/scripts/backtest.py --quiet --null --out data/backtest_null.json
           python /tmp/brain/scripts/backtest.py --quiet --out data/backtest.json
           python /tmp/brain/scripts/backtest.py --quiet --nifty-filter --out data/backtest_nifty.json
+          python /tmp/brain/scripts/backtest.py --quiet --vol-target --out data/backtest_vol.json
           rm -rf /tmp/brain
           rm -f results_trades.csv
       - run: |
           node -e '
           const fs = require("fs");
-          for (const f of ["data/backtest.json", "data/backtest_null.json", "data/backtest_nifty.json"]) {
+          for (const f of ["data/backtest.json", "data/backtest_null.json", "data/backtest_nifty.json", "data/backtest_vol.json"]) {
             if (!fs.existsSync(f)) throw new Error("missing " + f);
           }
           const n = JSON.parse(fs.readFileSync("data/backtest_nifty.json", "utf8"));
           if (!n.nifty_filter) throw new Error("STALE BRAIN COPY: backtest.py ignored --nifty-filter (sync brain scripts/backtest.py from src/bot/backtest.py)");
           console.log("guard ok: nifty_filter=true, trades=" + n.trades);
+          const v = JSON.parse(fs.readFileSync("data/backtest_vol.json", "utf8"));
+          if (!v.vol_target) throw new Error("STALE BRAIN COPY: backtest.py ignored --vol-target (sync brain scripts/backtest.py from src/bot/backtest.py)");
+          console.log("guard ok: vol_target=true, trades=" + v.trades + " avg_size=" + v.avg_size);
           '
-      - run: node scripts/scramble.mjs encrypt data/backtest.json data/backtest_null.json data/backtest_nifty.json
+      - run: node scripts/scramble.mjs encrypt data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json
         env:
           SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
       - run: |
           git config user.name "paper-tick"
           git config user.email "paper-tick@users.noreply.github.com"
-          git add data/backtest.json data/backtest_null.json data/backtest_nifty.json
+          git add data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json
           git diff --cached --quiet || git commit -m "backtest $(date -u +%F)"
           git push
