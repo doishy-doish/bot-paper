@@ -2,19 +2,40 @@ name: backtest
 # Scrambled: public runner computes, but data/*.json are AES-256-GCM ciphertext.
 # Decrypt on our side after pull (see SCRAMBLE.md). Triggers stay
 # schedule/dispatch ONLY — never add pull_request (that would expose
-# BRAIN_PAT / SCRAMBLE_KEY to forked runs).
+# BRAIN_PAT / SCRAMBLE to forked runs).
+#
+# Architecture (Batch-3 ready): ONE matrix job fans out to N parallel
+# backtests (public minutes are unlimited; free-plan concurrency fits ~20
+# jobs, so a 20-variant batch collapses to single-run wall time). Each
+# matrix job uploads its plaintext JSON as an artifact; the `collect` job
+# downloads all, encrypts, and makes the ONE commit. Never commit from
+# matrix jobs (parallel pushes conflict). Matrix jobs need BRAIN_PAT only
+# for the read-only brain clone.
 on:
   schedule:
     - cron: "0 12 * * 0"
   workflow_dispatch: {}
 permissions:
   contents: write
+  actions: read
 jobs:
   backtest:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: backtest, flags: "", expect_key: "", expect_window: ""}
+          - {name: backtest_null, flags: "--null", expect_key: "null_seed", expect_window: ""}
+          - {name: backtest_nifty, flags: "--nifty-filter", expect_key: "nifty_filter", expect_window: ""}
+          - {name: backtest_vol, flags: "--vol-target", expect_key: "vol_target", expect_window: ""}
+          - {name: backtest_mom, flags: "--momentum-rank", expect_key: "mom_rank", expect_window: ""}
+          - {name: backtest_mr, flags: "--mean-rev", expect_key: "mr_variant", expect_window: ""}
+          - {name: backtest_mr_sharp, flags: "--mean-rev-sharp", expect_key: "mr_variant", expect_window: ""}
+          - {name: backtest_valid, flags: "--start 2024-01-01 --trials 8", expect_key: "", expect_window: "2024-01-01"}
+          - {name: backtest_mr_sharp_valid, flags: "--mean-rev-sharp --start 2024-01-01 --trials 8", expect_key: "mr_variant", expect_window: "2024-01-01"}
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -23,53 +44,49 @@ jobs:
           git clone --depth 1 "https://x-access-token:${BRAIN_PAT}@github.com/doishy-doish/bot-paper-brain.git" /tmp/brain
         env:
           BRAIN_PAT: ${{ secrets.BRAIN_PAT }}
+      - run: python /tmp/brain/scripts/backtest.py --quiet ${{ matrix.flags }} --out /tmp/${{ matrix.name }}.json
       - run: |
-          mkdir -p data
-          python /tmp/brain/scripts/backtest.py --quiet --null --out data/backtest_null.json
-          python /tmp/brain/scripts/backtest.py --quiet --out data/backtest.json
-          python /tmp/brain/scripts/backtest.py --quiet --nifty-filter --out data/backtest_nifty.json
-          python /tmp/brain/scripts/backtest.py --quiet --vol-target --out data/backtest_vol.json
-          python /tmp/brain/scripts/backtest.py --quiet --momentum-rank --out data/backtest_mom.json
-          python /tmp/brain/scripts/backtest.py --quiet --mean-rev --out data/backtest_mr.json
-          python /tmp/brain/scripts/backtest.py --quiet --mean-rev-sharp --out data/backtest_mr_sharp.json
-          python /tmp/brain/scripts/backtest.py --quiet --start 2024-01-01 --trials 8 --out data/backtest_valid.json
-          python /tmp/brain/scripts/backtest.py --quiet --mean-rev-sharp --start 2024-01-01 --trials 8 --out data/backtest_mr_sharp_valid.json
           rm -rf /tmp/brain
           rm -f results_trades.csv
       - run: |
           node -e '
           const fs = require("fs");
-          for (const f of ["data/backtest.json", "data/backtest_null.json", "data/backtest_nifty.json", "data/backtest_vol.json", "data/backtest_mom.json", "data/backtest_mr.json", "data/backtest_mr_sharp.json", "data/backtest_valid.json", "data/backtest_mr_sharp_valid.json"]) {
-            if (!fs.existsSync(f)) throw new Error("missing " + f);
-          }
-          const n = JSON.parse(fs.readFileSync("data/backtest_nifty.json", "utf8"));
-          if (!n.nifty_filter) throw new Error("STALE BRAIN COPY: backtest.py ignored --nifty-filter (sync brain scripts/backtest.py from src/bot/backtest.py)");
-          console.log("guard ok: nifty_filter=true, trades=" + n.trades);
-          const v = JSON.parse(fs.readFileSync("data/backtest_vol.json", "utf8"));
-          if (!v.vol_target) throw new Error("STALE BRAIN COPY: backtest.py ignored --vol-target (sync brain scripts/backtest.py from src/bot/backtest.py)");
-          console.log("guard ok: vol_target=true, trades=" + v.trades + " avg_size=" + v.avg_size);
-          const m = JSON.parse(fs.readFileSync("data/backtest_mom.json", "utf8"));
-          if (!m.mom_rank) throw new Error("STALE BRAIN COPY: backtest.py ignored --momentum-rank (sync brain scripts/backtest.py from src/bot/backtest.py)");
-          console.log("guard ok: mom_rank=true, trades=" + m.trades);
-          for (const [f, key] of [["data/backtest_mr.json", "mr_variant"], ["data/backtest_mr_sharp.json", "mr_variant"]]) {
-            const r = JSON.parse(fs.readFileSync(f, "utf8"));
-            if (!r[key]) throw new Error("STALE BRAIN COPY: backtest.py ignored " + f + " flag (sync brain scripts/backtest.py from src/bot/backtest.py)");
-            console.log("guard ok: " + f + " variant=" + r[key] + " trades=" + r.trades);
-          }
-          for (const [f, key] of [["data/backtest_valid.json", null], ["data/backtest_mr_sharp_valid.json", "mr_variant"]]) {
-            const r = JSON.parse(fs.readFileSync(f, "utf8"));
-            if ((r.window || {}).start !== "2024-01-01") throw new Error("STALE BRAIN COPY: " + f + " missing --start 2024-01-01 (sync brain scripts/backtest.py)");
-            if (key && !r[key]) throw new Error("STALE BRAIN COPY: " + f + " missing flag");
-            if (r.trials !== 8) throw new Error("STALE BRAIN COPY: " + f + " trials=" + r.trials + " want 8");
-            console.log("guard ok: " + f + " window=" + r.window.start + " trades=" + r.trades);
-          }
+          const s = JSON.parse(fs.readFileSync(process.env.OUT_FILE, "utf8"));
+          if (!s.trades) throw new Error("STALE/EMPTY: no trades in " + process.env.OUT_FILE);
+          if (process.env.EXPECT_KEY && !s[process.env.EXPECT_KEY]) throw new Error("STALE BRAIN COPY: expected truthy " + process.env.EXPECT_KEY + " (sync brain scripts/backtest.py from src/bot/backtest.py)");
+          if (process.env.EXPECT_WINDOW && ((s.window || {}).start !== process.env.EXPECT_WINDOW)) throw new Error("STALE BRAIN COPY: window mismatch in " + process.env.OUT_FILE + " (sync brain scripts/backtest.py)");
+          console.log("guard ok: " + process.env.OUT_FILE + " trades=" + s.trades);
           '
+        env:
+          OUT_FILE: /tmp/${{ matrix.name }}.json
+          EXPECT_KEY: ${{ matrix.expect_key }}
+          EXPECT_WINDOW: ${{ matrix.expect_window }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: /tmp/${{ matrix.name }}.json
+          if-no-files-found: error
+  collect:
+    needs: backtest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          pattern: "backtest*"
+      - run: |
+          mkdir -p data
+          for f in artifacts/*/*.json; do cp "$f" "data/$(basename $f)"; done
+          ls data/
       - run: node scripts/scramble.mjs encrypt data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json data/backtest_mr.json data/backtest_mr_sharp.json data/backtest_valid.json data/backtest_mr_sharp_valid.json
         env:
           SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
       - run: |
           git config user.name "paper-tick"
           git config user.email "paper-tick@users.noreply.github.com"
+          git pull --rebase
           git add data/backtest.json data/backtest_null.json data/backtest_nifty.json data/backtest_vol.json data/backtest_mom.json data/backtest_mr.json data/backtest_mr_sharp.json data/backtest_valid.json data/backtest_mr_sharp_valid.json
           git diff --cached --quiet || git commit -m "backtest $(date -u +%F)"
           git push
