@@ -1,4 +1,9 @@
 name: paper-tick
+# Scrambled variant (simple / standalone tick.mjs with no brain clone).
+# data/paper.json on disk is AES-256-GCM ciphertext; tick.mjs decrypts in
+# memory when SCRAMBLE_KEY is set and re-encrypts before writing, logs stay
+# quiet (counts + hashes only). See SCRAMBLE.md for the pull/decrypt side.
+# Triggers stay schedule/dispatch ONLY — never add pull_request.
 on:
   schedule:
     - cron: "45 10 * * 1-5"
@@ -10,14 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          git clone --depth 1 "https://x-access-token:${BRAIN_PAT}@github.com/doishy-doish/bot-paper-brain.git" /tmp/brain
-          mkdir -p scripts
-          cp /tmp/brain/scripts/tick.mjs ./scripts/_brain_tick.mjs
-          node ./scripts/_brain_tick.mjs
-          rm -f ./scripts/_brain_tick.mjs
+      - run: node scripts/tick.mjs
         env:
-          BRAIN_PAT: ${{ secrets.BRAIN_PAT }}
+          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE_KEY }}
+      - run: node scripts/scramble.mjs encrypt data/paper.json
+        env:
+          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE_KEY }}
       - run: |
           git config user.name "paper-tick"
           git config user.email "paper-tick@users.noreply.github.com"
