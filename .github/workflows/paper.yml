@@ -20,32 +20,37 @@ jobs:
           if [ -f data/paper_state_r1.json ]; then node scripts/scramble.mjs decrypt data/paper_state_r1.json --out paper_state_r1.dec.json; fi
           if [ -f data/paper_state_r2.json ]; then node scripts/scramble.mjs decrypt data/paper_state_r2.json --out paper_state_r2.dec.json; fi
           if [ -f data/paper_state_t18.json ]; then node scripts/scramble.mjs decrypt data/paper_state_t18.json --out paper_state_t18.dec.json; fi
+          if [ -f data/paper_state_s7y.json ]; then node scripts/scramble.mjs decrypt data/paper_state_s7y.json --out paper_state_s7y.dec.json; fi
           if [ -f data/paper_ledger_r1.jsonl ]; then node scripts/scramble.mjs decrypt data/paper_ledger_r1.jsonl --out paper_ledger_r1.jsonl; fi
           if [ -f data/paper_ledger_r2.jsonl ]; then node scripts/scramble.mjs decrypt data/paper_ledger_r2.jsonl --out paper_ledger_r2.jsonl; fi
           if [ -f data/paper_ledger_t18.jsonl ]; then node scripts/scramble.mjs decrypt data/paper_ledger_t18.jsonl --out paper_ledger_t18.jsonl; fi
+          if [ -f data/paper_ledger_s7y.jsonl ]; then node scripts/scramble.mjs decrypt data/paper_ledger_s7y.jsonl --out paper_ledger_s7y.jsonl; fi
           python src/bot/paper/paper.py r1
           python src/bot/paper/paper.py r2
           python src/bot/paper/paper.py t18
+          python src/bot/paper/paper.py s7y
         env:
           SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
       - run: |
-          ls paper_state_r1.dec.json paper_state_r2.dec.json paper_state_t18.dec.json paper_ledger_r1.jsonl paper_ledger_r2.jsonl paper_ledger_t18.jsonl 2>/dev/null || { echo "NO_SESSION — nothing produced, nothing to commit"; exit 0; }
-          node scripts/scramble.mjs encrypt paper_state_r1.dec.json paper_state_r2.dec.json paper_state_t18.dec.json paper_ledger_r1.jsonl paper_ledger_r2.jsonl paper_ledger_t18.jsonl
+          ls paper_state_r1.dec.json paper_state_r2.dec.json paper_state_t18.dec.json paper_state_s7y.dec.json paper_ledger_r1.jsonl paper_ledger_r2.jsonl paper_ledger_t18.jsonl paper_ledger_s7y.jsonl 2>/dev/null || { echo "NO_SESSION — nothing produced, nothing to commit"; exit 0; }
+          node scripts/scramble.mjs encrypt paper_state_r1.dec.json paper_state_r2.dec.json paper_state_t18.dec.json paper_state_s7y.dec.json paper_ledger_r1.jsonl paper_ledger_r2.jsonl paper_ledger_t18.jsonl paper_ledger_s7y.jsonl
           mkdir -p data
           cp paper_state_r1.dec.json data/paper_state_r1.json
           cp paper_state_r2.dec.json data/paper_state_r2.json
           cp paper_state_t18.dec.json data/paper_state_t18.json
+          cp paper_state_s7y.dec.json data/paper_state_s7y.json
           cp paper_ledger_r1.jsonl data/paper_ledger_r1.jsonl
           cp paper_ledger_r2.jsonl data/paper_ledger_r2.jsonl
           cp paper_ledger_t18.jsonl data/paper_ledger_t18.jsonl
-          rm -f paper_state_r1.dec.json paper_state_r2.dec.json paper_state_t18.dec.json
+          cp paper_ledger_s7y.jsonl data/paper_ledger_s7y.jsonl
+          rm -f paper_state_r1.dec.json paper_state_r2.dec.json paper_state_t18.dec.json paper_state_s7y.dec.json
         env:
           SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
       - run: |
           ls data/paper_state_r1.json 2>/dev/null || { echo "NO_SESSION — nothing to commit"; exit 0; }
           git config user.name "paper-tick"
           git config user.email "paper-tick@users.noreply.github.com"
-          git add data/paper_state_r1.json data/paper_state_r2.json data/paper_state_t18.json data/paper_ledger_r1.jsonl data/paper_ledger_r2.jsonl data/paper_ledger_t18.jsonl
-          git diff --cached --quiet || git commit -m "paper-r1r2t18 $(date -u +%F)"
+          git add data/paper_state_r1.json data/paper_state_r2.json data/paper_state_t18.json data/paper_state_s7y.json data/paper_ledger_r1.jsonl data/paper_ledger_r2.jsonl data/paper_ledger_t18.jsonl data/paper_ledger_s7y.jsonl
+          git diff --cached --quiet || git commit -m "paper-r1r2t18s7y $(date -u +%F)"
           git pull --rebase
           git push
