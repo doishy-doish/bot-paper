@@ -2,7 +2,7 @@ name: paper-r1r2
 # FORWARD paper trio — frozen R1+R2+t18 (t18 = Batch 9 rung-1 clearer, K-free forward).
 on:
   schedule:
-    - cron: "30 10 * * 1-5"
+    - cron: "30 11 * * 1-5" # 17:00 IST — ~90 min after NSE close, past Yahoo's 15-60 min EOD lag (moved 2026-11-10: 16:00 IST sat inside the lag window)
   workflow_dispatch: {}
 permissions:
   contents: write
