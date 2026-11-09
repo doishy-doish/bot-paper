@@ -97,7 +97,7 @@ def main():
         print(f"genesis {cfg}: day 1 (Rs 100000, empty book)")
     for k, v in (("pending_exits", []), ("capped", 0),
                  ("nav", 100000.0), ("nav_peak", 100000.0),
-                 ("yield_total", 0.0)):
+                 ("yield_total", 0.0), ("last_session", None)):
          if k not in st:
              st[k] = v
     fh = sha(F)
@@ -121,6 +121,10 @@ def main():
     if d != ist_today:
         # No fresh bar (weekend/holiday or feed lag): do NOT treat stale close as new
         print(f"NO_SESSION {cfg}: latest bar {d} != today-ist {ist_today} — state untouched")
+        return
+    if st.get("last_session") == d:
+        # Same-day re-dispatch (cron + manual, or retry): session already banked.
+        print(f"DUPLICATE_SESSION {cfg}: {d} already banked as day {st.get('day')} — state untouched")
         return
     if F.get("yield"):
         # Honest-book accrual on idle cash at today's open (s7y only).
@@ -255,20 +259,12 @@ def main():
                    for x in st["pending_exits"]):
             p["age"] += 1
     st["day"] += 1
+    st["last_session"] = d
     for row in st.get("ledger", []):
         if "chain" not in row:
             row["prev"] = st["chain"]
             st["chain"] = sha(row)
             row["chain"] = st["chain"]
-    with open(sp, "w") as f:
-        json.dump(st, f, indent=1)
-    with open(lp, "a") as f:
-        for row in st.get("ledger", []):
-            if not row.get("_flushed"):
-                f.write(json.dumps(row, sort_keys=True) + "\n")
-                row["_flushed"] = True
-    with open(sp, "w") as f:
-        json.dump(st, f, indent=1)
     n = len(st["closed"])
     import statistics as S
     mu = sum(st["closed"]) / n if n else 0.0
@@ -292,8 +288,16 @@ def main():
         kill = f"drawdown {dd:.2%} > 15% (NAV {st['nav']:,.0f} vs peak {st['nav_peak']:,.0f})"
     if kill and not st.get("killed"):
         st["killed"] = kill + f" on {d}"
-        with open(sp, "w") as f:
-            json.dump(st, f, indent=1)
+    # Single state write, AFTER every derived field is final (#43 fix:
+    # nav/nav_peak/kill used to compute after the write and never persist).
+    # Fills/signals/exits above are byte-identical to the frozen runner.
+    with open(lp, "a") as f:
+        for row in st.get("ledger", []):
+            if not row.get("_flushed"):
+                f.write(json.dumps(row, sort_keys=True) + "\n")
+                row["_flushed"] = True
+    with open(sp, "w") as f:
+        json.dump(st, f, indent=1)
     pend = f" pend_exit={len(st['pending_exits'])}"
     print(f"paper-{cfg} day {st['day']} ({d}): pos={len(st['positions'])} staged={len(staged)} "
           f"closed={n} mean={mu:+.5f} dd={dd:.3f} nav={st['nav']:,.0f} capped={st['capped']} chain={st['chain'][:12]}"
