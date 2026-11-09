@@ -24,25 +24,20 @@ jobs:
           rm -rf /tmp/brain
           rm -f results_trades.csv
       - run: |
-          node -e '
-          const fs = require("fs");
-          const raw = fs.readFileSync("/tmp/backtest_mr_micro.json", "utf8");
-          console.log("bytes=" + raw.length);
-          console.log("head=" + raw.slice(0, 400));
-          const s = JSON.parse(raw);
-          console.log("keys=" + Object.keys(s).join(","));
-          console.log("trades=" + s.trades + " reason=" + s.reason + " mr_variant=" + s.mr_variant + " window=" + JSON.stringify(s.window) + " trials=" + s.trials);
-          '
-      - run: |
+          ls -la /tmp/ > /tmp/ls.txt 2>&1 || true
+          ls -la . >> /tmp/ls.txt 2>&1 || true
+          head -c 3000 /tmp/backtest_mr_micro.json > /tmp/head.txt 2>&1 || echo NOFILE > /tmp/head.txt
+          wc -c /tmp/backtest_mr_micro.json >> /tmp/ls.txt 2>&1 || true
           mkdir -p data
-          cp /tmp/backtest_mr_micro.json data/debug_micro.json
-      - run: node scripts/scramble.mjs encrypt data/debug_micro.json
+          cp /tmp/ls.txt data/debug_micro_ls.txt
+          cp /tmp/head.txt data/debug_micro_head.txt
+      - run: node scripts/scramble.mjs encrypt data/debug_micro_ls.txt data/debug_micro_head.txt
         env:
           SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
       - run: |
           git config user.name "debug-micro"
           git config user.email "debug-micro@users.noreply.github.com"
-          git add data/debug_micro.json
+          git add data/debug_micro_ls.txt data/debug_micro_head.txt
           git diff --cached --quiet || git commit -m "debug-micro $(date -u +%F_%T)"
           git pull --rebase
           git push
