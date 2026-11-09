@@ -1,0 +1,85 @@
+name: invariants
+# L2 — dimensionless lab on the public runner (K-FREE, scrambled outputs).
+# Frozen L1 harvest, 20 concurrent legs, one symbol per leg. No brain clone
+# (node, no deps — avoids BRAIN_PAT entirely). Triggers stay
+# schedule/dispatch ONLY — never add pull_request.
+on:
+  schedule:
+    - cron: "0 12 * * 0"
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  actions: read
+jobs:
+  inv:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: inv_SPY, symbol: "SPY" }
+          - { name: inv_NIFTYBEES_NS, symbol: "NIFTYBEES.NS" }
+          - { name: inv_EWJ, symbol: "EWJ" }
+          - { name: inv_EWG, symbol: "EWG" }
+          - { name: inv_EWU, symbol: "EWU" }
+          - { name: inv_EWQ, symbol: "EWQ" }
+          - { name: inv_EWY, symbol: "EWY" }
+          - { name: inv_EWT, symbol: "EWT" }
+          - { name: inv_EWZ, symbol: "EWZ" }
+          - { name: inv_EWC, symbol: "EWC" }
+          - { name: inv_EWA, symbol: "EWA" }
+          - { name: inv_EWH, symbol: "EWH" }
+          - { name: inv_FXI, symbol: "FXI" }
+          - { name: inv_INDA, symbol: "INDA" }
+          - { name: inv_EWS, symbol: "EWS" }
+          - { name: inv_EWM, symbol: "EWM" }
+          - { name: inv_EWW, symbol: "EWW" }
+          - { name: inv_ECH, symbol: "ECH" }
+          - { name: inv_EIRL, symbol: "EIRL" }
+          - { name: inv_EZA, symbol: "EZA" }
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node scripts/invariants.mjs --symbol "${{ matrix.symbol }}" --out /tmp/${{ matrix.name }}.json
+      - run: |
+          node -e '
+          const fs = require("fs");
+          const s = JSON.parse(fs.readFileSync(process.env.OUT_FILE, "utf8"));
+          if (!s.symbol || !s.gated || s.gated.N == null) throw new Error("STALE/EMPTY: bad shape in " + process.env.OUT_FILE);
+          if (s.gated.N === 0) { console.log("guard ok: valid dead leg (0 trades) in " + process.env.OUT_FILE); process.exit(0); }
+          console.log("guard ok: " + process.env.OUT_FILE + " gated_N=" + s.gated.N);
+          '
+        env:
+          OUT_FILE: /tmp/${{ matrix.name }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: /tmp/${{ matrix.name }}.json
+          if-no-files-found: error
+  collect:
+    needs: inv
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          pattern: "inv_*"
+      - run: |
+          mkdir -p data
+          for f in artifacts/*/*.json; do cp "$f" "data/$(basename $f)"; done
+          ls data/inv_*.json
+      - run: node scripts/scramble.mjs encrypt data/inv_SPY.json data/inv_NIFTYBEES_NS.json data/inv_EWJ.json data/inv_EWG.json data/inv_EWU.json data/inv_EWQ.json data/inv_EWY.json data/inv_EWT.json data/inv_EWZ.json data/inv_EWC.json data/inv_EWA.json data/inv_EWH.json data/inv_FXI.json data/inv_INDA.json data/inv_EWS.json data/inv_EWM.json data/inv_EWW.json data/inv_ECH.json data/inv_EIRL.json data/inv_EZA.json
+        env:
+          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
+      - run: |
+          git config user.name "paper-tick"
+          git config user.email "paper-tick@users.noreply.github.com"
+          git add data/inv_SPY.json data/inv_NIFTYBEES_NS.json data/inv_EWJ.json data/inv_EWG.json data/inv_EWU.json data/inv_EWQ.json data/inv_EWY.json data/inv_EWT.json data/inv_EWZ.json data/inv_EWC.json data/inv_EWA.json data/inv_EWH.json data/inv_FXI.json data/inv_INDA.json data/inv_EWS.json data/inv_EWM.json data/inv_EWW.json data/inv_ECH.json data/inv_EIRL.json data/inv_EZA.json
+          git diff --cached --quiet || git commit -m "invariants $(date -u +%F)"
+          git pull --rebase
+          git push
