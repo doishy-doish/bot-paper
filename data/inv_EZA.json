@@ -1,0 +1,9 @@
+{
+ "enc": "AES-256-GCM-v1",
+ "nonce": "H96K8Xz1b9MqXAqN",
+ "data": "VFCYc2rbokCK/l07mRJ85ycvZDS0wl7ZF5TB62BDFkqaz6l5GHkrzp/IZ0TXmwzHPENHMU4iAxDYzDnopYo9vRAmzsVoi7T3sj7Exp+H81ZnAHBvowg+aiYtuSLiABcBxZoszrr3Un7J1Kjlwj8IvH51Yw9KWhGKlQAqndcBGF22ycMDg1wsV+B7VhM0lqQUQNPnhM21o/egopghMLHz/jUwj7kaAzGl+DEKY+wBuKN3FJZF0To/4V2+f+cYfzfxOIvHb8ToIr1+BqFj1MrtAaFJFCOSoOXfmdV4N9tTIs/6l8AYUTLAnC96107qfFcxqY/0vciPxRFtqsWD8lntT67cKAwULqgtvpohZZfMSBKgMUboLpBmNUqNzhGWPxL9xgvu36EbmGR31ZSpRVbfdr4weyJounpkK7iLutDHZDMz/96jmtEE1wLtumT4Ud6VcuaImauaB9WznnXv6IIRCFmEWgC+lVuh5lr83762fRVtRbs+parUkQg8qqcptmhAfZokqjGmfkePYI5xHRvNizAgJDj1ZaWfHXcuj2DNRA==",
+ "tag": "EQk5HEMWjOEH+/fH2Oh5rg==",
+ "sha256": "f937c58a52bb25d54be77da0847017d6342d748add05ce1b5aca4fb3e435a455",
+ "bytes": 415,
+ "date": "2026-11-09"
+}
