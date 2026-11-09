@@ -242,6 +242,15 @@ def main():
     # validated with unranked placement (Batch 7 R5 tested ranking separately
     # and starved). Depth-rank staging was a v2 deviation; parity replay
     # measured it at 83% key agreement, exact prices on matches.
+    # #56-fix (pre-Session-2 slot-allocation correction): filter held BEFORE
+    # the free-slot cap, like allocate_nav (which iterates ALL of a day's
+    # cands and skips only when free_slots hits 0 — same-symbol overlap is
+    # impossible there by the per-symbol pos gate). The old code sliced
+    # sigs[:free] first: runner signals have no pos gate, so held symbols
+    # re-signal while dropping and occupied slice slots that were then
+    # skipped — systematic understaging concentrated on crowded down days
+    # (K-free sim on banked prices: 632 wasted slots / 418 days; fix
+    # recovers +67 fills, 1179 -> 1246 vs backtest-taken 1238).
     exiting = {x["symbol"] for x in st["pending_exits"]}
     held = {p["symbol"] for p in st["positions"]} | exiting
     # Slots freed by tomorrow's exit fills are reusable by tomorrow's entry fills.
@@ -249,7 +258,9 @@ def main():
           if any(p["symbol"] == x["symbol"] and p["entry_date"] == x["entry_date"]
                  for p in st["positions"])]))
     staged = []
-    for _, s, sc in sigs[:max(free, 0)]:
+    for _, s, sc in sigs:
+        if len(staged) >= max(free, 0):
+            break
         if s not in held:
             staged.append({"symbol": s, "date": d, "sig_close": round(sc, 4)})
             held.add(s)
