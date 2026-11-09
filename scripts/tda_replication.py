@@ -17,6 +17,8 @@
 # Per epoch: mean_corr, lam1_frac (RMT market-mode share), persistent entropy
 # H0/H1/H-all, H1 landscape L1/L2 (Bubenik tents), forward-10-bar equal-weight
 # basket DD (diagnostic target), trailing-20d basket vol (control).
+# X3: kind==idx uses cloud="euclid" (Euclidean pdist over w row-vectors);
+# kind==stocks uses cloud="corr".
 # Spectral-slope + shuffle-null + vol-control comparisons happen in SCORING
 # (workspace-side, tiny), not here.
 
@@ -111,8 +113,13 @@ def landscape_norms_h1(dgm1):
     return l1, l2
 
 
-def epoch_measures(X):
-    """X: (w, n) log-returns, NaN-free, non-degenerate. Returns dict."""
+def epoch_measures(X, cloud="corr"):
+    """X: (w, n) log-returns, NaN-free, non-degenerate. Returns dict.
+    cloud="corr": Rips over the n column-points with correlation distance
+        (India-paper geometry: cross-sectional correlation topology).
+    cloud="euclid": Rips over the w row-vectors with Euclidean distance
+        (Gidea-Katz geometry: phase-space loops of d joint series).
+    mean_corr/lam1_frac are always 4-or-N-column descriptors."""
     w, n = X.shape
     C = np.corrcoef(X, rowvar=False)
     C = np.nan_to_num(C, nan=0.0, posinf=0.0, neginf=0.0)
@@ -122,7 +129,11 @@ def epoch_measures(X):
     mean_corr = float(np.mean(C[iu])) if n > 1 else 0.0
     eig = np.linalg.eigvalsh(C)
     lam1_frac = float(eig[-1] / max(n, 1))
-    D = np.sqrt(np.maximum(0.0, 2.0 * (1.0 - C)))
+    if cloud == "euclid":
+        from scipy.spatial.distance import pdist, squareform
+        D = squareform(pdist(X, metric="euclidean"))
+    else:
+        D = np.sqrt(np.maximum(0.0, 2.0 * (1.0 - C)))
     dg = ripser(D, distance_matrix=True, maxdim=1)["dgms"]
     d0 = np.asarray(dg[0], dtype=float) if len(dg) > 0 else np.zeros((0, 2))
     d1 = np.asarray(dg[1], dtype=float) if len(dg) > 1 else np.zeros((0, 2))
@@ -191,7 +202,7 @@ def main():
             sg[sg < 1e-12] = 1.0
             X = (X - mu) / sg
         try:
-            m = epoch_measures(X)
+            m = epoch_measures(X, cloud=("euclid" if cfg["kind"] == "idx" else "corr"))
         except Exception:
             skipped += 1
             continue
