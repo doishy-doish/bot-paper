@@ -47,13 +47,20 @@ def main():
     import yfinance as yfmod
     import paper
 
-    data = yfmod.download(paper.UNIVERSE, start="2021-01-01",
+    # Warmup-aware fetch (#57): the day loop must start on the first 2021 bar
+    # with pre-window history behind it. Fetching from 2021-01-01 and looping
+    # from bar 30 skipped every January signal the ref backtest takes (its
+    # rolling dvol gate is warm by late Jan) — a DRIVER warmup artifact, not
+    # runner infidelity (forensics: ref entries 2021-02-01 unreachable).
+    data = yfmod.download(paper.UNIVERSE, start="2020-07-01",
                           auto_adjust=True, progress=False, threads=True)
     closes_all, opens_all = data["Close"], data["Open"]
     vols_all = data["Volume"]
     dates = closes_all.index
     assert len(dates) > 60, f"fetch too short: {len(dates)}"
-    print(f"replay window: {dates[0].date()}..{dates[-1].date()} ({len(dates)} bars)")
+    _d0 = __import__("pandas").Timestamp("2021-01-01", tz=dates.tz)
+    i0 = next((k for k, d in enumerate(dates) if d >= _d0), 30)
+    print(f"replay window: {dates[i0].date()}..{dates[-1].date()} ({len(dates)-i0} sessions, {i0} warmup bars)")
 
     real_download = yfmod.download
     fake = {}
@@ -75,7 +82,7 @@ def main():
     os.chdir(tmp)
     sys.argv = ["paper.py", "r1"]
     try:
-        for i in range(30, len(dates)):
+        for i in range(max(30, i0), len(dates)):
             fake["i"] = i
             fake["now"] = dates[i].to_pydatetime() - _dt.timedelta(hours=5, minutes=30)
             try:
@@ -189,7 +196,7 @@ def main():
                           "halt_info": halt_info,
                           "crowded_ref_days": crowded,
                           "forensics_error": forensics_err},
-           "bars": len(dates)}
+           "bars": len(dates) - max(30, i0), "warmup_bars": int(max(30, i0))}
     json.dump(out, open(a.out, "w"), indent=1)
     print(f"replay trades={n} mean={mean:+.5f} win={win:.4f} "
           f"ref trades={ref_sum['trades']} mean={ref_sum['mean_net']:+.5f} win={ref_sum['winrate']:.4f}")
