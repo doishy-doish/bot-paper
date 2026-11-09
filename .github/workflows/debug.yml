@@ -1,0 +1,49 @@
+name: debug
+# Temporary single-job diagnostic (K-neutral infra triage, 2026-11-09):
+# two full-matrix runs failed at the python step on every leg. This job
+# distinguishes (a) engine syntax breakage [py_compile] from (b) dep/network
+# breakage [import versions + tiny Yahoo download]. Findings are emitted via
+# ::warning:: so they are readable through the checks/annotations API.
+# DELETE this file once the cause is fixed (it is not part of the book).
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install yfinance pandas numpy
+      - run: |
+          git clone --depth 1 "https://x-access-token:${BRAIN_PAT}@github.com/doishy-doish/bot-paper-brain.git" /tmp/brain
+        env:
+          BRAIN_PAT: ${{ secrets.BRAIN_PAT }}
+      - run: |
+          python - <<'PYEOF' || true
+          import traceback
+          parts = []
+          try:
+              import numpy, pandas, yfinance
+              parts.append("versions numpy=%s pandas=%s yf=%s" % (numpy.__version__, pandas.__version__, yfinance.__version__))
+          except Exception:
+              parts.append("IMPORT_FAIL " + traceback.format_exc().replace("\n", " | ")[:1200])
+          try:
+              import py_compile
+              py_compile.compile("/tmp/brain/scripts/backtest.py", doraise=True)
+              parts.append("py_compile OK")
+          except Exception:
+              parts.append("PY_COMPILE_FAIL " + traceback.format_exc().replace("\n", " | ")[:1200])
+          try:
+              import yfinance as yf
+              d = yf.download("RELIANCE.NS", period="5d", progress=False, auto_adjust=True)
+              parts.append("download shape=%s cols=%s" % (d.shape, list(d.columns.get_level_values(0))[:3]))
+          except Exception:
+              parts.append("DOWNLOAD_FAIL " + traceback.format_exc().replace("\n", " | ")[:1200])
+          print("::warning::DIAG " + " || ".join(parts)[:2500])
+          PYEOF
