@@ -1,0 +1,72 @@
+name: tda
+# X2 — proper TDA landscape-norm replication (K-FREE probe, ZERO K, scrambled outputs).
+# Standalone python script in public scripts/ (no brain clone, no secrets, no
+# engine change). Pre-reg: BATCHES.md "X2". Triggers stay
+# schedule/dispatch ONLY — never add pull_request.
+on:
+  schedule:
+    - cron: "0 12 * * 0"
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  actions: read
+jobs:
+  tda:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: tda_stocks22, mode: "stocks22" }
+          - { name: tda_stocks22std, mode: "stocks22std" }
+          - { name: tda_idx50, mode: "idx50" }
+          - { name: tda_idx100, mode: "idx100" }
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install yfinance pandas numpy scipy ripser
+      - run: python scripts/tda_replication.py --mode "${{ matrix.mode }}" --out /tmp/${{ matrix.name }}.json
+      - run: |
+          node -e '
+          const fs = require("fs");
+          const s = JSON.parse(fs.readFileSync(process.env.OUT_FILE, "utf8"));
+          if (!s.mode || !Array.isArray(s.epochs) || s.epochs.length <= 100) throw new Error("STALE/EMPTY: epochs<=100 in " + process.env.OUT_FILE);
+          const e0 = s.epochs[0];
+          for (const k of ["mean_corr","lam1_frac","pe_h0","pe_h1","pe_all","l1","l2","fwd10dd"]) { if (typeof e0[k] !== "number") throw new Error("BAD SHAPE: " + k + " in " + process.env.OUT_FILE); }
+          if (typeof e0.vol20 !== "number" && e0.vol20 !== null) throw new Error("BAD SHAPE: vol20 in " + process.env.OUT_FILE);
+          console.log("guard ok: " + process.env.OUT_FILE + " mode=" + s.mode + " epochs=" + s.epochs.length + " bars=" + s.bars);
+          '
+        env:
+          OUT_FILE: /tmp/${{ matrix.name }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: /tmp/${{ matrix.name }}.json
+          if-no-files-found: error
+  collect:
+    needs: tda
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          pattern: "tda_*"
+      - run: |
+          mkdir -p data
+          for f in artifacts/*/*.json; do cp "$f" "data/$(basename $f)"; done
+          ls data/tda_*.json
+      - run: node scripts/scramble.mjs encrypt data/tda_stocks22.json data/tda_stocks22std.json data/tda_idx50.json data/tda_idx100.json
+        env:
+          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
+      - run: |
+          git config user.name "paper-tick"
+          git config user.email "paper-tick@users.noreply.github.com"
+          git add data/tda_stocks22.json data/tda_stocks22std.json data/tda_idx50.json data/tda_idx100.json
+          git diff --cached --quiet || git commit -m "tda $(date -u +%F)"
+          git pull --rebase
+          git push
