@@ -1,0 +1,9 @@
+{
+ "enc": "AES-256-GCM-v1",
+ "nonce": "/CdSxn7iRCMicb/+",
+ "data": "mo0EqAi3ue0APzRzfZ1u2Ft5iAvuzS41FJypD0ngYi0OdGiSWJyTTHhDLhdldsq1ah9au49PdANJgCMjYKlwLRpgdtkrglTAKhWPJrVPNgw7HftEjS6cplIenTjNsUdpEI3Ldi8Lw9olLCF9GkEKyqnNbaxpdhRuuAb0luOJM/SmTeFS5B2zdTkqvZhRCYle90nswJBh+Jq+WAf2dPbOSQXE4Y8VC11aj7jqig2xR7rdYcMAZz6c3OApHwnK5NozVo2t20NCdUF/D4UA/GpFFXzmE/2dVaYD3cvlVMuufUv877RDG+uePvqgq0/izhokwaD5smBZ1jtxksVF0+KJ9VrTcuhayaTTBiTy1Yj1Ur6Fg8ilFeDz6woH02m/Z+uGGeGRwcbxiTNqyHGZqWmTc5OMIW9acx7xk9/ZFI9anMA=",
+ "tag": "Td3tABgNHbiEu3wU+NPvPA==",
+ "sha256": "fa97ef8a33a2f6b3a31b0aa74e1d4c528a233ae095b4b681dbd5523c25978fc1",
+ "bytes": 320,
+ "date": "2026-11-09"
+}
