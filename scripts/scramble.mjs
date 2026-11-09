@@ -107,8 +107,6 @@ function cmdDecrypt(files, keyFile, out) {
     const raw = readFileSync(f, "utf8");
     const w = JSON.parse(raw);
     const plain = decryptWrapper(w, keyHex);
-    const dest = outs.length || files.length > 1
-      ? null : null;
     if (out) {
       writeFileSync(out, plain);
       console.log("decrypted " + f + " -> " + out + " bytes=" + plain.length);
@@ -122,8 +120,6 @@ function cmdDecrypt(files, keyFile, out) {
       outs.push(target);
     }
   }
-  void dest;
-  void outs;
 }
 
 const [, , cmd, ...rest] = process.argv;
