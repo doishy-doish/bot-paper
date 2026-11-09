@@ -1,27 +1,9 @@
 {
- "cash": 70000,
- "positions": {
-  "ICICIBANK.NS": {
-   "entryPx": 1565,
-   "entryDate": "2026-11-08",
-   "qty": 6.389776357827476
-  },
-  "TITAN.NS": {
-   "entryPx": 4990.5,
-   "entryDate": "2026-11-08",
-   "qty": 2.003807233744114
-  },
-  "SUNPHARMA.NS": {
-   "entryPx": 1915,
-   "entryDate": "2026-11-08",
-   "qty": 5.221932114882507
-  }
- },
- "trades": [],
- "equity": [
-  {
-   "date": "2026-11-08",
-   "equity": 100000
-  }
- ]
+ "enc": "AES-256-GCM-v1",
+ "nonce": "ENuDax3ZIkLPYRZq",
+ "data": "6gWBLROWfhpfEbBblyBLws3TS37HZEoyT41ZD8DOlY1EvF+Gca/aSdMAEPoUIOrjDaRhPvvfzfrqSLqYJPUxHg4C6qlxiliEJcKFjUsCshqazAuorN7kdCuxUQjKqmK4w8q6+zRXmA3efI5X2l+nlqq8tA+CV4LEEMCWISW3oL4KDAz3LtWIORNov8Aqb+Za1iMDDS10XoDk1mMUsuDeJl7PlJF6uc1KsEv5MUwd7GzI/WSyi1KQjv8bChClDa6iGhSTKPUB/Rweoin+Zf5Nbb/+nAtyyDaDzJnezFcBhBwQRK6oE/BWljzZXJbAyaMBchPhH5V3Ag8AUKRJ4meMJtG9KmYILUo2AHLM51vFqtrpMShcUV82cusfuHwTBRnewcpsrbMu9jLoKvJDELdABfRLVsxib5yrsntAAvsZ0gU68Bmqe+sbnzOH0G5EO3hB0I66oZ0u2t0cdKy0f8XRt1VhqCBBUIGdo5TGVWacY61YyLzKMbLJRJcGkA3FJV5syfusRrMqD/edju8K66V6yADK6H5gOdgf9rPe3SWtBkBpCJ/ECsbxvZuqG2y8hPtSZpFUH2KQCLGVbUap/JtPEKEJjHW4rGqAOut4XMHSyLCWHSAvPBtEqQgxVqwh1QuH8Ul3VXeu",
+ "tag": "Wx+aB580Wkgcx2tmkqwThg==",
+ "sha256": "1239c1c92ea2ec40e194561a9fab7212fed5e4fe1be0e6ec2dd57fe06b2e7884",
+ "bytes": 486,
+ "date": "2026-11-09"
 }
