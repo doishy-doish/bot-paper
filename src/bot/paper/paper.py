@@ -23,7 +23,12 @@ CONFIGS = {
     "r2": {"drop": -7.0, "drop_days": 3, "take": 3.0, "stop": 8.0, "hold": 5,
            "slots": 10, "friction": 0.003, "universe": "nifty50-49", "variant": "sharp-r2"},
     "t18": {"drop": -6.5, "drop_days": 3, "take": 3.0, "stop": 10.0, "hold": 10,
-           "slots": 10, "friction": 0.003, "universe": "nifty50-49", "variant": "sharp-t18"},
+            "slots": 10, "friction": 0.003, "universe": "nifty50-49", "variant": "sharp-t18"},
+    # s7y: honest-book forward (Batch 13 sweet spot + Batch 15 honest yield).
+    # Genesis Day 1 Monday; trio (r1/r2/t18, no yield) untouched beside it.
+    "s7y": {"drop": -6.5, "drop_days": 3, "take": 3.0, "stop": 10.0, "hold": 10,
+            "slots": 7, "friction": 0.003, "universe": "nifty50-49", "variant": "sharp-s7y",
+            "yield": True},
 }
 UNIVERSE = [
     "RELIANCE.NS","TCS.NS","HDFCBANK.NS","ICICIBANK.NS","INFY.NS","ITC.NS",
@@ -50,11 +55,35 @@ def cap(gross):
         return True, -0.999
     return False, gross
 
+# Honest-book idle yield (Batch 15 proxy, s7y only): RBI Bank Rate minus
+# 150bp liquid-fund drag. Same change-point table as backtest.py
+# HIST_YIELD_POINTS; trio books accrue nothing (record semantics preserved).
+S7Y_YIELD_POINTS = [
+    ("2015-01", 0.0725), ("2015-03", 0.0700), ("2015-06", 0.0675),
+    ("2015-10", 0.0625), ("2016-04", 0.0550), ("2016-10", 0.0525),
+    ("2017-04", 0.0500), ("2017-08", 0.0475), ("2018-06", 0.0500),
+    ("2018-08", 0.0525), ("2019-02", 0.0500), ("2019-04", 0.0475),
+    ("2019-06", 0.0450), ("2019-08", 0.0415), ("2019-10", 0.0390),
+    ("2020-03", 0.0315), ("2020-05", 0.0275), ("2022-05", 0.0315),
+    ("2022-06", 0.0365), ("2022-08", 0.0415), ("2022-09", 0.0465),
+    ("2022-12", 0.0500), ("2023-02", 0.0525), ("2025-02", 0.0500),
+    ("2025-04", 0.0475), ("2025-06", 0.0425),
+]
+
+def s7y_annual_rate(ym):
+    r = S7Y_YIELD_POINTS[0][1]
+    for m, v in S7Y_YIELD_POINTS:
+        if m <= ym:
+            r = v
+        else:
+            break
+    return r
+
 def main():
     import yfinance as yf
     cfg = sys.argv[1] if len(sys.argv) > 1 else "r1"
     if cfg not in CONFIGS:
-        print(f"unknown config {cfg} (want r1|r2|t18)")
+        print(f"unknown config {cfg} (want r1|r2|t18|s7y)")
         sys.exit(2)
     F = CONFIGS[cfg]
     sp, lp = f"paper_state_{cfg}.dec.json", f"paper_ledger_{cfg}.jsonl"
@@ -67,9 +96,10 @@ def main():
     except FileNotFoundError:
         print(f"genesis {cfg}: day 1 (Rs 100000, empty book)")
     for k, v in (("pending_exits", []), ("capped", 0),
-                 ("nav", 100000.0), ("nav_peak", 100000.0)):
-        if k not in st:
-            st[k] = v
+                 ("nav", 100000.0), ("nav_peak", 100000.0),
+                 ("yield_total", 0.0)):
+         if k not in st:
+             st[k] = v
     fh = sha(F)
     if st.get("frozen") in (None, fh):
         st["frozen"] = fh
@@ -92,6 +122,14 @@ def main():
         # No fresh bar (weekend/holiday or feed lag): do NOT treat stale close as new
         print(f"NO_SESSION {cfg}: latest bar {d} != today-ist {ist_today} — state untouched")
         return
+    if F.get("yield"):
+        # Honest-book accrual on idle cash at today's open (s7y only).
+        r = s7y_annual_rate(d[:7])
+        dyf = (1.0 + r) ** (1.0 / 252.0) - 1.0 if r and r > 0 else 0.0
+        if dyf:
+            yacc = st["cash"] * dyf
+            st["cash"] *= (1.0 + dyf)
+            st["yield_total"] = st.get("yield_total", 0.0) + yacc
 
     def pxat(frame, sym, loc):
         try:
@@ -259,6 +297,7 @@ def main():
     pend = f" pend_exit={len(st['pending_exits'])}"
     print(f"paper-{cfg} day {st['day']} ({d}): pos={len(st['positions'])} staged={len(staged)} "
           f"closed={n} mean={mu:+.5f} dd={dd:.3f} nav={st['nav']:,.0f} capped={st['capped']} chain={st['chain'][:12]}"
+          + (f" yld={st.get('yield_total', 0.0):,.0f}" if F.get("yield") else "")
           + pend + (f" KILL-FROZEN: {kill}" if kill else ""))
 
 if __name__ == "__main__":
