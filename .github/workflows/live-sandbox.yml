@@ -1,0 +1,62 @@
+name: live-sandbox
+# SANDBOX-ONLY executor proving the live path from the PUBLIC runner.
+# workflow_dispatch ONLY — never cron. Two modes:
+#   dryrun  (default, no broker secrets needed): decrypts paper states, diffs
+#            tonight's staged/pending_exits, runs all 7 gates, prints intent.
+#            Proves decision-diff + gates on rotating GHA IPs, zero broker touch.
+#   sandbox (needs DHAN_SANDBOX_* secrets): same, then places sandbox AMO orders.
+#            Success here empirically settles the static-IP question for Dhan:
+#            if sandbox orders place from a GHA runner, no VPS is needed.
+# LIVE_TRADING is never set in this file — sandbox orders are test orders by
+# construction (sandbox base URL + sandbox credentials, unusable for real fills).
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dryrun | sandbox"
+        required: true
+        default: "dryrun"
+jobs:
+  sandbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyotp
+      - run: |
+          if [ -f data/paper_state_r1.json ]; then node scripts/scramble.mjs decrypt data/paper_state_r1.json --out paper_state_r1.dec.json; fi
+          if [ -f data/paper_state_r2.json ]; then node scripts/scramble.mjs decrypt data/paper_state_r2.json --out paper_state_r2.dec.json; fi
+          if [ -f data/paper_state_t18.json ]; then node scripts/scramble.mjs decrypt data/paper_state_t18.json --out paper_state_t18.dec.json; fi
+          if [ -f data/paper_state_s7y.json ]; then node scripts/scramble.mjs decrypt data/paper_state_s7y.json --out paper_state_s7y.dec.json; fi
+        env:
+          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
+      - run: |
+          echo '{}' > instrument_ids.json
+          if [ "${{ inputs.mode }}" = "sandbox" ]; then
+            export LIVE_TRADING=1
+            export DHAN_BASE_URL="https://sandbox.dhan.co/v2"
+            export DHAN_CLIENT_ID="${{ secrets.DHAN_SANDBOX_CLIENT_ID }}"
+            export DHAN_API_KEY="${{ secrets.DHAN_SANDBOX_API_KEY }}"
+            export DHAN_API_SECRET="${{ secrets.DHAN_SANDBOX_API_SECRET }}"
+            export DHAN_PIN="${{ secrets.DHAN_SANDBOX_PIN }}"
+            export DHAN_TOTP_SECRET="${{ secrets.DHAN_SANDBOX_TOTP }}"
+            python src/bot/live/run_live.py --auto-token --receipts live_receipts.json
+          else
+            python src/bot/live/run_live.py --receipts live_receipts.json
+          fi
+      - run: |
+          node scripts/scramble.mjs encrypt live_receipts.json
+          mkdir -p data
+          cp live_receipts.json data/live_receipts_sandbox.json
+        env:
+          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
+      - run: |
+          git config user.name "live-sandbox"
+          git config user.email "live-sandbox@users.noreply.github.com"
+          git add data/live_receipts_sandbox.json
+          git diff --cached --quiet || git commit -m "live-sandbox ${{ inputs.mode }} $(date -u +%F)"
+          git pull --rebase
+          git push
