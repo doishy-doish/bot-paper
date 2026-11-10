@@ -1,0 +1,65 @@
+name: data-probe
+# K-free data-availability probe (M4 unblock check): pulls NSE intraday via
+# OpenChart (no key) for an OLD window + a RECENT control window, prints ONLY
+# metadata (row counts + date range, no prices) and uploads it as an artifact.
+# The control distinguishes "NSE blocks Actions IPs" (both empty) from
+# "genuine depth cap" (recent full, old empty).
+on:
+  workflow_dispatch:
+    inputs:
+      symbol:
+        description: 'Symbol (e.g. RELIANCE-EQ)'
+        required: false
+        default: 'RELIANCE-EQ'
+      segment:
+        description: 'Segment IDX/EQ/FO'
+        required: false
+        default: 'EQ'
+      old_from:
+        description: 'Old window start (depth test)'
+        required: false
+        default: '2023-01-02'
+      old_to:
+        description: 'Old window end'
+        required: false
+        default: '2023-01-31'
+      interval:
+        description: 'Interval'
+        required: false
+        default: '15m'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - run: pip install openchart pandas
+      - run: |
+          python - <<'EOF'
+          import json
+          from datetime import datetime
+          from openchart import NSEData
+          nse = NSEData()
+          sym = "${{ inputs.symbol }}"
+          seg = "${{ inputs.segment }}"
+          iv = "${{ inputs.interval }}"
+          out = {"symbol": sym, "interval": iv}
+          for tag, a, b in [("old", "${{ inputs.old_from }}", "${{ inputs.old_to }}"),
+                            ("recent", "2026-09-01", "2026-09-30")]:
+              try:
+                  df = nse.historical(sym, seg, datetime.fromisoformat(a), datetime.fromisoformat(b), iv)
+                  out[tag] = {"rows": int(len(df)), "first": str(df.index[0]) if len(df) else None,
+                              "last": str(df.index[-1]) if len(df) else None}
+              except Exception as e:
+                  out[tag] = {"error": str(e)[:200]}
+          print("PROBE_JSON:" + json.dumps(out))
+          with open("/tmp/probe.json", "w") as f:
+              json.dump(out, f)
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: probe
+          path: /tmp/probe.json
+          if-no-files-found: error
