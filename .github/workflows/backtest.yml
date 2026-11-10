@@ -12,7 +12,7 @@ name: backtest
 # matrix jobs (parallel pushes conflict). Matrix jobs need BRAIN_PAT only
 # for the read-only brain clone.
 #
-# Incremental runs (Batch-34 tooling, K-neutral): dispatch with
+# Incremental runs (incremental-run tooling, K-neutral; tooling is not a batch): dispatch with
 # only_legs="a,b,c" to run a subset (new legs + one parity anchor) instead
 # of the full matrix. Skipped legs upload nothing; collect picks up whatever
 # lands, encrypts via glob, stages via git add -A — so a new leg needs ONLY
@@ -159,6 +159,7 @@ jobs:
           - {name: backtest_mr_cr, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --composite --universe-cr --friction-rt 0.001 --trials 116", expect_key: "mr_variant", expect_window: ""}
           - {name: backtest_mr_pit32, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --cash-yield-hist --yield-tax 0.30 --composite --exclude-syms LICI.NS --trials 117", expect_key: "mr_variant", expect_window: ""}
           - {name: backtest_mr_vix33, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --cash-yield-hist --yield-tax 0.30 --composite --vix-gate 25 --trials 118", expect_key: "mr_variant", expect_window: ""}
+          - {name: backtest_mr_s3, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 3 --slot-cap --cash-yield-hist --yield-tax 0.30 --composite --dp-charge 147.5 --trials 119", expect_key: "mr_variant", expect_window: ""}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
