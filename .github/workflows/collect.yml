@@ -1,0 +1,49 @@
+name: collect
+# Intraday collector (dispatch-only). Needs ONE repo secret: UPSTOX_KEY or
+# DHAN_TOKEN (+DHAN_CLIENT_ID). No schedule until the first keyed run passes.
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'upstox|dhan'
+        required: false
+        default: 'upstox'
+      symbols:
+        description: 'comma-separated vendor instruments'
+        required: false
+        default: 'NSE_EQ|INE002A01018'
+      from:
+        description: 'YYYY-MM-DD'
+        required: false
+        default: '2023-01-01'
+      to:
+        description: 'YYYY-MM-DD'
+        required: false
+        default: '2023-03-31'
+      interval:
+        description: 'bar minutes'
+        required: false
+        default: '15'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          git clone --depth 1 "https://x-access-token:${BRAIN_PAT}@github.com/doishy-doish/bot-paper-brain.git" /tmp/brain
+        env:
+          BRAIN_PAT: ${{ secrets.BRAIN_PAT }}
+      - run: |
+          mkdir -p /tmp/out
+          UPSTOX_KEY='${{ secrets.UPSTOX_KEY }}' DHAN_TOKEN='${{ secrets.DHAN_TOKEN }}' DHAN_CLIENT_ID='${{ secrets.DHAN_CLIENT_ID }}' \
+          node /tmp/brain/scripts/collector/run.mjs --source '${{ inputs.source }}' --symbols '${{ inputs.symbols }}' \
+            --from '${{ inputs.from }}' --to '${{ inputs.to }}' --interval '${{ inputs.interval }}' --out /tmp/out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: intraday-${{ inputs.source }}-${{ inputs.from }}-${{ inputs.to }}
+          path: /tmp/out/
+          if-no-files-found: error
