@@ -46,6 +46,12 @@ jobs:
           seg = "${{ inputs.segment }}"
           iv = "${{ inputs.interval }}"
           out = {"symbol": sym, "interval": iv}
+          try:
+              sr = nse.search(sym if seg != "EQ" else sym.replace("-EQ", ""), seg)
+              out["search_rows"] = int(len(sr))
+              out["search_cols"] = list(sr.columns) if len(sr) else []
+          except Exception as e:
+              out["search_error"] = str(e)[:200]
           for tag, a, b in [("old", "${{ inputs.old_from }}", "${{ inputs.old_to }}"),
                             ("recent", "2026-09-01", "2026-09-30")]:
               try:
