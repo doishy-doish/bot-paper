@@ -160,6 +160,7 @@ jobs:
           - {name: backtest_mr_pit32, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --cash-yield-hist --yield-tax 0.30 --composite --exclude-syms LICI.NS --trials 117", expect_key: "mr_variant", expect_window: ""}
           - {name: backtest_mr_vix33, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --cash-yield-hist --yield-tax 0.30 --composite --vix-gate 25 --trials 118", expect_key: "mr_variant", expect_window: ""}
           - {name: backtest_mr_s3, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 3 --slot-cap --cash-yield-hist --yield-tax 0.30 --composite --dp-charge 147.5 --trials 119", expect_key: "mr_variant", expect_window: ""}
+          - {name: backtest_mr_micro2, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 2 --slot-cap --cash-yield-hist --yield-tax 0.30 --composite --dp-charge 147.5 --trials 120", expect_key: "mr_variant", expect_window: ""}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
