@@ -154,6 +154,9 @@ jobs:
           - {name: backtest_mr_q10p, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --cash-yield-hist --yield-tax 0.30 --composite --partial --trials 116", expect_key: "mr_variant", expect_window: ""}
           - {name: backtest_mr_de, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --composite --universe-de --trials 116", expect_key: "mr_variant", expect_window: ""}
           - {name: backtest_mr_hk, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --composite --universe-hk --trials 116", expect_key: "mr_variant", expect_window: ""}
+          - {name: backtest_mr_us, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --composite --universe-us --trials 128", expect_key: "mr_variant", expect_window: ""}
+          - {name: backtest_mr_uk, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --composite --universe-uk --trials 128", expect_key: "mr_variant", expect_window: ""}
+          - {name: backtest_mr_jp, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --composite --universe-jp --trials 128", expect_key: "mr_variant", expect_window: ""}
           - {name: backtest_mr_tm, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --cash-yield-hist --yield-tax 0.30 --composite --emit-touch --emit-wants --trials 116", expect_key: "mr_variant", expect_window: ""}
           - {name: backtest_mr_micro, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 1 --cash-yield-hist --yield-tax 0.30 --composite --dp-charge 147.5 --slot-cap --trials 117", expect_key: "mr_variant", expect_window: ""}
           - {name: backtest_mr_cr, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --composite --universe-cr --friction-rt 0.001 --trials 116", expect_key: "mr_variant", expect_window: ""}
