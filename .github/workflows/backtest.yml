@@ -163,6 +163,12 @@ jobs:
           - {name: backtest_mr_micro2, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 2 --slot-cap --cash-yield-hist --yield-tax 0.30 --composite --dp-charge 147.5 --trials 120", expect_key: "mr_variant", expect_window: ""}
           - {name: backtest_mr_hu1, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --cash-yield-hist --yield-tax 0.30 --composite --inv-penalty 0.5 --trials 122", expect_key: "mr_variant", expect_window: ""}
           - {name: backtest_mr_hu2, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --cash-yield-hist --yield-tax 0.30 --composite --inv-penalty 1.0 --trials 122", expect_key: "mr_variant", expect_window: ""}
+          - {name: backtest_mr_slot6, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 6 --slot-cap --cash-yield-hist --yield-tax 0.30 --composite --dp-charge 147.5 --trials 123", expect_key: "mr_variant", expect_window: ""}
+          - {name: backtest_mr_slot8, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 8 --slot-cap --cash-yield-hist --yield-tax 0.30 --composite --dp-charge 147.5 --trials 124", expect_key: "mr_variant", expect_window: ""}
+          - {name: backtest_mr_hu025, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --cash-yield-hist --yield-tax 0.30 --composite --inv-penalty 0.25 --trials 125", expect_key: "mr_variant", expect_window: ""}
+          - {name: backtest_mr_hu20, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --cash-yield-hist --yield-tax 0.30 --composite --inv-penalty 2.0 --trials 126", expect_key: "mr_variant", expect_window: ""}
+          - {name: backtest_mr_q10exp, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --cash-yield-hist --yield-tax 0.30 --composite --trials 127 --start 2021-01-01 --end 2023-12-31", expect_key: "mr_variant", expect_window: "2021-01-01"}
+          - {name: backtest_mr_q10val, flags: "--mean-rev-sharp --drop 6.5 --hold 10 --stop 10 --slots 10 --cash-yield-hist --yield-tax 0.30 --composite --trials 128 --start 2024-01-01", expect_key: "mr_variant", expect_window: "2024-01-01"}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
