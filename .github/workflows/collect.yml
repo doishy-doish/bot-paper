@@ -34,13 +34,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          git clone --depth 1 "https://x-access-token:${BRAIN_PAT}@github.com/doishy-doish/bot-paper-brain.git" /tmp/brain
-        env:
-          BRAIN_PAT: ${{ secrets.BRAIN_PAT }}
-      - run: |
           mkdir -p /tmp/out
           UPSTOX_KEY='${{ secrets.UPSTOX_KEY }}' DHAN_TOKEN='${{ secrets.DHAN_TOKEN }}' DHAN_CLIENT_ID='${{ secrets.DHAN_CLIENT_ID }}' \
-          node /tmp/brain/scripts/collector/run.mjs --source '${{ inputs.source }}' --symbols '${{ inputs.symbols }}' \
+          node scripts/collector/run.mjs --source '${{ inputs.source }}' --symbols '${{ inputs.symbols }}' \
             --from '${{ inputs.from }}' --to '${{ inputs.to }}' --interval '${{ inputs.interval }}' --out /tmp/out
       - uses: actions/upload-artifact@v4
         with:
