@@ -35,6 +35,35 @@ from safety import check, GateFail
 CFGS = ("r1", "r2", "t18", "s7y")
 SLOTS = {"r1": 10, "r2": 10, "t18": 10, "s7y": 7}
 
+# Scramble-quiet stdout (MISTAKES #6): the public Actions log carries COUNTS +
+# gate verdicts + a sha of the intent ONLY. Symbols, qtys, prices, notionals
+# live in the receipts file, which is AES-GCM-encrypted before commit — never
+# in stdout. Same rule as tick.mjs's scrambled quiet branch.
+import hashlib
+QUIET = os.environ.get("LIVE_QUIET", "1") == "1"
+
+
+def _gate_name(msg):
+    m = str(msg)
+    for prefix, name in [
+        ("DRY_RUN", "DRY_RUN"),
+        ("book frozen", "FROZEN"),
+        ("session already executed", "DUPLICATE"),
+        ("non-CNC", "NONCNC"),
+        ("symbol not in tonight's decisions", "WHITELIST"),
+        ("bad qty", "QTY"),
+        ("notional", "NOTIONAL"),
+        ("SELL without holding", "COVERAGE"),
+        ("bad side", "SIDE"),
+    ]:
+        if m.startswith(prefix):
+            return name
+    return "GATE"
+
+
+def _intent_sha(receipts):
+    return hashlib.sha256(json.dumps(receipts, sort_keys=True).encode()).hexdigest()[:16]
+
 
 def load_state(dec_dir, cfg):
     with open(os.path.join(dec_dir, f"paper_state_{cfg}.dec.json")) as f:
@@ -134,18 +163,31 @@ def main():
             continue
         date = st.get("last_session", "?")
         decisions, orders, skipped, held = build_orders(st, cfg, ids, max_notional=1.5 * st.get("nav", 100000.0) / SLOTS[cfg])
-        for s, why in skipped:
-            print(f"{cfg} SKIP {s}: {why}")
+        if not QUIET:
+            for s, why in skipped:
+                print(f"{cfg} SKIP {s}: {why}")
+        else:
+            skip_reasons = {}
+            for _, why in skipped:
+                skip_reasons[why] = skip_reasons.get(why, 0) + 1
         try:
             check(orders, decisions=decisions, positions=held,
                   frozen=bool(st.get("frozen") or st.get("killed")),
                   already_done=False, max_notional=1.5 * st.get("nav", 100000.0) / SLOTS[cfg])
             gated = True
         except GateFail as g:
-            print(f"{cfg} {date}: GATE — {g}")
+            if QUIET:
+                print(f"{cfg} {date}: {_gate_name(g)} (orders={len(orders)} skipped={len(skipped)})")
+            else:
+                print(f"{cfg} {date}: GATE — {g}")
             if not live:
-                for o in orders:  # dry-run: show intent even under DRY_RUN gate
-                    print(f"  would {o['side']} {o['qty']}x {o['symbol']} CNC AMO-{a.amo_time}")
+                if QUIET:
+                    n_buy = sum(1 for o in orders if o["side"] == "BUY")
+                    n_sell = len(orders) - n_buy
+                    print(f"  {cfg} dry-run intent: buy={n_buy} sell={n_sell} (detail in encrypted receipts)")
+                else:
+                    for o in orders:  # dry-run: show intent even under DRY_RUN gate
+                        print(f"  would {o['side']} {o['qty']}x {o['symbol']} CNC AMO-{a.amo_time}")
             continue
         for o in orders:
             cid_tag = f"q10-{cfg}-{date}-{o['symbol']}"[:30]
@@ -154,11 +196,14 @@ def main():
                 continue
             r = client.place_cnc_amo(o["side"], o["security_id"], o["qty"],
                                      amo_time=a.amo_time, correlation_id=cid_tag)
-            print(f"{cfg} {o['side']} {o['qty']}x {o['symbol']}: {r}")
+            if QUIET:
+                print(f"{cfg} {o['side']} ok ({len(all_receipts) + 1}/{len(orders)})")
+            else:
+                print(f"{cfg} {o['side']} {o['qty']}x {o['symbol']}: {r}")
             all_receipts.append({"cfg": cfg, "date": date, **o, "receipt": r})
     with open(a.receipts, "w") as f:
         json.dump(all_receipts, f, indent=1)
-    print(f"receipts: {len(all_receipts)} -> {a.receipts}")
+    print(f"receipts: {len(all_receipts)} -> {a.receipts} sha={_intent_sha(all_receipts)}")
     return rc
 
 
