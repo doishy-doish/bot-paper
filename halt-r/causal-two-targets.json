@@ -1,0 +1,10 @@
+{
+ "dagsScored": 543,
+ "shd": 0,
+ "learnedMap": "0110/0001/0001/0000",
+ "nObs": 300,
+ "nInt": 120,
+ "trueEffect": 1.1,
+ "estEffect": 1.132,
+ "err": 0.032
+}
