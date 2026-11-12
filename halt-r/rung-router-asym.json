@@ -1,0 +1,47 @@
+{
+ "truePipe": "A>M",
+ "note": "M commutes with S-shift B (different axes) so B>M vs M>B tie on ALL inputs — structural, not symmetry artifact; A>M vs M>A is the non-commuting probe",
+ "symmetricSupportTop3": [
+  {
+   "pipe": "A>M",
+   "err": 0,
+   "stages": 2
+  },
+  {
+   "pipe": "A",
+   "err": 2,
+   "stages": 1
+  },
+  {
+   "pipe": "B",
+   "err": 5,
+   "stages": 1
+  }
+ ],
+ "asymmetricSupportTop3": [
+  {
+   "pipe": "A>M",
+   "err": 0,
+   "stages": 2
+  },
+  {
+   "pipe": "A",
+   "err": 4,
+   "stages": 1
+  },
+  {
+   "pipe": "B",
+   "err": 5,
+   "stages": 1
+  }
+ ],
+ "asymSupportsDiverge": "5/5",
+ "asymmetricUniqueWinner": true,
+ "routerPickOnAsym": "A>M",
+ "queries": {
+  "n": 200,
+  "exact": 1,
+  "bit": 1
+ },
+ "tieCasesOnQueries": 0
+}
