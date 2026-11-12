@@ -1,0 +1,26 @@
+{
+ "data": "do(X4=+-3) only, N=500, X4 exogenous",
+ "ms": 58,
+ "learned": [
+  "0->5",
+  "1->6",
+  "2->5",
+  "2->7",
+  "4->5",
+  "4->7",
+  "5->9",
+  "6->9"
+ ],
+ "vsMutilated": {
+  "shd": 0,
+  "add": 0,
+  "del": 0,
+  "flip": 0
+ },
+ "vsFullTruth": {
+  "shd": 2,
+  "add": 0,
+  "del": 2,
+  "flip": 0
+ }
+}
