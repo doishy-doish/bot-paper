@@ -1,0 +1,43 @@
+{
+ "sem": "X2 = X0^2 + X1 + e",
+ "seed": 21,
+ "N": 500,
+ "selection": {
+  "deg1": {
+   "score": 613.1,
+   "features": [
+    "X1"
+   ],
+   "beta": [
+    0.965,
+    0.916
+   ]
+  },
+  "deg2": {
+   "score": 31.6,
+   "features": [
+    "X1",
+    "X0^2"
+   ],
+   "beta": [
+    -0.042,
+    0.953,
+    1.069
+   ]
+  },
+  "deg3": {
+   "score": 31.6,
+   "features": [
+    "X1",
+    "X0^2"
+   ],
+   "beta": [
+    -0.042,
+    0.953,
+    1.069
+   ]
+  }
+ },
+ "winnerDegree": 2,
+ "verdict": "BIC over expansion degrees auto-selects deg 2 with features {X0^2, X1} (linear deg 1 loses by BIC margin); discovery needs no human-picked degree."
+}
