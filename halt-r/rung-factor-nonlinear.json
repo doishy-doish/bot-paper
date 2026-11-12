@@ -1,0 +1,44 @@
+{
+ "truePipe": "N>M",
+ "H": 256,
+ "trainPerPrimitive": 400,
+ "primitives": {
+  "elmM_holdout100": {
+   "exact": 1,
+   "bit": 1
+  },
+  "elmN_holdout100": {
+   "exact": 0.77,
+   "bit": 0.9812
+  }
+ },
+ "supportTop": [
+  {
+   "pipe": "N>M",
+   "err": 1,
+   "stages": 2
+  },
+  {
+   "pipe": "M",
+   "err": 5,
+   "stages": 1
+  },
+  {
+   "pipe": "N",
+   "err": 5,
+   "stages": 1
+  }
+ ],
+ "routerPick": "N>M",
+ "factorizedQueries": {
+  "n": 200,
+  "exact": 0.78,
+  "bit": 0.9838
+ },
+ "monolithicRef": {
+  "note": "ELM trained on primitives only, tested on held-out composition",
+  "n": 200,
+  "exact": 0,
+  "bit": 0.665
+ }
+}
