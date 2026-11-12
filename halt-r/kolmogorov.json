@@ -1,0 +1,62 @@
+{
+ "principle": "score = accuracy per byte of (code+params). Smallest machine booting its territory wins. Seeds count, not expansions.",
+ "table": [
+  {
+   "model": "causal DAG diamond",
+   "params": 12,
+   "bytes": 96,
+   "acc": 1,
+   "solvedOf": "SHD=0, effect err 0.03",
+   "kb": 0.09,
+   "accPerKB": 10.67
+  },
+  {
+   "model": "classic Hopfield (8x64b)",
+   "params": 2016,
+   "bytes": 264,
+   "acc": 0.95,
+   "solvedOf": "pattern retrieval",
+   "note": "store=64B patterns+seed",
+   "kb": 0.26,
+   "accPerKB": 3.68
+  },
+  {
+   "model": "modern Hopfield b=8 (32x64b)",
+   "params": 256,
+   "bytes": 456,
+   "acc": 1,
+   "solvedOf": "pattern retrieval 32 pats",
+   "note": "store=256B patterns",
+   "kb": 0.45,
+   "accPerKB": 2.25
+  },
+  {
+   "model": "linear-operator (mirror)",
+   "params": 256,
+   "bytes": 2048,
+   "acc": 1,
+   "solvedOf": "mirror clean exact",
+   "kb": 2,
+   "accPerKB": 0.5
+  },
+  {
+   "model": "linear-operator (fill)",
+   "params": 256,
+   "bytes": 2048,
+   "acc": 1,
+   "solvedOf": "fill clean exact",
+   "kb": 2,
+   "accPerKB": 0.5
+  },
+  {
+   "model": "ELM H=256 readout (fill-noisy10)",
+   "params": 4096,
+   "bytes": 32768,
+   "acc": 0.84,
+   "solvedOf": "fill noisy exact",
+   "seedBonus": "random W = 8-byte seed",
+   "kb": 32,
+   "accPerKB": 0.03
+  }
+ ]
+}
