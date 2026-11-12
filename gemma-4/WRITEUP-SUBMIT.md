@@ -66,6 +66,7 @@ We inspected all `44` landed traces locally (`0` GPU hours), checking every modi
 | **`WIN` Combined** | `W1 + W2A` calibrated slice | **`14/32`** | **`43.8%`** | **`[28.2%, 60.7%]`** | `+43.8` pp over the `0/10` 31B floor (two-sided Fisher exact `p = 0.017`) |
 | **`FAM` (Holdout)** | `12` brand-new tasks (`4 × 3`) | **`3/12`** | **`25.0%`** | **`[8.9%, 53.2%]`** | Flat `1/4 × 3` (`3/11 = 27.3%` excluding `rich_3506` sandbox lag kill) |
 | **`Best-of-3` (`T=0.75`)** | `5` misses × `3` high-temp rollouts | **`0/15`** | **`0.0%`** | **`[0.0%, 20.4%]`** | `0/5` tasks converted (`0/3` attractors, `0/2` variable-patch tasks) |
+| **`E4B` replication** | Same `32` calibrated tasks, E4B checkpoint | `6/32` | `18.8%` | `[8.9%, 35.3%]` | `14786`, `6644`, `3518`, `3006`, `3067`, `3454` (kernel `144641971`) |
 
 Calibration lifted the model from `0/10` to `14/32` (`43.8%`, `p = 0.017`) with zero weight updates. Two patterns looked strong:
 * **Patch size:** Tasks with gold diffs `<= 600` chars solved at `12/20` (`60.0%`) vs. `2/12` (`16.7%`) above `600` chars (`OR = 7.50`, two-sided Fisher exact `p = 0.028`).
@@ -132,6 +133,7 @@ Holdout pessimism and our no-fine-tuning call match the literature. Zhang et al.
 3. **Self-written reproducers:** Most traces verified edits with custom `repro.py` scripts rather than the hidden grading test suite.
 4. **Public repositories:** `Textualize/rich`, `fastapi/fastapi`, and `psf/requests` are public codebases that may appear in pretraining data, making `WIN-SLICE` (`43.8%`) an upper bound.
 5. **Cross-checkpoint baseline:** Five of the seven baseline arms ran on Gemma 4 E4B (`37` runs); the `31B`-only floor is `0/10` on attractor tasks (`0/10 -> 14/32`, `p = 0.017`).
+6. **Cross-checkpoint replication (E4B `6/32 = 18.8%`, 95% CI `[8.9%, 35.3%]`, kernel `144641971`):** calibration transfers across checkpoints at a rate-scaled level.
 
 ---
 
