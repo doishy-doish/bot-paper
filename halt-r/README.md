@@ -291,3 +291,16 @@ left anywhere. Sharp boundary, CPU ms: mask-prediction learns structure, never
 creates it. (Prior 4x4 block-100% was a different instance with correlated
 blocks; this rung's instance is fully specified and reproducible.)
 (Rung file: rung-masked-scale.json.)
+
+## MNIST capacity rung (real correlated data; temperature is everything)
+MNIST train binarized (>128), P=200 stored, 10% bit flips, 50 trials, modern
+Hopfield. beta=0.005: 0% retrieval; beta=0.02: 2%; beta=0.1: 100%, 2.88 steps,
+hamDist 0. On real correlated patterns the modern net still delivers — but the
+working temperature window is sharp (beta*D ~ 78 for a clean match here).
+(Rung file: rung-mnist-capacity.json.)
+
+## Auto-temperature rung (5 probes replace the human beta)
+Same MNIST setup. Grid beta in {0.005..0.2} scored on 5 probe queries: probes
+pick beta=0.2 (100% probe acc, fewest steps); fresh-50 eval at the picked
+temperature: 100% retrieval, 2.08 avg steps. No human in the loop.
+(Rung file: rung-mnist-autotemp.json.)
