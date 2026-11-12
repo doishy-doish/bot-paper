@@ -1,0 +1,12 @@
+{
+ "randomMask3": {
+  "data": "random-4x4",
+  "bit": 0.625,
+  "exact": 0.27
+ },
+ "blockMask3": {
+  "data": "2x2-block",
+  "bit": 1,
+  "exact": 1
+ }
+}
