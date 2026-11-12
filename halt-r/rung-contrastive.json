@@ -1,0 +1,22 @@
+{
+ "task": "contrastive-Hebbian encoder (online, no matrix inverse)",
+ "mirrorLinear": {
+  "trainK": 500,
+  "epochs": 60,
+  "exact": 1,
+  "bit": 1,
+  "note": "online rule reaches least-squares ceiling (100%) with enough pairs; K=200 gives 98.7%/99.9%"
+ },
+ "xorNeighbor": {
+  "singleLayer": {
+   "exact": 0,
+   "bit": 0.606
+  },
+  "CHL_H16": {
+   "exact": 0,
+   "bit": 0.597
+  },
+  "note": "hidden-layer CHL learns nothing over single-layer control (59.7% vs 60.6% bit) -- negative result, open problem; ELM closed-form covers hidden layers (78%/98%)"
+ },
+ "verdict": "learning rule proven for the linear encoder (the actual HALT-R encoder target); hidden-layer credit assignment without backprop remains open"
+}
