@@ -210,3 +210,19 @@ from the CI artifact) were then fetched and instantiated in a live browser page:
 12 iters, nearest=3, hamDist 0 — one source file, three substrates (Rust/wasm,
 node, browser). CPU-only, zero GPU, zero quota.
 (Rung file: rung-wasm.json.)
+
+## Greedy scale-up rung (10 nodes; hill-climb SHD 3, regime-aware interventions close it)
+Random 10-node DAG (10 edges, seed 31, weights +-1..2.5, weights in-file),
+N=1000 obs. Greedy hill-climb BIC (add/delete/reverse + cycle check, best of
+3 restarts): skeleton recall 1.0, SHD 3 (adds 1->5, 2->4; flip 5->4), ~0.1s
+CPU, 473 cached fits. Exhaustive is impossible here (~4.2e18 DAGs). All obs
+errors touch node 4/5, so do(X4=+-3): naive pooling (obs+int, N=1500) lands in
+the SAME local optimum, SHD 3 — pooled single-DAG BIC is mixture-misspecified
+(honest negative, kept on record). Regime-aware instead: hill-climb on the
+do(X4) data alone (N=500, X4 exogenous) recovers the mutilated graph EXACTLY
+(SHD 0: 4->5 oriented, both spurious edges gone); the 2 edges into X4 come
+from the obs run. Union = full truth SHD 0. Lesson: at scale, interventions
+must be scored as regimes (GIES-style joint scoring is the next method rung),
+never pooled.
+(Rung files: rung-causal-greedy.json, rung-causal-greedy-int.json,
+rung-causal-greedy-intonly.json.)
