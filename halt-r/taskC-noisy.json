@@ -1,0 +1,14 @@
+{
+ "mirror_noise10": {
+  "acc": 0,
+  "avgBestDist": 3.25
+ },
+ "moveBlock_noise10": {
+  "acc": 0.92,
+  "avgBestDist": 1.76
+ },
+ "fillEnclosed_noise10": {
+  "acc": 0.88,
+  "avgBestDist": 1.69
+ }
+}
