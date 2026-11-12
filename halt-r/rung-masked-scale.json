@@ -1,0 +1,37 @@
+{
+ "data": "8x8 grids of 2x2 constant blocks, K=800 train / 200 test, shared linear map, masked->0",
+ "curves": {
+  "random_mask6": {
+   "bit": 1,
+   "ms": 93
+  },
+  "block_mask6": {
+   "bit": 0.555,
+   "ms": 63
+  },
+  "random_mask13": {
+   "bit": 1,
+   "ms": 38
+  },
+  "block_mask13": {
+   "bit": 0.5125,
+   "ms": 70
+  },
+  "random_mask25": {
+   "bit": 0.9941,
+   "ms": 38
+  },
+  "block_mask25": {
+   "bit": 0.5025,
+   "ms": 35
+  },
+  "random_mask50": {
+   "bit": 0.9458,
+   "ms": 40
+  },
+  "block_mask50": {
+   "bit": 0.5025,
+   "ms": 37
+  }
+ }
+}
