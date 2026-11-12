@@ -189,6 +189,55 @@ if (process.argv[2] === 'decrypt'){
   const evalMs = Date.now() - t1;
   console.log(`eval beta=${best.beta} hopfield acc=${e.acc.toFixed(3)} ppl=${e.ppl.toFixed(2)} steps=${e.avgSteps.toFixed(2)} ms=${evalMs} rss=${rssMB()}MB`);
   console.log(`base bigram acc=${biE.acc.toFixed(3)} ppl=${biE.ppl.toFixed(2)} | unigram acc=${uniE.acc.toFixed(3)} ppl=${uniE.ppl.toFixed(2)}`);
+  // generation quality: argmax continuations from fixed held-out prompts, both systems
+  const GEN_N = 3, GEN_LEN = 100;
+  const wordSet = new Set((train.toLowerCase().match(/[a-z]+/g) || []));
+  const gSeed = rng(3000), gPrompts = [];
+  for (let g = 0; g < GEN_N; g++) gPrompts.push(Math.floor(gSeed() * (valIds.length - W - 1)));
+  function distOf(win){
+    const qq = new Float32Array(D);
+    for (let k = 0; k < W; k++) qq[k * V + win[k]] = 1;
+    for (let j = 0; j < D; j++) qq[j] = qq[j] > 0.5 ? 1 : -1;
+    const { w } = recallW(qq, X, P, D, best.beta, 12);
+    const dist = predictNext(w, next, V);
+    let tot = 0; for (let i = 0; i < V; i++) tot += dist[i];
+    for (let i = 0; i < V; i++) dist[i] /= (tot + 1e-12 * V);
+    return dist;
+  }
+  function genText(kind, pos){
+    const win = new Array(W);
+    for (let k = 0; k < W; k++) win[k] = valIds[pos + k];
+    let text = '';
+    for (let k = 0; k < W; k++) text += chars[win[k]];
+    for (let t = 0; t < GEN_LEN; t++){
+      let ni;
+      if (kind === 'hop') ni = argmax(distOf(win));
+      else { const row = win[W - 1] * V; let b = -1; ni = 0; for (let c = 0; c < V; c++){ if (bi[row + c] > b){ b = bi[row + c]; ni = c; } } }
+      text += chars[ni];
+      for (let k = 0; k < W - 1; k++) win[k] = win[k + 1];
+      win[W - 1] = ni;
+    }
+    return text;
+  }
+  function qualityOf(text){
+    const body = text.slice(W);
+    const grams = new Set();
+    let total = 0;
+    for (let i = 0; i + 4 <= body.length; i++){ grams.add(body.slice(i, i + 4)); total++; }
+    const words = (body.toLowerCase().match(/[a-z]+/g) || []);
+    let ok = 0; for (const wd of words) if (wordSet.has(wd)) ok++;
+    return { rep4: total ? 1 - grams.size / total : 0, wordValid: words.length ? ok / words.length : 0 };
+  }
+  const samples = [];
+  let qRep = 0, qWord = 0;
+  for (const pos of gPrompts){
+    const h = genText('hop', pos), b = genText('bi', pos);
+    const qh = qualityOf(h);
+    qRep += qh.rep4; qWord += qh.wordValid;
+    samples.push({ prompt: h.slice(0, W), hop: h.slice(W), bi: b.slice(W) });
+  }
+  const quality = { n: GEN_N, genLen: GEN_LEN, rep4: qRep / GEN_N, wordValid: qWord / GEN_N };
+  console.log(`gen rep4=${quality.rep4.toFixed(3)} wordValid=${quality.wordValid.toFixed(3)}`);
   let failN = 0;
   const check = (n, c, d) => { console.log(((c ? 'PASS' : 'FAIL') + ' ' + n + ' ' + (d || ''))); if (!c) failN++; };
   // hard gate = machinery (the exact stored KEY must win, whatever its label);
@@ -218,8 +267,11 @@ if (process.argv[2] === 'decrypt'){
   let encBytes = 0;
   if (!noEnc){ const wj = JSON.stringify(encryptWrap(plain, secret)); writeFileSync(outDir + '/model.bin.enc', wj); encBytes = wj.length; console.log(`enc bytes=${encBytes} sha256=${sum}`); }
   else { writeFileSync(outDir + '/model.bin', plain); console.log(`plain-smoke bytes=${plain.length} sha256=${sum}`); }
-  const metrics = { ...meta, trials: TR, flips: 'n/a-nextchar', acc: e.acc, ppl: e.ppl, avgSteps: e.avgSteps, bigramAcc: biE.acc, bigramPpl: biE.ppl, unigramAcc: uniE.acc, unigramPpl: uniE.ppl, beatUni: e.acc > uniE.acc, buildMs, evalMs, maxRssMB: rssMB(), encBytes, evalScope: 'heldout-val' };
+  const metrics = { ...meta, trials: TR, flips: 'n/a-nextchar', acc: e.acc, ppl: e.ppl, avgSteps: e.avgSteps, bigramAcc: biE.acc, bigramPpl: biE.ppl, unigramAcc: uniE.acc, unigramPpl: uniE.ppl, beatUni: e.acc > uniE.acc, quality, buildMs, evalMs, maxRssMB: rssMB(), encBytes, evalScope: 'heldout-val' };
   writeFileSync(outDir + '/metrics.json', JSON.stringify(metrics));
+  let stxt = '';
+  for (const s of samples) stxt += 'PROMPT: ' + JSON.stringify(s.prompt) + '\nHOP: ' + JSON.stringify(s.hop) + '\nBI: ' + JSON.stringify(s.bi) + '\n---\n';
+  writeFileSync(outDir + '/samples-' + tag + '-W' + W + '.txt', stxt);
   if (failN){ console.log('lm-shakespeare: ' + failN + ' FAILURES'); process.exit(1); }
   console.log('lm-shakespeare: benched');
 }
