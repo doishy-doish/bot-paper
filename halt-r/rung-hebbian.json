@@ -1,0 +1,26 @@
+{
+ "directCorrected": [
+  {
+   "noise": 0.02,
+   "exact": 0.743,
+   "bit": 0.981
+  },
+  {
+   "noise": 0.1,
+   "exact": 0.213,
+   "bit": 0.903
+  }
+ ],
+ "stackedAtNoise2": {
+  "exact": 0.677,
+  "bit": 0.977
+ },
+ "stackedAtNoise10": {
+  "exact": 0.233,
+  "bit": 0.904
+ },
+ "ceilings": {
+  "n02": 0.724,
+  "n10": 0.185
+ }
+}
