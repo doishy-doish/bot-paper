@@ -1,0 +1,42 @@
+{
+ "nodes": 10,
+ "seed": 31,
+ "n_obs": 1000,
+ "intervention": "do(X4=+-3), 250/arm, pooled N=1500",
+ "method": "same greedy hill-climb BIC, best of 3 restarts, cold start",
+ "ms": 141,
+ "evals": 474,
+ "learned": [
+  "0->4",
+  "0->5",
+  "1->4",
+  "1->5",
+  "1->6",
+  "2->4",
+  "2->5",
+  "2->7",
+  "4->7",
+  "5->4",
+  "5->9",
+  "6->9"
+ ],
+ "shd": {
+  "shd": 3,
+  "add": 2,
+  "del": 0,
+  "flip": 1
+ },
+ "skeletonRecall": 1,
+ "ladder": {
+  "obs_only": {
+   "shd": 3,
+   "note": "adds 1->5, 2->4; flip 5->4"
+  },
+  "plus_doX4": {
+   "shd": 3,
+   "add": 2,
+   "del": 0,
+   "flip": 1
+  }
+ }
+}
