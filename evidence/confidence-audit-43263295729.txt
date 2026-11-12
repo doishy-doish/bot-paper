@@ -1,0 +1,49 @@
+traces=44 GREEN=10 SOURCE_ONLY=9 pytest_traces=3 (requests_7315,rich_3067,requests_7309)
+exit_histogram={"-1": 1, "0": 17, "1": 22, "2": 4}
+empty_submit=rich_3472,rich_3506
+fastapi_14786    pc=403   ex=0   E1 S1 C1 F1 T1 D1 GREEN=1 SRC=1 | fastapi/security/utils.py | \"All tests passed!\"",
+rich_2943        pc=399   ex=0   E1 S1 C1 F1 T1 D1 GREEN=1 SRC=1 | rich/style.py | \"Test passed!\"",
+requests_7205    pc=502   ex=1   E0 S1 C1 F1 T1 D1 GREEN=0 SRC=0 | src/requests/utils.py | \"PASS: Returned None for empty netrc entry\"",
+requests_7315    pc=521   ex=1   E0 S1 C1 F1 T0 D1 GREEN=0 SRC=0 | src/requests/adapters.py | \"Request URL: //key_with_leading_slash.txt\"",
+rich_3296        pc=539   ex=1   E0 S1 C1 F1 T1 D1 GREEN=0 SRC=0 | rich/syntax.py | \"Segment: '                                                                    
+rich_3882        pc=1475  ex=0   E1 S0 C1 F1 T1 D1 GREEN=0 SRC=0 | rich/prompt.py | \"PASS: Markup was rendered\"",
+requests_7328    pc=884   ex=1   E0 S1 C1 F1 T1 D1 GREEN=0 SRC=0 | src/requests/sessions.py | \"NO BUG: r2 is not in its own history\"",
+fastapi_13537    pc=823   ex=0   E1 S1 C1 F1 T1 D1 GREEN=1 SRC=1 | fastapi/dependencies/utils.py | \"Test passed!\"",
+fastapi_14258    pc=2308  ex=1   E0 S0 C1 F1 T1 D1 GREEN=0 SRC=0 | fastapi/routing.py | \"occurrences\": 1, \"strategy\": \"exact\" in edit_file response.",
+rich_3518        pc=1152  ex=0   E1 S1 C1 F1 T1 D1 GREEN=1 SRC=1 | rich/table.py | \"Segment: 123, Style: bold not italic cyan\"",
+requests_6589    pc=360   ex=1   E0 S1 C1 F1 T1 D1 GREEN=0 SRC=0 | src/requests/utils.py | \"files_changed\": 1 and the repro script passed.",
+fastapi_9425     pc=558   ex=0   E1 S1 C1 F0 T0 D1 GREEN=0 SRC=0 | fastapi/dependencies/utils.py,test_annotation.py | \"if annotation == \\\"None\\\":\\n        return None\"",
+fastapi_14479    pc=521   ex=1   E0 S1 C1 F1 T1 D1 GREEN=0 SRC=0 | fastapi/dependencies/utils.py | \"AssertionError: Query param 'data' must be of one of the supported types\"",
+requests_6644    pc=455   ex=0   E1 S1 C1 F1 T1 D1 GREEN=1 SRC=1 | src/requests/models.py | \"URL: http://example.com//foo -> Prepared: http://example.com/foo\"",
+requests_6592    pc=578   ex=1   E0 S1 C1 F1 T1 D1 GREEN=0 SRC=0 | src/requests/status_codes.py | \"PASS\"",
+rich_3006        pc=900   ex=0   E1 S1 C1 F1 T1 D1 GREEN=1 SRC=1 | rich/repr.py | \"if param.default is param.empty:\"",
+rich_3905        pc=626   ex=0   E1 S1 C1 F1 T1 D1 GREEN=1 SRC=1 | rich/progress.py | \"PASS\"",
+rich_3894        pc=594   ex=0   E1 S1 C1 F1 T1 D1 GREEN=1 SRC=1 | rich/_inspect.py | \"Testing inspect(Klaas, all=True)...\" followed by the output showing it no lon
+rich_3067        pc=652   ex=0   E1 S1 C1 F0 T0 D1 GREEN=0 SRC=0 | rich/highlighter.py,tests/test_highlighter.py | \"pytest tests/test_highlighter.py -k test_highlight_regex\" passed and the diff
+rich_3454        pc=654   ex=0   E1 S1 C1 F1 T1 D1 GREEN=1 SRC=1 | rich/highlighter.py | \"PASS: https://user:pass@example.com was highlighted. Spans: [Span(0, 29, 'repr
+fastapi_14487    pc=5023  ex=1   E0 S0 C1 F1 T1 D0 GREEN=0 SRC=0 | fix_docs.py | \"Updated docs_src/custom_request_and_route/tutorial002.py\\nUpdated docs_src/cu
+fastapi_14303    pc=2289  ex=2   E0 S0 C1 F1 T1 D1 GREEN=0 SRC=0 | fastapi/dependencies/utils.py | \"test_pass_extra_list passed!\"",
+fastapi_15589    pc=3129  ex=1   E0 S0 C1 F0 T0 D1 GREEN=0 SRC=0 | fastapi/dependencies/utils.py,test_headers.py | \"Tool call budget exhausted (28 calls)\"",
+requests_7433    pc=1962  ex=1   E0 S0 C1 F1 T1 D1 GREEN=0 SRC=0 | src/requests/models.py | \"Test passed: ProxyStream detected as stream\"",
+requests_7427    pc=2730  ex=1   E0 S0 C1 F0 T0 D1 GREEN=0 SRC=0 | src/requests/utils.py,test_proxy_bypass.py,test_urllib.py | I didn't actually change any source code in this session, and the code already s
+requests_6629    pc=2765  ex=1   E0 S0 C1 F0 T0 D1 GREEN=0 SRC=0 | src/requests/exceptions.py,test_compat_reduce.py,test_json_args.py,test_json_att | \"By specifying in the class which parent `__reduce__` method should be called, 
+fastapi_13920    pc=1854  ex=1   E0 S0 C1 F0 T0 D1 GREEN=0 SRC=0 | fastapi/_compat/shared.py,test_type_alias.py | \"PASS\" (from the test script output)",
+fastapi_14372    pc=2110  ex=0   E1 S0 C1 F0 T0 D1 GREEN=0 SRC=0 | fastapi/dependencies/utils.py,fastapi/params.py,test_frozen.py,test_frozen_post_ | \"Depends hashable: True\\nSecurity hashable: True\\nSecurity different: True\\n
+fastapi_5077     pc=3803  ex=0   E1 S0 C1 F0 T1 D1 GREEN=0 SRC=0 | fastapi/dependencies/utils.py,module_a.py,module_b.py | \"the logic implemented follows the proposed solution to resolve forward referen
+fastapi_14430    pc=3591  ex=2   E0 S0 C1 F0 T0 D1 GREEN=0 SRC=0 | fastapi/_compat/v2.py,test_origin.py | \"PASS\" in the reproduction script (although I didn't run it in this turn, I di
+fastapi_11355    pc=1819  ex=2   E0 S0 C1 F1 T1 D1 GREEN=0 SRC=0 | fastapi/dependencies/utils.py | \"occurrences\": 1, \"strategy\": \"exact\" in edit_file output.",
+requests_7309    pc=687   ex=1   E0 S1 C1 F0 T0 D1 GREEN=0 SRC=0 | src/requests/utils.py,test_encoding.py | \"diff --git a/src/requests/utils.py b/src/requests/utils.py\\nindex 54959bb8..8
+rich_3471        pc=1026  ex=1   E0 S1 C1 F1 T1 D1 GREEN=0 SRC=0 | rich/text.py | \"Caught exception: TypeError: object of type 'NoneType' has no len()\" was repr
+rich_3470        pc=2970  ex=0   E1 S0 C1 F1 T1 D1 GREEN=0 SRC=0 | rich/console.py | \"occurrences\": 1, \"strategy\": \"exact\" in the edit_file output.",
+rich_3472        pc=0     ex=1   E0 S0 C1 F0 T1 D1 GREEN=0 SRC=0 |  | \"patch_size\": 0",
+rich_3063        pc=1212  ex=1   E0 S0 C0 F0 T0 D1 GREEN=0 SRC=0 | repro2.py,rich/markup.py,test_escape.py,test_fix.py,test_replace.py | 
+rich_3480        pc=2242  ex=0   E1 S0 C0 F1 T1 D1 GREEN=0 SRC=0 | rich/text.py | 
+rich_3064        pc=2074  ex=1   E0 S0 C1 F0 T0 D1 GREEN=0 SRC=0 | rich/markdown.py,test_justify.py | \"PASS\" (from the test run I did before the budget ran out, although I was conf
+rich_3535        pc=798   ex=1   E0 S1 C1 F0 T0 D1 GREEN=0 SRC=0 | rich/cells.py,test_regex.py | \"PASS\" (from the test script)",
+rich_3506        pc=0     ex=-1  E0 S0 C0 F0 T1 D1 GREEN=0 SRC=0 |  | 
+fastapi_14492    pc=388   ex=0   E1 S1 C1 F1 T1 D0 GREEN=1 SRC=0 | docs_src/metadata/tutorial001_1_py39.py | \"diff --git a/docs_src/metadata/tutorial001_1_py39.py b/docs_src/metadata/tutor
+fastapi_14360    pc=634   ex=2   E0 S1 C1 F1 T1 D1 GREEN=0 SRC=0 | fastapi/dependencies/utils.py | \"All tests passed!\"",
+fastapi_5624     pc=2094  ex=1   E0 S0 C1 F1 T1 D1 GREEN=0 SRC=0 | fastapi/routing.py | \"PASS\" (if I had run the fixed repro) - actually I didn't see PASS, but the lo
+requests_7502    pc=2633  ex=1   E0 S0 C1 F1 T1 D1 GREEN=0 SRC=0 | src/requests/models.py | \"status\": \"ok\" from py_compile and the logic matches the proposed solution.\
+wrote evidence/confidence-audit-results.json
+exit=0 python=Python 3.12.16

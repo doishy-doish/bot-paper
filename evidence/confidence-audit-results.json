@@ -1,0 +1,948 @@
+[
+ {
+  "id": "fastapi_14786",
+  "patch": 403,
+  "exit": 0,
+  "calls": 11,
+  "edited": [
+   "fastapi/security/utils.py"
+  ],
+  "conf_evidence": "\\\"All tests passed!\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": true,
+  "SOURCE_ONLY": true
+ },
+ {
+  "id": "rich_2943",
+  "patch": 399,
+  "exit": 0,
+  "calls": 27,
+  "edited": [
+   "rich/style.py"
+  ],
+  "conf_evidence": "\\\"Test passed!\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": true,
+  "SOURCE_ONLY": true
+ },
+ {
+  "id": "requests_7205",
+  "patch": 502,
+  "exit": 1,
+  "calls": 17,
+  "edited": [
+   "src/requests/utils.py"
+  ],
+  "conf_evidence": "\\\"PASS: Returned None for empty netrc entry\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "requests_7315",
+  "patch": 521,
+  "exit": 1,
+  "calls": 17,
+  "edited": [
+   "src/requests/adapters.py"
+  ],
+  "conf_evidence": "\\\"Request URL: //key_with_leading_slash.txt\\\"\",",
+  "pytest_invocations": 1,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": false,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "rich_3296",
+  "patch": 539,
+  "exit": 1,
+  "calls": 22,
+  "edited": [
+   "rich/syntax.py"
+  ],
+  "conf_evidence": "\\\"Segment: '                                                                                \\\\\\\\n', Style: on red\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "rich_3882",
+  "patch": 1475,
+  "exit": 0,
+  "calls": 28,
+  "edited": [
+   "rich/prompt.py"
+  ],
+  "conf_evidence": "\\\"PASS: Markup was rendered\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "requests_7328",
+  "patch": 884,
+  "exit": 1,
+  "calls": 28,
+  "edited": [
+   "src/requests/sessions.py"
+  ],
+  "conf_evidence": "\\\"NO BUG: r2 is not in its own history\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "fastapi_13537",
+  "patch": 823,
+  "exit": 0,
+  "calls": 15,
+  "edited": [
+   "fastapi/dependencies/utils.py"
+  ],
+  "conf_evidence": "\\\"Test passed!\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": true,
+  "SOURCE_ONLY": true
+ },
+ {
+  "id": "fastapi_14258",
+  "patch": 2308,
+  "exit": 1,
+  "calls": 28,
+  "edited": [
+   "fastapi/routing.py"
+  ],
+  "conf_evidence": "\\\"occurrences\\\": 1, \\\"strategy\\\": \\\"exact\\\" in edit_file response.\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "rich_3518",
+  "patch": 1152,
+  "exit": 0,
+  "calls": 28,
+  "edited": [
+   "rich/table.py"
+  ],
+  "conf_evidence": "\\\"Segment: 123, Style: bold not italic cyan\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": true,
+  "SOURCE_ONLY": true
+ },
+ {
+  "id": "requests_6589",
+  "patch": 360,
+  "exit": 1,
+  "calls": 28,
+  "edited": [
+   "src/requests/utils.py"
+  ],
+  "conf_evidence": "\\\"files_changed\\\": 1 and the repro script passed.\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "fastapi_9425",
+  "patch": 558,
+  "exit": 0,
+  "calls": 28,
+  "edited": [
+   "fastapi/dependencies/utils.py",
+   "test_annotation.py"
+  ],
+  "conf_evidence": "\\\"if annotation == \\\\\\\"None\\\\\\\":\\\\n        return None\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": false,
+   "no_test": false,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "fastapi_14479",
+  "patch": 521,
+  "exit": 1,
+  "calls": 20,
+  "edited": [
+   "fastapi/dependencies/utils.py"
+  ],
+  "conf_evidence": "\\\"AssertionError: Query param 'data' must be of one of the supported types\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "requests_6644",
+  "patch": 455,
+  "exit": 0,
+  "calls": 23,
+  "edited": [
+   "src/requests/models.py"
+  ],
+  "conf_evidence": "\\\"URL: http://example.com//foo -> Prepared: http://example.com/foo\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": true,
+  "SOURCE_ONLY": true
+ },
+ {
+  "id": "requests_6592",
+  "patch": 578,
+  "exit": 1,
+  "calls": 20,
+  "edited": [
+   "src/requests/status_codes.py"
+  ],
+  "conf_evidence": "\\\"PASS\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "rich_3006",
+  "patch": 900,
+  "exit": 0,
+  "calls": 28,
+  "edited": [
+   "rich/repr.py"
+  ],
+  "conf_evidence": "\\\"if param.default is param.empty:\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": true,
+  "SOURCE_ONLY": true
+ },
+ {
+  "id": "rich_3905",
+  "patch": 626,
+  "exit": 0,
+  "calls": 25,
+  "edited": [
+   "rich/progress.py"
+  ],
+  "conf_evidence": "\\\"PASS\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": true,
+  "SOURCE_ONLY": true
+ },
+ {
+  "id": "rich_3894",
+  "patch": 594,
+  "exit": 0,
+  "calls": 14,
+  "edited": [
+   "rich/_inspect.py"
+  ],
+  "conf_evidence": "\\\"Testing inspect(Klaas, all=True)...\\\" followed by the output showing it no longer crashes.\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": true,
+  "SOURCE_ONLY": true
+ },
+ {
+  "id": "rich_3067",
+  "patch": 652,
+  "exit": 0,
+  "calls": 28,
+  "edited": [
+   "rich/highlighter.py",
+   "tests/test_highlighter.py"
+  ],
+  "conf_evidence": "\\\"pytest tests/test_highlighter.py -k test_highlight_regex\\\" passed and the diff shows the tilde added to the URL regex.",
+  "pytest_invocations": 1,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": false,
+   "no_test": false,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "rich_3454",
+  "patch": 654,
+  "exit": 0,
+  "calls": 17,
+  "edited": [
+   "rich/highlighter.py"
+  ],
+  "conf_evidence": "\\\"PASS: https://user:pass@example.com was highlighted. Spans: [Span(0, 29, 'repr.url')]\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": true,
+  "SOURCE_ONLY": true
+ },
+ {
+  "id": "fastapi_14487",
+  "patch": 5023,
+  "exit": 1,
+  "calls": 28,
+  "edited": [
+   "fix_docs.py"
+  ],
+  "conf_evidence": "\\\"Updated docs_src/custom_request_and_route/tutorial002.py\\\\nUpdated docs_src/custom_request_and_route/tutorial002_an.py",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": false
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "fastapi_14303",
+  "patch": 2289,
+  "exit": 2,
+  "calls": 28,
+  "edited": [
+   "fastapi/dependencies/utils.py"
+  ],
+  "conf_evidence": "\\\"test_pass_extra_list passed!\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "fastapi_15589",
+  "patch": 3129,
+  "exit": 1,
+  "calls": 28,
+  "edited": [
+   "fastapi/dependencies/utils.py",
+   "test_headers.py"
+  ],
+  "conf_evidence": "\\\"Tool call budget exhausted (28 calls)\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": false,
+   "no_test": false,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "requests_7433",
+  "patch": 1962,
+  "exit": 1,
+  "calls": 28,
+  "edited": [
+   "src/requests/models.py"
+  ],
+  "conf_evidence": "\\\"Test passed: ProxyStream detected as stream\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "requests_7427",
+  "patch": 2730,
+  "exit": 1,
+  "calls": 28,
+  "edited": [
+   "src/requests/utils.py",
+   "test_proxy_bypass.py",
+   "test_urllib.py"
+  ],
+  "conf_evidence": "I didn't actually change any source code in this session, and the code already seemed to have the fix, yet the reproduct",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": false,
+   "no_test": false,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "requests_6629",
+  "patch": 2765,
+  "exit": 1,
+  "calls": 28,
+  "edited": [
+   "src/requests/exceptions.py",
+   "test_compat_reduce.py",
+   "test_json_args.py",
+   "test_json_attrs.py",
+   "test_oserror_reduce.py",
+   "test_reduce.py"
+  ],
+  "conf_evidence": "\\\"By specifying in the class which parent `__reduce__` method should be called, the bug is fixed\\\" and I implemented exa",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": false,
+   "no_test": false,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "fastapi_13920",
+  "patch": 1854,
+  "exit": 1,
+  "calls": 28,
+  "edited": [
+   "fastapi/_compat/shared.py",
+   "test_type_alias.py"
+  ],
+  "conf_evidence": "\\\"PASS\\\" (from the test script output)\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": false,
+   "no_test": false,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "fastapi_14372",
+  "patch": 2110,
+  "exit": 0,
+  "calls": 28,
+  "edited": [
+   "fastapi/dependencies/utils.py",
+   "fastapi/params.py",
+   "test_frozen.py",
+   "test_frozen_post_init.py",
+   "test_hash.py",
+   "test_post_init.py"
+  ],
+  "conf_evidence": "\\\"Depends hashable: True\\\\nSecurity hashable: True\\\\nSecurity different: True\\\\n\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": false,
+   "no_test": false,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "fastapi_5077",
+  "patch": 3803,
+  "exit": 0,
+  "calls": 28,
+  "edited": [
+   "fastapi/dependencies/utils.py",
+   "module_a.py",
+   "module_b.py"
+  ],
+  "conf_evidence": "\\\"the logic implemented follows the proposed solution to resolve forward references by recursively dereferencing `__wrap",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": false,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "fastapi_14430",
+  "patch": 3591,
+  "exit": 2,
+  "calls": 28,
+  "edited": [
+   "fastapi/_compat/v2.py",
+   "test_origin.py"
+  ],
+  "conf_evidence": "\\\"PASS\\\" in the reproduction script (although I didn't run it in this turn, I did in the previous one).\\nWait, I should ",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": false,
+   "no_test": false,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "fastapi_11355",
+  "patch": 1819,
+  "exit": 2,
+  "calls": 28,
+  "edited": [
+   "fastapi/dependencies/utils.py"
+  ],
+  "conf_evidence": "\\\"occurrences\\\": 1, \\\"strategy\\\": \\\"exact\\\" in edit_file output.\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "requests_7309",
+  "patch": 687,
+  "exit": 1,
+  "calls": 21,
+  "edited": [
+   "src/requests/utils.py",
+   "test_encoding.py"
+  ],
+  "conf_evidence": "\\\"diff --git a/src/requests/utils.py b/src/requests/utils.py\\\\nindex 54959bb8..805cf9d2 100644\\\\n--- a/src/requests/util",
+  "pytest_invocations": 1,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": false,
+   "no_test": false,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "rich_3471",
+  "patch": 1026,
+  "exit": 1,
+  "calls": 28,
+  "edited": [
+   "rich/text.py"
+  ],
+  "conf_evidence": "\\\"Caught exception: TypeError: object of type 'NoneType' has no len()\\\" was reproduced and the fix handles `content is N",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "rich_3470",
+  "patch": 2970,
+  "exit": 0,
+  "calls": 28,
+  "edited": [
+   "rich/console.py"
+  ],
+  "conf_evidence": "\\\"occurrences\\\": 1, \\\"strategy\\\": \\\"exact\\\" in the edit_file output.\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "rich_3472",
+  "patch": 0,
+  "exit": 1,
+  "calls": 28,
+  "edited": [],
+  "conf_evidence": "\\\"patch_size\\\": 0\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": false,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "rich_3063",
+  "patch": 1212,
+  "exit": 1,
+  "calls": 25,
+  "edited": [
+   "repro2.py",
+   "rich/markup.py",
+   "test_escape.py",
+   "test_fix.py",
+   "test_replace.py"
+  ],
+  "conf_evidence": "",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": false,
+   "files1": false,
+   "no_test": false,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "rich_3480",
+  "patch": 2242,
+  "exit": 0,
+  "calls": 21,
+  "edited": [
+   "rich/text.py"
+  ],
+  "conf_evidence": "",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": false,
+   "conf_ok": false,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "rich_3064",
+  "patch": 2074,
+  "exit": 1,
+  "calls": 28,
+  "edited": [
+   "rich/markdown.py",
+   "test_justify.py"
+  ],
+  "conf_evidence": "\\\"PASS\\\" (from the test run I did before the budget ran out, although I was confused about the output, it seemed to pass",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": false,
+   "no_test": false,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "rich_3535",
+  "patch": 798,
+  "exit": 1,
+  "calls": 24,
+  "edited": [
+   "rich/cells.py",
+   "test_regex.py"
+  ],
+  "conf_evidence": "\\\"PASS\\\" (from the test script)\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": false,
+   "no_test": false,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "rich_3506",
+  "patch": 0,
+  "exit": -1,
+  "calls": 9,
+  "edited": [],
+  "conf_evidence": "",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": false,
+   "files1": false,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "fastapi_14492",
+  "patch": 388,
+  "exit": 0,
+  "calls": 18,
+  "edited": [
+   "docs_src/metadata/tutorial001_1_py39.py"
+  ],
+  "conf_evidence": "\\\"diff --git a/docs_src/metadata/tutorial001_1_py39.py b/docs_src/metadata/tutorial001_1_py39.py\\\\nindex a8f5b945..41923",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": true,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": false
+  },
+  "GREEN": true,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "fastapi_14360",
+  "patch": 634,
+  "exit": 2,
+  "calls": 24,
+  "edited": [
+   "fastapi/dependencies/utils.py"
+  ],
+  "conf_evidence": "\\\"All tests passed!\\\"\",",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": true,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "fastapi_5624",
+  "patch": 2094,
+  "exit": 1,
+  "calls": 28,
+  "edited": [
+   "fastapi/routing.py"
+  ],
+  "conf_evidence": "\\\"PASS\\\" (if I had run the fixed repro) - actually I didn't see PASS, but the logic is sound.\\nWait, I should be honest.",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ },
+ {
+  "id": "requests_7502",
+  "patch": 2633,
+  "exit": 1,
+  "calls": 28,
+  "edited": [
+   "src/requests/models.py"
+  ],
+  "conf_evidence": "\\\"status\\\": \\\"ok\\\" from py_compile and the logic matches the proposed solution.\\n\\nWait, I should have checked `git diff",
+  "pytest_invocations": 0,
+  "gates": {
+   "exit_ok": false,
+   "size_ok": false,
+   "conf_ok": true,
+   "files1": true,
+   "no_test": true,
+   "no_docs": true
+  },
+  "GREEN": false,
+  "SOURCE_ONLY": false
+ }
+]
