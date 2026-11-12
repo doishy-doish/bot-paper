@@ -8,12 +8,12 @@
 
 ## Abstract
 
-We ask a simple question: once a coding agent's harness is frozen, what actually turns a failed bug fix into a working one? Starting from `0/47` resolved runs across seven baseline arms on two checkpoints (`0/37` on Gemma 4 E4B, `0/10` on our 31B submission checkpoint), a frozen 31-billion-parameter agent (`gemma-4-31b-it-qat-w4a16-ct`) solves **`14/32` tasks (`43.8%`**, `[28.2%, 60.7%]`; `+43.8` pp, Fisher `p = 0.017`) on a calibrated single-file slice (`5/10` on the first ten, `9/22` on the held-out remainder). On twelve brand-new tasks (`FAM`), it then scores a flat **`3/12` (`25.0%`**; `3/11 = 27.3%` after removing one run killed by sandbox lag)—exactly **`1/4`** in each of three buckets (`rich-small`, `rich-large`, `non-rich`).
+We ask a narrow question: once a coding agent's harness is frozen, what actually turns a failed bug fix into a working one? Starting from `0/47` resolved runs across seven baseline arms on two checkpoints (`0/37` on Gemma 4 E4B, `0/10` on our 31B submission checkpoint), a frozen 31-billion-parameter agent (`gemma-4-31b-it-qat-w4a16-ct`) solves **`14/32` tasks (`43.8%`**, `[28.2%, 60.7%]`; `+43.8` pp, Fisher `p = 0.017`) on a calibrated single-file slice (`5/10` on the first ten, `9/22` on the held-out remainder). On twelve brand-new tasks (`FAM`), it then scores a flat **`3/12` (`25.0%`**; `3/11 = 27.3%` after removing one run killed by sandbox lag)—exactly **`1/4`** in each of three buckets (`rich-small`, `rich-large`, `non-rich`).
 
-Three controlled interventions all score clean nulls (`0/15` task conversions across `30` runs):
+Three controlled interventions all score clean nulls (`0` conversions across `30` probe runs on `6` unique miss tasks):
 1. **Verification prompting (`W2B`):** Telling the agent to verify its fix before submitting converts `0/5` misses (`5/10` overall, with the exact same five tasks passing and failing; `p = 9.8e-4` under independent rollouts).
 2. **Target-function naming (`G2v2`):** Naming the exact function to edit in the issue text converts `0/5` tasks, reproducing the identical `687`-character wrong patch on `requests_7309` with and without the hint.
-3. **High-temperature sampling (`Best-of-3` at `T=0.75`):** Running three independent rollouts per task at elevated temperature converts `0/5` tasks (`0/15` runs), with `requests_7309` emitting the exact same `687`-character SHA-256 diff in all three rollouts.
+3. **High-temperature sampling (`Best-of-3` at `T=0.75`):** Running three independent rollouts per task at elevated temperature converts `0/5` tasks (`0/15` runs) on the same five `G2v2` tasks, with `requests_7309` emitting the exact same `687`-character SHA-256 diff in all three rollouts.
 
 A zero-GPU audit of all `44` unique traces cuts our clean training pool down to **`9` source-only surgical fixes**, rules out a syntax-guard fix (all four `exit-2` crashes in `fastapi` are logic/assertion failures, not syntax errors), and shows that only `3/44` traces ever ran `pytest`. Calibration is real and large; verification prompts, function hints, and high-temperature sampling do not convert misses; no task group predicts success on unseen tasks; and residual failures come down to weight-locked wrong-patch habits and edit size. The contribution is the falsification chain, not a headline score.
 
@@ -72,13 +72,13 @@ Calibration lifted the model from `0/10` to `14/32` (`43.8%`, `p = 0.017`) with 
 
 Our fresh holdout (`FAM`) tested whether either pattern actually holds on new bugs.
 
-### 3.2 Two Controlled Prompt & Hint Nulls
+### 3.2 Controlled Prompt & Hint Nulls
 
 **1. Verification prompting converts nothing (`W2B`: `0/5` misses converted, `5/10` identical set).**  
 Adding explicit `VERIFY-FIX` instructions to `W1` changed the pass/fail result on **zero tasks**: the same five passed and the same five failed (`Cohen's kappa = 1.00`; `0.5^10 = 9.8e-4` under independent rollouts; 95% Wilson upper bound `43.4%` in `W2B`, `27.8%` across all `10` single-rollout probes). Patches still shifted on three misses—`rich_3296` `539`→`1,737` chars, `requests_7328` `884`→`3,127` chars (`len(hist)-1 >= max` to `len(hist) > max`), `fastapi_14258` `2,308`→`1,085` chars—while `requests_7205` and `requests_7315` repeated the same wrong edits (`if _netrc and any(_netrc)`, deleting the `//` collapse). Verification prompts change patch size, not outcomes.
 
 **2. Naming the target function converts nothing (`G2v2`: `0/5` converted).**  
-Appending the target function and file path to the issue text (*"The change required is in `_parse_content_type_header` in `src/requests/utils.py`. Other functions with similar patterns are out of scope."*) converted `0/3` probes plus `0/2` controls. On `requests_7309`, the agent wrote the **same `687`-character wrong patch** (`16` calls) with the hint as without it (`21` calls). Caveat: the true fix also edits sister function `parse_dict_header`, which our hint ruled out—so `G2v2` proves *naming the main function is not enough*, not that *full specification is useless*. In `CALv3`, naming both functions grew `7309`'s diff `687`→`1,326` chars with the second hunk moving the right way—and still failed. Extra specification shifts patches without converting results.
+Appending the target function and file path to the issue text (*"The change required is in `_parse_content_type_header` in `src/requests/utils.py`. Other functions with similar patterns are out of scope."*) converted `0/3` probes plus `0/2` controls. On `requests_7309`, the agent wrote the **same `687`-character wrong patch** (`16` calls) with the hint as without it (`21` calls). Caveat: the true fix also edits sister function `parse_dict_header`, which our hint ruled out—so `G2v2` proves *naming the main function is not enough*, not that *full specification is useless*. In `CALv3` (an earlier multi-function specification probe), naming both functions grew `7309`'s diff `687`→`1,326` chars with the second hunk moving the right way—and still failed. Extra specification shifts patches without converting results.
 
 ### 3.3 The Flat Fresh Holdout (`FAM`: `3/12`, Exact `1/4 × 3`)
 
@@ -111,8 +111,8 @@ Because baseline runs at `T=0.2` are nearly deterministic, a single miss could j
 | **Multi-Modal** | `rich_3296` | `539B`, `26c` (`51f248c709d3`) | `503B`, `28c` (`69c9aaf817b0`) | `4261B`, `28c` (`6e290e963a20`) | `0/3` |
 
 **Result (`0/15` runs, `0/5` tasks converted; 95% Wilson upper bound `20.4%`):**
-* **Attractors (`0/3`):** Even at `T=0.75`, `requests_7309` emitted the **exact byte-identical `687B` diff (`600a2da88433`) in `3/3` rollouts**, while `7205` and `7315` repeated identical wrong hashes (`c0a47bd2c1b4` and `8a947f41a86f`) in `2/3` rollouts. Weight-locked, not sampling noise.
-* **Multi-Modal Misses (`0/2`):** six distinct patches, `0/6` solved; `7328` runs bloated to `2.3–5.9 KB` at the `28`-call cap. With `W2B` (`0/5`) and `G2v2` (`0/5`), `0/15` across `30` runs rules out prompts, hints, and sampling on frozen `31B` weights.
+* **Attractors (`0/3`):** At `T=0.75`, `requests_7309` emitted the **byte-identical `687B` diff (hash `600a2da88433`) in `3/3` rollouts**. `7205` and `7315` repeated identical wrong hashes in `2/3` rollouts each. The attractors are weight-locked, not sampling noise.
+* **Multi-Modal Misses (`0/2`):** Six distinct diffs across six rollouts (`0/6` solved); all three `requests_7328` runs bloated to `2.3–5.9 KB` at the `28`-call cap. With `W2B` (`0/5`), `G2v2` (`0/5`) and `Best-of-3` (`0/5`), zero conversions across `30` runs on `6` unique miss tasks rules out prompts, hints, and sampling on frozen `31B` weights.
 
 ---
 
