@@ -16,7 +16,7 @@
    "acc": 1,
    "avgSteps": 2,
    "buildMs": 8,
-   "evalMs": 951,
+   "evalMs": 830,
    "maxRssMB": 50.4,
    "encBytes": 341541,
    "evalScope": "full"
@@ -36,8 +36,8 @@
    "acc": 1,
    "avgSteps": 2,
    "buildMs": 71,
-   "evalMs": 10389,
-   "maxRssMB": 56.5,
+   "evalMs": 10368,
+   "maxRssMB": 57.2,
    "encBytes": 6826874,
    "evalScope": "full"
   },
@@ -55,9 +55,9 @@
    "flips": 0.1,
    "acc": 1,
    "avgSteps": 2,
-   "buildMs": 639,
-   "evalMs": 74766,
-   "maxRssMB": 108.4,
+   "buildMs": 650,
+   "evalMs": 75597,
+   "maxRssMB": 102.8,
    "encBytes": 68266875,
    "evalScope": "full"
   },
@@ -75,9 +75,9 @@
    "flips": 0.1,
    "acc": 1,
    "avgSteps": 2,
-   "buildMs": 2465,
-   "evalMs": 165577,
-   "maxRssMB": 265.4,
+   "buildMs": 2328,
+   "evalMs": 155310,
+   "maxRssMB": 264.7,
    "encBytes": 273066876,
    "evalScope": "full"
   }
