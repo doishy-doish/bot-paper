@@ -68,7 +68,7 @@ We inspected all 44 landed traces locally (0 GPU hours), checking every modified
 | **Best-of-3 (`T=0.75`)** | 5 misses × 3 high-temp rollouts | **0/15** | **0.0%** | **[0.0%, 20.4%]** | 0/5 tasks converted (0/3 attractors, 0/2 variable-patch tasks) |
 | **E4B replication** | Same 32 calibrated tasks, E4B checkpoint | 6/32 | 18.8% | [8.9%, 35.3%] | 14786, 6644, 3518, 3006, 3067, 3454 (kernel 144641971) |
 
-*Note: fastapi_6644 resolved in our environment, but an external report suggests its gold patch may fail elsewhere; pending a false-accept audit it remains in the numerator (13/32 ex-6644 leaves every conclusion unchanged).* resolved in our environment, but an external report suggests its gold patch may fail elsewhere; pending a false-accept audit it remains in the numerator (13/32 ex-6644 leaves every conclusion unchanged).
+*Note: fastapi_6644 resolved in our environment, but an external report suggests its gold patch may fail elsewhere; pending a false-accept audit it remains in the numerator (13/32 ex-6644 leaves every conclusion unchanged).*
 
 Calibration lifted the model from 0/10 to 14/32 (43.8%, p = 0.017) with zero weight updates. Two patterns looked strong:
 * **Patch size:** Tasks with gold diffs `<= 600` chars solved at 12/20 (60.0%) vs. 2/12 (16.7%) above 600 chars (OR = 7.50, two-sided Fisher exact p = 0.028).
