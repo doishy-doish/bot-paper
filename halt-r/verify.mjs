@@ -1,3 +1,4 @@
+// (c) 2026 Andrale Misquitta. All Rights Reserved. See halt-r/LICENSE.
 // halt-r/verify.mjs — public-runner verification: Hopfield recall + Task-C memory baseline.
 // CPU seconds, zero deps, no secrets, no network. Exit non-zero on regression.
 import { makePatterns, corrupt, hebbian, recallClassic, recallModern } from './ref-hopfield.mjs';
