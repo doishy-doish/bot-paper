@@ -164,3 +164,35 @@ ladder). Path-traced total effect X0->X4 on learned weights: -2.443 vs -2.346
 truth (err 0.098), obs data only. Two self-caught bugs fixed on record:
 self-parent mask (RSS=0 degenerate) and an SHD scorer iterating key-sets as
 edges (phantom SHD 12 on an exact recovery). (Rung file: rung-causal-scale.json.)
+
+## Near-unfaithful rung (exact cancellation; only intervention sees the edge)
+Triangle 0->1 (2), 1->2 (2), 0->2 (-4) + 2->3 (1.5): the direct edge exactly
+cancels the indirect path, so population Corr(X0,X2)=0. Seed 7, N=500.
+Obs marginal screening (Fisher-z, the PC-skeleton first step): r=-0.060,
+p=0.18 — edge DROPPED, as theory predicts. Exhaustive BIC prune-free ALSO
+drops it (skeleton 3/4): it prefers a 3-edge collider model 0->1<-2, 2->3
+(score 154.1 vs truth 158.5) that fits better with fewer edges. Exact
+cancellation defeats score-based discovery too — not just constraint-based.
+do(X1=+-2.5) breaks the cancellation: within-arm corr -0.61 (z=-15.9),
+OLS X2~{X0,X1} nails w02=-3.97, w12=1.97 model-free. Ladder, honestly scored
+on skeleton recall: obs-marginal MISS -> obs-BIC MISS -> intervention HIT.
+Method corrections on record: (1) branch-and-bound prune REMOVED everywhere —
+partial BIC can exceed best-so-far yet later negative terms win, so the prune
+silently cut valid branches (caught when two sample sizes returned identical
+graphs); 4-5 node exhaustive needs no pruning (1536/122880 evals, cached OLS,
+ms). (2) BIC ties inside a Markov class resolve by enumeration order, so
+DAG-SHD is reported only where v-structures compel orientations; otherwise
+skeleton recall. (3) seeds + weights recorded in-file from here on. The 5-node
+scale-up optimum was re-run prune-free (seed 11, weights in-file): SHD 0
+exact — the earlier SHD-0 stands, method note corrected.
+(Rung file: rung-causal-nearfaith.json.)
+
+## Nonlinear SEM rung (linear discovery blind, quadratic expansion recovers)
+X0,X1 ~ N(0,1); X2 = X0^2 + X1 + e. Seed 21, N=500. Linear-Gaussian exhaustive
+BIC: skeleton {1-2} only — the quadratic edge 0-2 is invisible (linear fit of
+X0^2 on symmetric X0 is 0). Quadratic expansion (nodes X0,X1,X0^2 with X0^2
+root-fixed, X2): recovers 0sq->2 and 1->2 with correct v-structure
+orientations, plus one disclosed artifact edge (0sq->0, the deterministic
+feature read backwards). Verdict: linear discovery is blind past the linear
+frontier; polynomial/GAM expansion is the next rung.
+(Rung file: rung-causal-nonlinear.json.)
