@@ -113,3 +113,12 @@ never overwrites wrapper — never commit decrypted files).
 Key lives in exactly 3 places (values never printed): scratch/vault/keys/scramble.key,
 private halt-r keys/scramble.key (storage only, no Actions), public repo secret SCRAMBLE.
 Details: SCRAMBLE.md.
+
+## Router rung (factorized compositional generalization)
+Ops library trained once on primitives (mirror, shiftA, shiftB — never composed).
+Held-out composition B-then-M, router picks pipeline by 5 support pairs:
+monolithic map scored 20-24% on the same held-out; factorized pipeline scores
+100% exact / 100% bit on 200 queries. Footnote: support tied M>B vs B>M (2x2
+block is mirror-symmetric, both pipelines coincide) — tie-break needs asymmetric
+probes; accuracy unaffected. The contrast is the finding: factorization, not
+capacity, is what crosses the composition gap.
