@@ -1,0 +1,28 @@
+{
+ "kSweep": [
+  {
+   "K": 20,
+   "exact": 1
+  },
+  {
+   "K": 40,
+   "exact": 1
+  },
+  {
+   "K": 80,
+   "exact": 1
+  },
+  {
+   "K": 160,
+   "exact": 1
+  },
+  {
+   "K": 320,
+   "exact": 1
+  }
+ ],
+ "noisyPipe": {
+  "operatorOnly": 0.185,
+  "operatorPlusHopfield": 0
+ }
+}
