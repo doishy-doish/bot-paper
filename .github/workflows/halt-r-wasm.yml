@@ -1,0 +1,21 @@
+name: halt-r-wasm
+on:
+  push:
+    paths:
+      - 'halt-r/rust-recall/**'
+      - '.github/workflows/halt-r-wasm.yml'
+  workflow_dispatch: {}
+jobs:
+  build-test:
+    runs-on: ubuntu-latest  # public runner, CPU only, no secrets
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: install wasm target
+        run: rustup target add wasm32-unknown-unknown
+      - name: build recall core
+        run: cd halt-r/rust-recall && cargo build --release --target wasm32-unknown-unknown && cp target/wasm32-unknown-unknown/release/halt_r_recall.wasm recall.wasm && ls -l recall.wasm
+      - name: test wasm vs JS reference
+        run: cd halt-r/rust-recall && node test-recall.mjs
