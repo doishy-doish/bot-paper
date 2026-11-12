@@ -53,3 +53,26 @@ with physics behind it — and storage is Hebbian one-shot, no gradients at all.
 3. Actions workflow: ONLY on explicit push approval (repo rules).
 4. Encoder: contrastive-Hebbian tiny MLP, still CPU-minutes.
 5. Scale: ARC-mini symbols as binary patterns; report steps-saved vs fixed unroll.
+
+## Results log (all CPU, worker sandbox + Actions runner, zero GPU)
+Toy: 8x64-bit patterns, 8 flips, 200 trials unless noted. Reasoning: 4x4 binary grids.
+
+- Retrieval (seen patterns): classic 95.0%/2.17 steps; modern b=8 100%/3.13 steps.
+  Storage = Hebbian one-shot, zero grad steps. Halt saves ~75% vs fixed 12.
+- Capacity (D=64, 8 flips): classic 8->95%, 16->20%, 32->0% (textbook ~0.14D collapse).
+  Modern b=8: 8->100%/3.1, 16->100%/4.0, 32->100%/4.8. Modern is the scalable substrate.
+- Memory != reasoning: nearest-memory rule transfer: mirror 0%, move 100%, fill 100%
+  clean (tiny spaces memorize); +10% noise: mirror 0%, move 92%, fill 88%.
+- Operator learning (least squares, closed form, CPU ms): mirror 500 pairs -> 100%
+  exact on unseen (K=20 suffices); move 100%, fill 100% clean. Noisy10: bit 89-95%,
+  exact 16-61% (linear can't denoise+map; Hopfield cleanup of unseen targets: 0% -
+  negative result, associative cleanup needs the target stored).
+- Causal (diamond 0->1,0->2,1->3,2->3, N=300, exhaustive BIC over 543 DAGs):
+  obs-only SHD=2 (effect err 0.57, edge flipped = Markov equivalence);
+  +do(X2) SHD=2 (other edge flips = single-target insufficiency, Hauser-Buehlmann);
+  +do(X0)+do(X2) SHD=0, map exact, effect 1.132 vs 1.10 (err 0.03).
+  The causal reasoning model: discovery + multi-target interventions + do-calculus.
+
+Frontier: multi-target interventional discovery on larger graphs (PC/GES scale-up),
+nonlinear SEMs (fill-rule needs hidden layer), encoder contrastive learning for
+noise-robust operators. Math-dataset fallback NOT needed - causal loop closed.
