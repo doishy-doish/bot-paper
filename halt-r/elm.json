@@ -1,0 +1,30 @@
+[
+ {
+  "task": "fill-clean",
+  "H": 256,
+  "exact": 1,
+  "bit": 1,
+  "noise": 0
+ },
+ {
+  "task": "fill-noisy10",
+  "H": 256,
+  "exact": 0.84,
+  "bit": 0.976,
+  "noise": 0.1
+ },
+ {
+  "task": "mirror-noisy10",
+  "H": 256,
+  "exact": 0.195,
+  "bit": 0.905,
+  "noise": 0.1
+ },
+ {
+  "task": "xor-sanity",
+  "H": 64,
+  "exact": 1,
+  "bit": 1,
+  "noise": 0
+ }
+]
