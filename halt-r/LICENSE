@@ -1,0 +1,19 @@
+HALT-R PROPRIETARY LICENSE
+Copyright (c) 2026 Andrale Misquitta. All Rights Reserved.
+
+The files in this directory (halt-r/) are proprietary and confidential.
+They are NOT covered by the repository-wide Apache-2.0 license.
+
+You may NOT, without prior written permission from the copyright holder:
+  1. use, copy, reproduce, or redistribute these files or any part of them;
+  2. modify, adapt, translate, or create derivative works from them;
+  3. merge them into other software, models, datasets, or training corpora;
+  4. publish, display, sublicense, sell, lease, or otherwise exploit them commercially;
+  5. use them, in whole or in part, to train, fine-tune, distill, or evaluate
+     machine-learning models (including crawling or scraping for datasets).
+
+Reading for evaluation purposes in the browser/GitHub UI is permitted.
+All model weights, parameters, patterns, graphs, and results files herein are
+part of the copyrighted work. No patent or trademark rights are granted.
+
+THE FILES ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
