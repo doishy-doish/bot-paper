@@ -96,6 +96,24 @@ At T=0.2, the agent is near-deterministic, so every null above measures one basi
 
 ---
 
+### 3.6 Census-Guards Probe (pre-registered, kernel 144655910)
+Freezing the winner-shape harness and baking four census guards into system.md (edit-miss recovery, 60s read time-box, empty-submit ban, 1,500-char thrash-stop), we ran 6 valid-miss challenges (baseline 0/6 by construction) + 2 valid-resolve controls on the same 31B shape.
+
+| Arm | Task | Resolved | Patch | Calls | Time |
+| :--- | :--- | :---: | :--- | :---: | :--- |
+| challenge | fastapi_14258 | F | 1513B | 21 | 491s |
+| challenge | fastapi_14487 | F | 1148B | 28 | 181s |
+| challenge | fastapi_15589 | F | 3059B | 28 | 334s |
+| challenge | fastapi_5624 | T | 2880B | 28 | 303s |
+| challenge | rich_3471 | F | 753B | 25 | 485s |
+| challenge | rich_3506 | F | 575B | 10 | 485s |
+| control | rich_3518 | T | 528B | 26 | 92s |
+| control | rich_3470 | F | 2445B | 28 | 297s |
+
+Result (challenges 1/6, controls 1/2): Weak signal, needs larger n -- fastapi_5624 converted but control rich_3470 regressed, and rich_3506 still died submit-less under the read time-box.
+
+---
+
 ## 4. Related Work
 
 Repair-agent literature clusters around three explanations for why small models fail: fault localization, verification distinguishability, and domain priors. Bellam (2026) ran a pre-registered scale study of structural tooling: nine open-weight models (`Qwen3` 0.6B–32B, `Gemma 4` E2B–12B) on 500 held-out SWE-bench tasks, finding code-graph and embedding tools raise function Acc@10 by +0.06–0.10 for small models but barely at 32B — with the embedding index, not the code graph, carrying the gain, and a placebo arm showing random tool output harms small models. Our traces consistently obey the prompt's `SPEC` and `grep` localization mandate on exact target symbols and still fail at identical rates, showing that procedural localization compliance without synthesis precision does not move outcomes.
