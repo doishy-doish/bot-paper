@@ -102,3 +102,14 @@ noise-robust operators. Math-dataset fallback NOT needed - causal loop closed.
 Float64 accounting; toy scale. Ordering is the claim: the frontier model is the
 tiniest one that regenerates its territory. ELM's 32KB readout is the bloat the
 thrash-stop rule predicts. (Full table: kolmogorov.json.)
+
+## Scramble protocol (public compute, private numbers)
+Same protocol as src/bot/SCRAMBLE.md. Synthetic toys stay plaintext (no private
+numbers in them). Anything real (datasets, private evals) encrypts-before-push:
+wrapper {enc:"AES-256-GCM-v1", nonce, data, tag, sha256, bytes, date}, quiet logs
+(counts + hashes), no pull_request triggers. Decrypt after pull:
+node scripts/scramble.mjs decrypt <file> --key-file <vault key> (writes .dec,
+never overwrites wrapper — never commit decrypted files).
+Key lives in exactly 3 places (values never printed): scratch/vault/keys/scramble.key,
+private halt-r keys/scramble.key (storage only, no Actions), public repo secret SCRAMBLE.
+Details: SCRAMBLE.md.
