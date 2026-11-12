@@ -110,7 +110,7 @@ Freezing the winner-shape harness and baking four census guards into system.md (
 | control | rich_3518 | T | 528B | 26 | 92s |
 | control | rich_3470 | F | 2445B | 28 | 297s |
 
-Result (challenges 1/6, controls 1/2): Weak signal, needs larger n -- fastapi_5624 converted but control rich_3470 regressed, and rich_3506 still died submit-less under the read time-box.
+Result (challenges 1/6, controls 1/2): Weak signal with a control regression -- fastapi_5624 converted, but baseline-resolved rich_3470 (2,970-char solve) failed here (2,445 chars, exit 1), and rich_3506 still died submit-less. Net conversion is zero-to-negative: the guards change behavior (no empty submits, no 5KB bloat) while costs offset gains, consistent with the thesis that residual failures are weight-locked, not harness-shaped. Candidate mechanism for the regression is the 1,500-char thrash-stop or 60s read time-box cutting a task that needed a large diff, though the trace alone does not isolate which guard bit; needs larger n to size the trade-off.
 
 ---
 
