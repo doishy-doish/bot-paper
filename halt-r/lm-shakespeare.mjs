@@ -120,10 +120,11 @@ if (process.argv[2] === 'decrypt'){
   // store: seeded sampled train contexts
   const t0 = Date.now();
   const D = W * V;
-  const X = new Int8Array(P * D), next = new Uint8Array(P);
+  const X = new Int8Array(P * D), next = new Uint8Array(P), spos = new Int32Array(P);
   const r = rng(SEED), q = new Float32Array(D);
   for (let s = 0; s < P; s++){
     const pos = Math.floor(r() * (trainIds.length - W));
+    spos[s] = pos;
     encodeCtx(trainIds, pos, W, V, q);
     for (let j = 0; j < D; j++) X[s * D + j] = q[j] > 0.5 ? 1 : 0;
     next[s] = trainIds[pos + W];
@@ -196,7 +197,7 @@ if (process.argv[2] === 'decrypt'){
     const rs = rng(999);
     let self = 0; const NS = 20;
     for (let t = 0; t < NS; t++){
-      const pos = Math.floor(rs() * (trainIds.length - W));
+      const s = Math.floor(rs() * P), pos = spos[s]; // query an ACTUAL stored key
       encodeCtx(trainIds, pos, W, V, qs);
       for (let j = 0; j < D; j++) qp[j] = qs[j] > 0.5 ? 1 : -1;
       const { w } = recallW(qp, X, P, D, best.beta, 12);
