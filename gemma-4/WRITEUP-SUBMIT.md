@@ -1,8 +1,9 @@
 # Calibration Is Real, Verification Is Not Enough
-**Subtitle:** A pre-registered falsification chain on small-model code repair — a frozen 31B agent, 47 failed baseline runs, 14/32 on a calibrated slice, three controlled nulls, and a flat held-out test
+**Subtitle:** A frozen 31B agent goes from 0/10 to 14/32 (43.8%) through task calibration, while verification prompts, function hints, and T=0.75 Best-of-3 sampling convert 0/5 each
 
 **Track:** Google — The Gemma 4 Developer Agent (Paper Track)  
-**Author:** Andrale Misquitta  
+**Author:** Andrale Misquitta
+**Code & Artifacts:** https://github.com/doishy-doish/bot-paper (Apache 2.0) | **Kaggle Kernels:** `144573461`, `144573665`, `144590816`, `144590833`, `144607478`  
 
 ---
 
