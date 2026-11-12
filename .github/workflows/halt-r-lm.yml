@@ -1,0 +1,71 @@
+name: halt-r-lm
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/lm-shakespeare.mjs'
+      - 'halt-r/lm-collect.mjs'
+      - '.github/workflows/halt-r-lm.yml'
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: lm W${{ matrix.W }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        W: [16, 32]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fetch Tiny Shakespeare (public domain toy)
+        run: curl -sSL -o /tmp/ts.txt https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt && wc -c /tmp/ts.txt
+      - name: bench
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/ts.txt --out out/W${{ matrix.W }} --W ${{ matrix.W }} --P 8000 --trials 100
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lm-W${{ matrix.W }}
+          path: out/W${{ matrix.W }}/
+          retention-days: 30
+  collect:
+    name: collect lm bench
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: lm-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: merge + table
+        run: |
+          node halt-r/lm-collect.mjs $(find models -name metrics.json) --out halt-r/lm-bench.json --md halt-r/lm-bench.md
+          cat halt-r/lm-bench.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit bench back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            node halt-r/lm-collect.mjs $(find models -name metrics.json) --out halt-r/lm-bench.json --md halt-r/lm-bench.md
+            git add halt-r/lm-bench.json halt-r/lm-bench.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: lm bench $(date -u +%F)"
+            git push origin main && exit 0
+            sleep 10
+          done
+          exit 1
