@@ -304,3 +304,12 @@ Same MNIST setup. Grid beta in {0.005..0.2} scored on 5 probe queries: probes
 pick beta=0.2 (100% probe acc, fewest steps); fresh-50 eval at the picked
 temperature: 100% retrieval, 2.08 avg steps. No human in the loop.
 (Rung file: rung-mnist-autotemp.json.)
+
+<!-- HALT-R-MATRIX -->
+## Matrix regression (public compute)
+All 21 rungs ship as runnable scripts in `halt-r/rungs/*.mjs` and re-verify on every push via
+`.github/workflows/halt-r-matrix.yml`: 19 dependency-free rungs as matrix jobs plus one MNIST job
+that curls the IDX bytes then runs `mnist-capacity` + `mnist-autotemp` (`max-parallel: 20`,
+ubuntu-latest, no secrets). Two documented subtleties: `gieslite` allows one Markov-equivalent
+flip (single do(X4) cannot orient the 1-6 edge; the script proves the score tie, gap ~1e-12) and
+`active` picks intervention targets truth-free from restart disagreement, closing to joint SHD 0.
