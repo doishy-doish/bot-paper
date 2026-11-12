@@ -1,3 +1,4 @@
+// (c) 2026 Andrale Misquitta. All Rights Reserved. See halt-r/LICENSE.
 // ref-hopfield.mjs — Nobel-grounded recursive recall, pure JS, zero deps, CPU-ms.
 // Classic Hebbian storage (one-shot, no gradients) + modern Hopfield update
 // (softmax attention) + adaptive halt on energy delta. Run: node ref-hopfield.mjs
