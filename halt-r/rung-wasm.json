@@ -44,5 +44,13 @@
   "target": 3,
   "hamDist": 0,
   "pass": true
+ },
+ "adaptiveHalt": {
+  "run_id": 43316899640,
+  "conclusion": "success",
+  "tol": 0.001,
+  "haltedIters": 2,
+  "fixedIters": 12,
+  "maxAbsDiffVsConverged": 0
  }
 }
