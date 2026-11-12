@@ -1,0 +1,6 @@
+{
+ "train": "d1+d2 mixed (150 each)",
+ "seenD1": 0.68,
+ "seenD2": 0.613,
+ "heldOutD3": 0.24
+}
