@@ -1,0 +1,25 @@
+{
+ "truePipe": "B>M",
+ "supportTop3": [
+  {
+   "pipe": "M>B",
+   "err": 0,
+   "stages": 2
+  },
+  {
+   "pipe": "B>M",
+   "err": 0,
+   "stages": 2
+  },
+  {
+   "pipe": "M",
+   "err": 5,
+   "stages": 1
+  }
+ ],
+ "routerPick": "M>B",
+ "query": {
+  "exact": 1,
+  "bit": 1
+ }
+}
