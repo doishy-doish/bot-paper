@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       max-parallel: 20
       matrix:
-        W: [16, 32]
+        W: [2, 4, 8, 16, 32]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
