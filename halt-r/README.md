@@ -208,7 +208,10 @@ identically), retrieval nearest=3 hamDist 0.0 — 3/3 PASS, run 43314419634
 green first try. The same hosted bytes (halt-r/rust-recall/recall.wasm, committed
 from the CI artifact) were then fetched and instantiated in a live browser page:
 12 iters, nearest=3, hamDist 0 — one source file, three substrates (Rust/wasm,
-node, browser). CPU-only, zero GPU, zero quota.
+node, browser). CPU-only, zero GPU, zero quota. Adaptive-halt path verified in
+CI next: tol=1e-3 halts at 2 iters (vs fixed 12) with maxAbsDiff 0.00e+0 vs the
+converged state — the efficiency claim (fixed-point exit, ~83% steps saved)
+now holds in Rust/wasm too, run 43316899640 green.
 (Rung file: rung-wasm.json.)
 
 ## Greedy scale-up rung (10 nodes; hill-climb SHD 3, regime-aware interventions close it)
