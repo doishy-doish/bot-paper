@@ -122,3 +122,22 @@ monolithic map scored 20-24% on the same held-out; factorized pipeline scores
 block is mirror-symmetric, both pipelines coincide) — tie-break needs asymmetric
 probes; accuracy unaffected. The contrast is the finding: factorization, not
 capacity, is what crosses the composition gap.
+
+## Router asym probe (non-commuting orders; corrects the tie footnote)
+M (mirror L-R) commutes with S-shift B (different axes), so B>M vs M>B tie on
+ALL inputs — structural, not a symmetry artifact. The earlier footnote blaming
+2x2-block symmetry was wrong; corrected here. Non-commuting probe A>M
+(east-shift then mirror) vs M>A: 5/5 asym supports diverge, router picks A>M
+uniquely (next best err 4 vs 0), 200/200 queries 100% exact / 100% bit, 0 ties.
+Symmetric 2x2 blocks already separate A-orders (A>M err 0 vs next 2), as expected.
+(Rung file: rung-router-asym.json.)
+
+## Nonlinear factorized pipeline (learned ELM ops, held-out composition)
+Primitives M (mirror) + N (dilate-east OR, nonlinear), one ELM H=256 each on 400
+random pairs (CPU closed-form): M 100%/100%, N 77% exact / 98.1% bit on 100
+held-out. Composition N-then-M held-out (asymmetric only): router picks N>M by
+5 support, factorized ELM pipeline 78% exact / 98.4% bit on 200 queries —
+composition adds ~no error beyond the N-op bottleneck. Monolithic ELM trained on
+primitives only, tested on the same composition: 0% exact / 66.5% bit.
+Factorization, not capacity, crosses the gap — even with imperfect learned ops.
+(Rung file: rung-factor-nonlinear.json.)
