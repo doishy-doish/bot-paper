@@ -141,3 +141,26 @@ composition adds ~no error beyond the N-op bottleneck. Monolithic ELM trained on
 primitives only, tested on the same composition: 0% exact / 66.5% bit.
 Factorization, not capacity, crosses the gap — even with imperfect learned ops.
 (Rung file: rung-factor-nonlinear.json.)
+
+## Contrastive-Hebbian encoder rung (online rule, no backprop, no matrix inverse)
+Single-layer contrastive-Hebbian (clamped-vs-free co-occurrence, perceptron-form
+online updates, CPU seconds): mirror rule 100% exact / 100% bit on unseen
+grids at K=500 pairs (98.7%/99.9% at K=200) — the online rule reaches the
+least-squares closed-form ceiling with enough pairs. This proves the HALT-R
+learn step for the linear encoder, the actual architecture target.
+Negative control behaves correctly: single-layer scores 0% exact on xor-neighbor
+(a task needing hidden units). The 2-layer hidden CHL as implemented learns
+nothing (59.7% bit vs 60.6% single-layer control) — hidden-layer credit
+assignment without backprop stays OPEN; ELM closed-form covers hidden layers
+in the meantime (78%/98% factorized). (Rung file: rung-contrastive.json.)
+
+## Causal scale-up rung (5 nodes, exhaustive BIC, CPU ~0.1s)
+Random 5-node DAG (6 edges), linear-Gaussian N=500. Exhaustive BIC over all
+29,281 DAGs (120 orders x 1024 subsets, cached OLS, ~0.1s CPU) recovers the
+exact graph obs-only (SHD 0); interventional arms (+do(X2), +do(X0)) confirm
+stability (SHD 0 throughout) — no ladder headroom on this instance
+(orientation already identified; a near-unfaithful instance is next for the
+ladder). Path-traced total effect X0->X4 on learned weights: -2.443 vs -2.346
+truth (err 0.098), obs data only. Two self-caught bugs fixed on record:
+self-parent mask (RSS=0 degenerate) and an SHD scorer iterating key-sets as
+edges (phantom SHD 12 on an exact recovery). (Rung file: rung-causal-scale.json.)
