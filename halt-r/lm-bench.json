@@ -25,9 +25,15 @@
    "unigramAcc": 0.14,
    "unigramPpl": 27.565596525738606,
    "beatUni": true,
-   "buildMs": 7,
-   "evalMs": 1814,
-   "maxRssMB": 68,
+   "quality": {
+    "n": 3,
+    "genLen": 100,
+    "rep4": 0.9450171821305843,
+    "wordValid": 1
+   },
+   "buildMs": 8,
+   "evalMs": 1861,
+   "maxRssMB": 85.2,
    "encBytes": 1397542,
    "evalScope": "heldout-val"
   },
@@ -54,9 +60,15 @@
    "unigramAcc": 0.14,
    "unigramPpl": 27.640326514062977,
    "beatUni": true,
-   "buildMs": 8,
-   "evalMs": 3670,
-   "maxRssMB": 76.4,
+   "quality": {
+    "n": 3,
+    "genLen": 100,
+    "rep4": 0.8178694158075602,
+    "wordValid": 0.6538461538461539
+   },
+   "buildMs": 9,
+   "evalMs": 4091,
+   "maxRssMB": 95.9,
    "encBytes": 2784206,
    "evalScope": "heldout-val"
   },
@@ -83,9 +95,15 @@
    "unigramAcc": 0.13,
    "unigramPpl": 28.719868410732484,
    "beatUni": false,
-   "buildMs": 14,
-   "evalMs": 11503,
-   "maxRssMB": 91.8,
+   "quality": {
+    "n": 3,
+    "genLen": 100,
+    "rep4": 0.9896907216494846,
+    "wordValid": 0
+   },
+   "buildMs": 19,
+   "evalMs": 14482,
+   "maxRssMB": 104,
    "encBytes": 5557542,
    "evalScope": "heldout-val"
   },
@@ -112,9 +130,15 @@
    "unigramAcc": 0.17,
    "unigramPpl": 28.55123744633054,
    "beatUni": false,
-   "buildMs": 33,
-   "evalMs": 20283,
-   "maxRssMB": 127.2,
+   "quality": {
+    "n": 3,
+    "genLen": 100,
+    "rep4": 0.9896907216494846,
+    "wordValid": 0
+   },
+   "buildMs": 34,
+   "evalMs": 20320,
+   "maxRssMB": 131.8,
    "encBytes": 11104206,
    "evalScope": "heldout-val"
   },
@@ -141,9 +165,15 @@
    "unigramAcc": 0.12,
    "unigramPpl": 29.040645792253116,
    "beatUni": false,
+   "quality": {
+    "n": 3,
+    "genLen": 100,
+    "rep4": 0.9896907216494846,
+    "wordValid": 0
+   },
    "buildMs": 45,
-   "evalMs": 31479,
-   "maxRssMB": 193,
+   "evalMs": 31319,
+   "maxRssMB": 199.3,
    "encBytes": 22197543,
    "evalScope": "heldout-val"
   },
@@ -170,9 +200,15 @@
    "unigramAcc": 0.19,
    "unigramPpl": 25.231682470569428,
    "beatUni": false,
-   "buildMs": 11,
-   "evalMs": 3822,
-   "maxRssMB": 79.2,
+   "quality": {
+    "n": 3,
+    "genLen": 100,
+    "rep4": 0.9896907216494846,
+    "wordValid": 0
+   },
+   "buildMs": 7,
+   "evalMs": 3011,
+   "maxRssMB": 141.7,
    "encBytes": 1696206,
    "evalScope": "heldout-val"
   },
@@ -199,9 +235,15 @@
    "unigramAcc": 0.15,
    "unigramPpl": 24.991581114017805,
    "beatUni": true,
-   "buildMs": 16,
-   "evalMs": 6176,
-   "maxRssMB": 91.3,
+   "quality": {
+    "n": 3,
+    "genLen": 100,
+    "rep4": 0.7628865979381443,
+    "wordValid": 0.9696969696969697
+   },
+   "buildMs": 8,
+   "evalMs": 2721,
+   "maxRssMB": 135.1,
    "encBytes": 3381542,
    "evalScope": "heldout-val"
   },
@@ -228,9 +270,15 @@
    "unigramAcc": 0.14,
    "unigramPpl": 21.849069336888643,
    "beatUni": false,
-   "buildMs": 18,
-   "evalMs": 21040,
-   "maxRssMB": 102.9,
+   "quality": {
+    "n": 3,
+    "genLen": 100,
+    "rep4": 0.9896907216494846,
+    "wordValid": 0
+   },
+   "buildMs": 24,
+   "evalMs": 27041,
+   "maxRssMB": 128.2,
    "encBytes": 6752206,
    "evalScope": "heldout-val"
   },
@@ -257,9 +305,15 @@
    "unigramAcc": 0.2,
    "unigramPpl": 20.505668635931222,
    "beatUni": true,
-   "buildMs": 24,
-   "evalMs": 21433,
-   "maxRssMB": 142.7,
+   "quality": {
+    "n": 3,
+    "genLen": 100,
+    "rep4": 0.9759450171821307,
+    "wordValid": 0
+   },
+   "buildMs": 31,
+   "evalMs": 30910,
+   "maxRssMB": 160.8,
    "encBytes": 13493543,
    "evalScope": "heldout-val"
   },
@@ -286,9 +340,15 @@
    "unigramAcc": 0.13,
    "unigramPpl": 23.226300027204722,
    "beatUni": false,
-   "buildMs": 57,
-   "evalMs": 51145,
-   "maxRssMB": 217.5,
+   "quality": {
+    "n": 3,
+    "genLen": 100,
+    "rep4": 0.9896907216494846,
+    "wordValid": 0
+   },
+   "buildMs": 39,
+   "evalMs": 28873,
+   "maxRssMB": 248.1,
    "encBytes": 26976207,
    "evalScope": "heldout-val"
   }
