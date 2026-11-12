@@ -1,3 +1,5 @@
+> **License:** halt-r/ is proprietary — (c) 2026 Andrale Misquitta, All Rights Reserved. See [LICENSE](./LICENSE). Not covered by the repo-wide Apache-2.0.
+
 # HALT-R: Nobel-grounded recursive reasoning, CPU/WASM-first
 Date: 2026-11-12. Status: reference staged, WASM port + Actions next.
 
@@ -88,3 +90,15 @@ noise-robust operators. Math-dataset fallback NOT needed - causal loop closed.
 - Systematicity (train d1+d2 shifts, test held-out d3): seen 68%/61%, held-out 24%.
   Monolithic map can't compose; mixing primitives degrades even seen directions.
   Fodor's challenge stands = the marked frontier. Next: factorized operators + router.
+
+## Kolmogorov shootout (accuracy per byte — smallest machine booting its territory wins)
+| model | acc | bytes | acc/KB |
+|---|---|---|---|
+| causal DAG diamond | 1.0 | 96 | 10.67 |
+| classic Hopfield 8x64b | 0.95 | 264 | 3.68 |
+| modern Hopfield b=8, 32 pats | 1.0 | 456 | 2.25 |
+| linear operator | 1.0 | 2048 | 0.50 |
+| ELM H=256 readout | 0.84 | 32768 | 0.03 |
+Float64 accounting; toy scale. Ordering is the claim: the frontier model is the
+tiniest one that regenerates its territory. ELM's 32KB readout is the bloat the
+thrash-stop rule predicts. (Full table: kolmogorov.json.)
