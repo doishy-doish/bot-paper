@@ -1,0 +1,30 @@
+{
+ "probe5": {
+  "b0.005": {
+   "acc": 0,
+   "avgSteps": 4.2
+  },
+  "b0.02": {
+   "acc": 0,
+   "avgSteps": 8.8
+  },
+  "b0.05": {
+   "acc": 1,
+   "avgSteps": 6.4
+  },
+  "b0.1": {
+   "acc": 1,
+   "avgSteps": 4.4
+  },
+  "b0.2": {
+   "acc": 1,
+   "avgSteps": 2.4
+  }
+ },
+ "chosenBeta": 0.2,
+ "fresh50": {
+  "acc": 1,
+  "avgSteps": 2.08
+ },
+ "verdict": "5 probes auto-pick the working temperature; no human beta."
+}
