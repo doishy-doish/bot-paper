@@ -3,7 +3,7 @@
 
 **Track:** Google — The Gemma 4 Developer Agent (Paper Track)  
 **Author:** Andrale Misquitta
-**Code & Artifacts:** https://github.com/doishy-doish/bot-paper (Apache 2.0) | **Kaggle Kernels:** 144573461, 144573665, 144590816, 144590833, 144607478  
+**Code & Artifacts:** https://github.com/doishy-doish/bot-paper (Apache 2.0) | **Kaggle Kernels:** 144573461, 144573665, 144590816, 144590833, 144607478, 144641971, 144655910  
 
 ---
 
@@ -179,4 +179,4 @@ Calibration works: freezing a clean workflow and choosing well-scoped single-fil
 * **Public-set upper bounds vs. held-out rates:** `WIN-slice` (`14/32 = 43.8%`) is a calibrated public-set upper bound; `FAM` (`3/12 = 25.0%`; `3/11 = 27.3%` excluding the 482.2 s sandbox-latency kill on `rich_3506`) is the uncalibrated held-out rate.
 * **Docs-only solve (`fastapi_14492`):** Counted in `FAM`'s 3/12 graded score (`exit=0`) because the target edit lived in `docs_src/metadata/tutorial001_1_py39.py`, and excluded from the 9-trace source-only training pool.
 * **Hint scope caveat (`requests_7309`):** G2v2 named `_parse_content_type_header` while ruling out sister functions (`parse_dict_header`), bounding G2v2 to main-function naming; CALv3 named both functions and shifted the diff (`687B -> 1326B`) without passing tests.
-* **Kaggle Kernel Execution Manifest:** 144573461 (W2A), 144573665 (W2B), 144590816 (G2v2), 144590833 (`FAM`), and 144607478 (Best-of-3 temperature probe).
+* **Kaggle Kernel Execution Manifest:** 144573461 (W2A), 144573665 (W2B), 144590816 (G2v2), 144590833 (`FAM`), and 144607478 (Best-of-3 temperature probe), 144641971 (E4B replication), and 144655910 (Guards probe).
