@@ -1,0 +1,62 @@
+name: halt-r-pretrain
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/sweep-pretrain.mjs'
+      - 'halt-r/sweep-collect.mjs'
+      - '.github/workflows/halt-r-pretrain.yml'
+permissions:
+  contents: write
+jobs:
+  sweep:
+    name: pretrain ${{ matrix.scale }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        scale: [S, M, L, XL]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: sweep + wrap
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/sweep-pretrain.mjs --scale ${{ matrix.scale }} --out out/${{ matrix.scale }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: model-${{ matrix.scale }}
+          path: out/${{ matrix.scale }}/
+          retention-days: 30
+  collect:
+    name: collect scaling table
+    needs: sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: model-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: merge + table
+        run: |
+          node halt-r/sweep-collect.mjs $(find models -name metrics.json) --out halt-r/scaling-table.json --md halt-r/scaling.md
+          cat halt-r/scaling.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit table back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          git add halt-r/scaling-table.json halt-r/scaling.md
+          git commit -m "halt-r: scaling table $(date -u +%F)" || exit 0
+          git pull --rebase origin main || true
+          git push origin main
