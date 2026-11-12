@@ -1,0 +1,38 @@
+{
+ "method": "GIES-lite: joint regime-aware score (obs BIC + arm BIC with X4 mutilated/skipped), same hill-climb, best of 3",
+ "data": "obs N=1000 + do(X4=+-3) 250/arm",
+ "ms": 137,
+ "evals": 983,
+ "restarts": [
+  {
+   "score": 244.7,
+   "moves": 12
+  },
+  {
+   "score": 244.7,
+   "moves": 27
+  },
+  {
+   "score": 244.7,
+   "moves": 26
+  }
+ ],
+ "learned": [
+  "0->4",
+  "0->5",
+  "1->4",
+  "1->6",
+  "2->5",
+  "2->7",
+  "4->5",
+  "4->7",
+  "5->9",
+  "6->9"
+ ],
+ "shd": {
+  "shd": 0,
+  "add": 0,
+  "del": 0,
+  "flip": 0
+ }
+}
