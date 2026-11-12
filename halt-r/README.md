@@ -196,3 +196,15 @@ orientations, plus one disclosed artifact edge (0sq->0, the deterministic
 feature read backwards). Verdict: linear discovery is blind past the linear
 frontier; polynomial/GAM expansion is the next rung.
 (Rung file: rung-causal-nonlinear.json.)
+
+## WASM recall core rung (Rust, zero deps, Actions-verified bit-identical)
+rust-recall/src/lib.rs (~70 lines, no dependencies): modern Hopfield step
+(x <- X^T softmax(beta X x)) + C ABI `recall()` on caller-owned buffers.
+GitHub Actions (ubuntu-latest, free runner) builds wasm32-unknown-unknown
+and runs node test-recall.mjs: recall.wasm = 20,675 bytes (under the 50KB
+claim), 12/12 iters deterministic, maxAbsDiff vs JS reference 0.00e+0
+(exact: +-1 arithmetic is exact in f32 and f64, winner-take-all normalizes
+identically), retrieval nearest=3 hamDist 0.0 — 3/3 PASS, run 43314419634
+green first try. CPU-only, zero GPU, zero quota. Browser run of the same
+bytes is next (raw fetch + instantiate in-page).
+(Rung file: rung-wasm.json.)
