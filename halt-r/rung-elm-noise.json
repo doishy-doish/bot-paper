@@ -1,0 +1,85 @@
+{
+ "task": "8-bit 1D mirror + xor-neighbor, ELM tanh, K=500, ridge 1e-3, test 200 (noise on INPUT train+test)",
+ "curves": {
+  "mirror_noise0_H64": {
+   "bit": 1,
+   "exact": 1,
+   "ms": 84
+  },
+  "mirror_noise0_H256": {
+   "bit": 1,
+   "exact": 1,
+   "ms": 218
+  },
+  "mirror_noise5_H64": {
+   "bit": 0.9531,
+   "exact": 0.66,
+   "ms": 23
+  },
+  "mirror_noise5_H256": {
+   "bit": 0.8969,
+   "exact": 0.44,
+   "ms": 215
+  },
+  "mirror_noise10_H64": {
+   "bit": 0.905,
+   "exact": 0.445,
+   "ms": 14
+  },
+  "mirror_noise10_H256": {
+   "bit": 0.8413,
+   "exact": 0.275,
+   "ms": 217
+  },
+  "mirror_noise20_H64": {
+   "bit": 0.7919,
+   "exact": 0.16,
+   "ms": 22
+  },
+  "mirror_noise20_H256": {
+   "bit": 0.6925,
+   "exact": 0.055,
+   "ms": 281
+  },
+  "xorneighbor_noise0_H64": {
+   "bit": 0.8538,
+   "exact": 0.295,
+   "ms": 12
+  },
+  "xorneighbor_noise0_H256": {
+   "bit": 0.9962,
+   "exact": 0.97,
+   "ms": 216
+  },
+  "xorneighbor_noise5_H64": {
+   "bit": 0.7963,
+   "exact": 0.215,
+   "ms": 15
+  },
+  "xorneighbor_noise5_H256": {
+   "bit": 0.8106,
+   "exact": 0.39,
+   "ms": 216
+  },
+  "xorneighbor_noise10_H64": {
+   "bit": 0.7056,
+   "exact": 0.105,
+   "ms": 19
+  },
+  "xorneighbor_noise10_H256": {
+   "bit": 0.715,
+   "exact": 0.205,
+   "ms": 240
+  },
+  "xorneighbor_noise20_H64": {
+   "bit": 0.5775,
+   "exact": 0.01,
+   "ms": 20
+  },
+  "xorneighbor_noise20_H256": {
+   "bit": 0.5587,
+   "exact": 0.035,
+   "ms": 264
+  }
+ }
+}
