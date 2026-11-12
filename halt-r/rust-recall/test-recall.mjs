@@ -52,5 +52,14 @@ const check = (name, cond, detail) => { console.log((cond ? 'PASS' : 'FAIL') + '
 check('wasm-runs-iters', n === ITERS && n2 === ITERS, 'n=' + n + ',' + n2);
 check('wasm-matches-ref', maxd < 1e-3, 'maxd=' + maxd.toExponential(2));
 check('wasm-retrieves', bi === k, 'nearest=' + bi);
+// adaptive halt: tol>0 must stop early but land at the converged state
+q.forEach((v, i) => { F[P * D + i] = v; });
+const nHalt = instance.exports.recall(PB, SB, CB, P, D, BETA, 12, 0.001);
+const halted = Array.from(mem().slice(P * D, P * D + D));
+let maxdHalt = 0;
+for (let j = 0; j < D; j++) maxdHalt = Math.max(maxdHalt, Math.abs(halted[j] - after[j]));
+console.log('haltedIters=' + nHalt + ' maxAbsDiffVsConverged=' + maxdHalt.toExponential(2));
+check('wasm-halts-early', nHalt >= 1 && nHalt < 12, 'n=' + nHalt);
+check('wasm-halt-accurate', maxdHalt < 1e-2, 'maxd=' + maxdHalt.toExponential(2));
 if (fail) { console.log('WASM-RECALL: ' + fail + ' FAILURES'); process.exit(1); }
 console.log('WASM-RECALL: all green');
