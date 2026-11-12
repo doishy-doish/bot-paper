@@ -1,0 +1,43 @@
+{
+ "sem": "X0,X1~N(0,1); X2 = X0^2 + X1 + e",
+ "seed": 21,
+ "N": 500,
+ "linear": {
+  "skeleton": [
+   "1-2"
+  ],
+  "recall_0_2": 0,
+  "verdict": "linear-Gaussian BIC blind to the quadratic edge (fits E[X2|X0]=0 over symmetric X0)"
+ },
+ "quadratic": {
+  "skeleton": [
+   "0-0sq",
+   "0sq-2",
+   "1-2"
+  ],
+  "edges": [
+   {
+    "to": 1,
+    "from": []
+   },
+   {
+    "to": "0sq",
+    "from": []
+   },
+   {
+    "to": 0,
+    "from": [
+     "0sq"
+    ]
+   },
+   {
+    "to": 2,
+    "from": [
+     1,
+     "0sq"
+    ]
+   }
+  ],
+  "verdict": "quadratic expansion recovers 0sq->2 and 1->2 (v-structure orients both); nonlinearity = next frontier rung (polynomial/GAM discovery)"
+ }
+}
