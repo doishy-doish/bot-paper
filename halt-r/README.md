@@ -226,3 +226,23 @@ must be scored as regimes (GIES-style joint scoring is the next method rung),
 never pooled.
 (Rung files: rung-causal-greedy.json, rung-causal-greedy-int.json,
 rung-causal-greedy-intonly.json.)
+
+## GIES-lite rung (joint regime-aware scoring: full truth SHD 0, one run)
+Same 10-node instance and data (obs N=1000 + do(X4) arms). Score(par) =
+BIC_obs(all nodes) + BIC_arm(all nodes except intervened X4, whose incoming
+edges are mutilated away). Same hill-climb, best of 3 cold restarts: SHD 0
+exact — add 0, del 0, flip 0. The complete causal ladder on one instance:
+obs-only SHD 3 -> naive pooling SHD 3 (misspecified, negative) ->
+regime-split mutilated-exact -> joint regime-aware SHD 0. Interventions work
+at scale iff scored as regimes. CPU ~0.1-0.2s throughout.
+(Rung file: rung-causal-gieslite.json.)
+
+## Polynomial auto-discovery rung (BIC picks the degree; no human in the loop)
+Same nonlinear SEM (X2 = X0^2 + X1 + e, seed 21, N=500). Per-target best-subset
+BIC over polynomial feature pools: deg1 (linear) score 613.1, selects {X1}
+only — the quadratic edge invisible; deg2 score 31.6, selects {X1, X0^2};
+deg3 score 31.6, selects the same {X1, X0^2} (penalty correctly rejects the
+cubic extras). Winner: degree 2, exact feature set, ~580 BIC margin — discovery
+needs no human-picked degree. The remaining frontier: cross-term/auto-basis
+selection (GAM-sieve) and orientation under expansion.
+(Rung file: rung-causal-polyauto.json.)
