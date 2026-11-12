@@ -96,6 +96,7 @@ if (process.argv[2] === 'decrypt'){
   const dataPath = gv('data', null), outDir = gv('out', null);
   if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100]');
   const W = parseInt(gv('W', DEF.W)), P = parseInt(gv('P', DEF.P)), TR = parseInt(gv('trials', DEF.trials));
+  const tag = gv('tag', 'shakes');
   const kei = a.indexOf('--key-env');
   const secret = process.env[kei >= 0 ? a[kei + 1] : 'SCRAMBLE'];
   if (!secret && !noEnc) fail('SCRAMBLE key missing (refuses plaintext save; --no-encrypt for smoke only)');
@@ -212,7 +213,7 @@ if (process.argv[2] === 'decrypt'){
   // save wrapped store
   const plain = Buffer.concat([Buffer.from(X), Buffer.from(next)]);
   const sum = sha256hex(plain);
-  const meta = { task: 'tinyshakespeare-nextchar', W, P, V, D, seed: SEED, beta: best.beta, bytes: plain.length, sha256: sum, enc: noEnc ? 'none-smoke' : 'AES-256-GCM-v1', chars: raw.length };
+  const meta = { task: 'nextchar-heldout', corpus: tag, W, P, V, D, seed: SEED, beta: best.beta, bytes: plain.length, sha256: sum, enc: noEnc ? 'none-smoke' : 'AES-256-GCM-v1', chars: raw.length };
   writeFileSync(outDir + '/meta.json', JSON.stringify(meta));
   let encBytes = 0;
   if (!noEnc){ const wj = JSON.stringify(encryptWrap(plain, secret)); writeFileSync(outDir + '/model.bin.enc', wj); encBytes = wj.length; console.log(`enc bytes=${encBytes} sha256=${sum}`); }
