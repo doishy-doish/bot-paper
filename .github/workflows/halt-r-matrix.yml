@@ -1,0 +1,39 @@
+name: halt-r-matrix
+on:
+  push:
+    paths:
+      - 'halt-r/rungs/**'
+      - '.github/workflows/halt-r-matrix.yml'
+  workflow_dispatch: {}
+jobs:
+  rung:
+    name: rung ${{ matrix.rung }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        rung: [capacity, operator, contrastive, hebbian, systematic, masked4x4, elm, elm-noise, ep-hidden, masked-scale, diamond, scale5, nearfaith, nonlinear, polyauto, greedy10, gieslite, greedy20, active]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: run rung
+        run: node halt-r/rungs/${{ matrix.rung }}.mjs
+  mnist:
+    name: mnist rungs (real data)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: fetch MNIST train images
+        run: curl -sSL -o /tmp/mnist-train-images-idx3-ubyte.gz https://storage.googleapis.com/cvdf-datasets/mnist/train-images-idx3-ubyte.gz && ls -la /tmp/mnist-train-images-idx3-ubyte.gz
+      - name: mnist-capacity
+        run: node halt-r/rungs/mnist-capacity.mjs /tmp/mnist-train-images-idx3-ubyte.gz
+      - name: mnist-autotemp
+        run: node halt-r/rungs/mnist-autotemp.mjs /tmp/mnist-train-images-idx3-ubyte.gz
