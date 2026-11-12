@@ -1,0 +1,1 @@
+{"classic":[{"NPAT":8,"retrieval":0.95},{"NPAT":16,"retrieval":0.2},{"NPAT":32,"retrieval":0}],"modernBeta8":[{"NPAT":8,"retrieval":1,"avgSteps":3.13},{"NPAT":16,"retrieval":1,"avgSteps":3.98},{"NPAT":32,"retrieval":1,"avgSteps":4.79}]}
