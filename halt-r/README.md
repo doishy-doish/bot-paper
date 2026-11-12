@@ -278,3 +278,13 @@ vs H=64 85.4%/29.5%; noise10 ~71%/10-20%; noise20 ~57-58% (near chance) —
 nonlinearity + noise compound. Lesson: size H to the noise, not the task; or
 raise ridge with noise (untested, noted).
 (Rung file: rung-elm-noise.json.)
+
+## Masked scale-up rung (self-supervision works iff the mask spares signal)
+8x8 grids of independent 2x2 constant blocks, shared linear map (masked->0),
+K=800/200 test. Random-position masks: 100% fill at 6-13% masked, 99.4% at
+25%, 94.6% at 50% — neighbors carry the block bit. Whole-block masks: 50-55%
+(chance) at EVERY fraction — a fully hidden independent block has no signal
+left anywhere. Sharp boundary, CPU ms: mask-prediction learns structure, never
+creates it. (Prior 4x4 block-100% was a different instance with correlated
+blocks; this rung's instance is fully specified and reproducible.)
+(Rung file: rung-masked-scale.json.)
