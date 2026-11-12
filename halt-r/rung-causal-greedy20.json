@@ -1,0 +1,31 @@
+{
+ "nodes": 20,
+ "seed": 41,
+ "n": 2000,
+ "edgeProb": 0.15,
+ "trueEdges": 25,
+ "method": "greedy hill-climb BIC, best of 3 restarts",
+ "ms": 1451,
+ "fits": 3362,
+ "restarts": [
+  {
+   "score": 135.8,
+   "moves": 31
+  },
+  {
+   "score": 511.6,
+   "moves": 103
+  },
+  {
+   "score": 930.2,
+   "moves": 51
+  }
+ ],
+ "shd": {
+  "shd": 6,
+  "add": 4,
+  "del": 0,
+  "flip": 2
+ },
+ "skeletonRecall": 1
+}
