@@ -1,0 +1,67 @@
+{
+ "instance": {
+  "seed": 7,
+  "weights": {
+   "0->1": 2,
+   "1->2": 2,
+   "0->2": -4,
+   "2->3": 1.5
+  },
+  "n_obs": 500,
+  "n_int": 500,
+  "note": "c=-4 exactly cancels indirect path 2*2=4: population Corr(X0,X2)=0 (near-unfaithful)"
+ },
+ "obs_marginal": {
+  "corr_X0X2": -0.0596,
+  "fisher_z": -1.331,
+  "p": 0.1833,
+  "edge_kept": false,
+  "verdict": "PC-style screening DROPS 0-2 (blind, as theory predicts)"
+ },
+ "obs_BIC": {
+  "skeleton": [
+   "0-1",
+   "1-2",
+   "2-3"
+  ],
+  "skeleton_recall": "3/4",
+  "loser_score": 154.1,
+  "truth_score": 158.5,
+  "verdict": "BIC ALSO drops 0-2: prefers a 3-edge collider model (0->1<-2, 2->3) that fits better with fewer edges. Exact cancellation defeats score-based discovery too, not just constraint-based. Only intervention sees the edge."
+ },
+ "int_doX1": {
+  "corr_X0X2": -0.6134,
+  "fisher_z": -15.92,
+  "p": 0,
+  "ols_w02": -3.969,
+  "ols_w12": 1.966,
+  "verdict": "intervention breaks cancellation: marginal corr strong, OLS nails w02=-4.0 model-free"
+ },
+ "scaleup_rerun": {
+  "seed": 11,
+  "weights": {
+   "0->2": 1.5,
+   "0->4": -2,
+   "1->3": 2,
+   "1->4": 1,
+   "2->3": -1.5,
+   "2->4": 2
+  },
+  "method": "exhaustive BIC prune-free",
+  "learned": [
+   "0->2",
+   "0->4",
+   "1->3",
+   "1->4",
+   "2->3",
+   "2->4"
+  ],
+  "shd": 0,
+  "verdict": "5-node optimum CONFIRMED prune-free (SHD 0): earlier SHD-0 stands, method note corrected"
+ },
+ "method_notes": [
+  "Branch-and-bound prune REMOVED from all causal BIC code: partial BIC can exceed best-so-far yet later negative terms win; the prune silently cut valid branches (caught when a weak-edge arm returned identical graphs at two sample sizes). 4-5 node exhaustive needs no pruning (1536 / 122880 evals, cached OLS, ms).",
+  "BIC ties within a Markov class resolve by enumeration order, so DAG-level SHD is reported only where orientations are compelled (v-structures); otherwise skeleton recall is the metric.",
+  "All seeds and weights recorded in-file from this rung on (the earlier scale-up json lacked them; rerun here with seed 11)."
+ ]
+}
