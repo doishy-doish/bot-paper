@@ -11,7 +11,7 @@ import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 
 const DEF = { W: 32, P: 8000, trials: 100, probeN: 10 };
-const BETAS = [0.1, 0.3, 1.0, 3.0];
+const BETAS = [0.1, 0.3, 1.0, 3.0, 10.0];
 const SEED = 7;
 function fail(m){ console.error('FAIL ' + m); process.exit(1); }
 function rng(seed){ let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
@@ -189,7 +189,8 @@ if (process.argv[2] === 'decrypt'){
   console.log(`base bigram acc=${biE.acc.toFixed(3)} ppl=${biE.ppl.toFixed(2)} | unigram acc=${uniE.acc.toFixed(3)} ppl=${uniE.ppl.toFixed(2)}`);
   let failN = 0;
   const check = (n, c, d) => { console.log(((c ? 'PASS' : 'FAIL') + ' ' + n + ' ' + (d || ''))); if (!c) failN++; };
-  // hard gate = machinery (self-retrieval must be exact); baselines are recorded comparisons, not gates
+  // hard gate = machinery (the exact stored KEY must win, whatever its label);
+  // labels are ambiguous under duplicate contexts, so patterns — not next-chars — are the check
   {
     const qs = new Float32Array(D), qp = new Float32Array(D);
     const rs = rng(999);
@@ -199,9 +200,12 @@ if (process.argv[2] === 'decrypt'){
       encodeCtx(trainIds, pos, W, V, qs);
       for (let j = 0; j < D; j++) qp[j] = qs[j] > 0.5 ? 1 : -1;
       const { w } = recallW(qp, X, P, D, best.beta, 12);
-      if (predictNext(w, next, V) && argmax(predictNext(w, next, V)) === trainIds[pos + W]) self++;
+      let bi = 0; for (let i = 1; i < P; i++) if (w[i] > w[bi]) bi = i;
+      let same = true;
+      for (let j = 0; j < D; j++){ const bit = qp[j] > 0 ? 1 : 0; if (X[bi * D + j] !== bit){ same = false; break; } }
+      if (same) self++;
     }
-    check('self-retrieval-exact', self === NS, self + '/' + NS);
+    check('self-key-retrieval', self === NS, self + '/' + NS);
   }
   console.log(`compare hopfield acc=${e.acc.toFixed(3)} ppl=${e.ppl.toFixed(2)} vs bigram ${biE.acc.toFixed(3)}/${biE.ppl.toFixed(2)} vs unigram ${uniE.acc.toFixed(3)}/${uniE.ppl.toFixed(2)} beatUni=${e.acc > uniE.acc}`);
   // save wrapped store
