@@ -1,148 +1,159 @@
-Calibration Is Real, Verification Is Not Enough
-A pre-registered falsification chain on small-model code repair — frozen 31B agent, 47 failed baseline attempts, 14/32 on a calibrated slice, two controlled nulls, and a flat held-out probe
+# Calibration Is Real, Verification Is Not Enough
+**Subtitle:** A pre-registered falsification chain on small-model code repair — a frozen 31B agent, 47 failed baseline runs, 14/32 on a calibrated slice, three controlled nulls, and a flat held-out test
 
-Track: Google — The Gemma 4 Developer Agent (Paper Track)
+**Track:** Google — The Gemma 4 Developer Agent (Paper Track)  
+**Author:** Andrale Misquitta  
 
-Author: Andrale Misquitta
+---
 
-Abstract
-We ask a narrow question: what actually converts failures into fixes for an open-weight code-repair agent once the harness is frozen? Starting from 0/47 resolved attempts across seven baseline arms on two checkpoints (0/37 E4B-era, 0/10 same-checkpoint 31B), a frozen 31-billion-parameter quantized agent (gemma-4-31b-it-qat-w4a16-ct) resolves 14/32 tasks (43.8%, Wilson 95% CI [28.2%, 60.7%]; +43.8 pp over the 0/10 same-checkpoint 31B floor, two-sided Fisher exact p = 0.017, non-overlapping 95% CIs) on a calibrated single-file slice (5/10 on the initial ten, 9/22 on the held-out remainder), then scores a flat 3/12 (25.0%; 3/11 = 27.3% excluding one sandbox-latency kill) on twelve brand-new tasks—exactly 1/4 in each of three strata (small-rich, large-rich, non-rich). Two controlled interventions both yield clean nulls: adding explicit verify-then-fix instructions converts 0/5 misses (W2B, 5/10 with the identical resolved set (p=9.8e-4 under rollout independence), and injecting the target function name into the issue text converts 0/5 (G2v2), reproducing the exact same 687-character wrong patch on requests_7309 with and without the target symbol named. The two interventions the field assumes are the levers both fail under controlled tests.
+## Abstract
 
-A 44-trace zero-GPU forensic audit cuts the clean training pool to 9 source-only surgical greens, refutes a syntax/compile-guard hypothesis (all four exit-2 failures in fastapi are semantic assertion mismatches, zero are syntax errors), and reveals the agent's confidence is calibrated on its own reproducer output: only 3/44 traces ever invoked pytest, and 11 of 12 held-out traces verified exclusively through hand-written repro scripts. Calibration is real and large; verification prompting and symbol specification are insufficient; group-level task features fail to predict success out-of-sample; and residual failures reside in task-specific parametric attractors and locality boundaries.
+We ask a simple question: once a coding agent's harness is frozen, what actually turns a failed bug fix into a working one? Starting from `0/47` resolved runs across seven baseline arms on two checkpoints (`0/37` on Gemma 4 E4B, `0/10` on our 31B submission checkpoint), a frozen 31-billion-parameter agent (`gemma-4-31b-it-qat-w4a16-ct`) solves **`14/32` tasks (`43.8%`**, `[28.2%, 60.7%]`; `+43.8` pp, Fisher `p = 0.017`) on a calibrated single-file slice (`5/10` on the first ten, `9/22` on the held-out remainder). On twelve brand-new tasks (`FAM`), it then scores a flat **`3/12` (`25.0%`**; `3/11 = 27.3%` after removing one run killed by sandbox lag)—exactly **`1/4`** in each of three buckets (`rich-small`, `rich-large`, `non-rich`).
 
-1. Introduction
-Small open-weight models are the economic frontier of autonomous software repair: if a 31B quantized agent can reliably resolve repository issues on commodity multi-GPU hardware, any engineering team can deploy it offline. Yet benchmark headlines obscure the operational question a practitioner actually faces: given a frozen agent harness and a fixed compute budget, which intervention genuinely converts a miss into a fix? Prompt edits are cheap to propose and expensive to trust, because every evaluation consumes GPU hours and post-hoc explanations easily fit noisy readouts.
+Three controlled interventions all score clean nulls (`0/15` task conversions across `30` runs):
+1. **Verification prompting (`W2B`):** Telling the agent to verify its fix before submitting converts `0/5` misses (`5/10` overall, with the exact same five tasks passing and failing; `p = 9.8e-4` under independent rollouts).
+2. **Target-function naming (`G2v2`):** Naming the exact function to edit in the issue text converts `0/5` tasks, reproducing the identical `687`-character wrong patch on `requests_7309` with and without the hint.
+3. **High-temperature sampling (`Best-of-3` at `T=0.75`):** Running three independent rollouts per task at elevated temperature converts `0/5` tasks (`0/15` runs), with `requests_7309` emitting the exact same `687`-character SHA-256 diff in all three rollouts.
 
-We ran this investigation under strict pre-registration. One agent architecture was frozen early and never re-tuned. Every subsequent experiment was registered before execution with a locked task list, an explicit pass/fail bar, and a hard rule against silent re-fires: any rerun or prompt modification constitutes a distinct experimental arm. Seven baseline and injection arms failed first (0/47 combined: 0/37 on E4B, 0/10 on the 31B submission checkpoint), establishing an unvarnished floor before any positive signal appeared. From that floor, we tested three candidate converters—verification discipline, target-locus specification, and repository/size structure—alongside a zero-GPU trace audit governing what data, if any, is clean enough for post-training.
+A zero-GPU audit of all `44` unique traces cuts our clean training pool down to **`9` source-only surgical fixes**, rules out a syntax-guard fix (all four `exit-2` crashes in `fastapi` are logic/assertion failures, not syntax errors), and shows that only `3/44` traces ever ran `pytest`. Calibration is real and large; verification prompts, function hints, and high-temperature sampling do not convert misses; no task group predicts success on unseen tasks; and residual failures come down to weight-locked wrong-patch habits and edit size. The contribution is the falsification chain, not a headline score.
 
-The headline result is a structural split, not a smooth scaling curve. Calibration—selecting well-scoped single-file tasks and freezing a disciplined procedure—moved solve rate from 0% to 43.8% across 32 tasks. Prompt-level interventions moved nothing: 0/5 and 0/5 on controlled probes. A stratified held-out probe (FAM) then returned a perfectly flat 1/4 × 3, falsifying both repository-family and diff-size predictors simultaneously. What survives is a residual governed by two mechanisms: task-specific attractor basins where the agent converges to the same wrong diff regardless of extra context, and a locality boundary around compact single-file edits.
+---
 
-2. Methods
-2.1 The Frozen Agent and Execution Envelope
-All experiments execute a single-root Agent Development Kit (ADK) loop backed by gemma-4-31b-it-qat-w4a16-ct (W4A16 quantization-aware trained) served offline on 4 × NVIDIA L4 GPUs via vLLM (tensor_parallel_size=4). The tool registry exposes nine active tools (run, read, edit, write, four code-navigation tools, and submit, with three graph tools declared and disabled by prompt instruction) under fixed execution envelopes:
+## 1. Introduction
 
-Budgets & Timeouts: 28 tool calls, 80 max turns, 480 s (8-minute) task wall-clock limit, 240 s per-command timeout, and 300 s evaluation suite timeout, with EventsCompactionConfig (compaction_interval=15, overlap_size=2, token_threshold=14336, event_retention_size=5).
+Small open-weight models are the practical frontier for automated bug fixing: if a `31B` quantized agent can patch real repositories on a single multi-GPU node, any engineering team can run it privately. Papers usually report headline pass rates on giant models, but a working engineer faces a narrower choice: **given one frozen harness and a fixed GPU budget, which change actually converts a failed task into a pass?** Prompt tweaks are cheap to invent and expensive to trust, because every run burns GPU hours and it is easy to tell a convincing story after seeing the numbers.
 
-Winner-Shape Procedure: The system prompt enforces a fixed workflow: write a three-line SPEC (trigger, expected, acceptance), locate and read target symbols before editing, apply a best-guess edit by call 12, verify against a targeted test or reproducer without modifying test or config files, inspect git diff, and call submit.
+We ran this lane the boring way. One agent setup, frozen early and never re-tuned. Every run was pre-registered with a locked task list, a pass/fail bar, and a ban on silent retries. Seven baseline arms failed first (`0/47` combined: `0/37` on E4B, `0/10` on the `31B` checkpoint), giving us an honest floor instead of a cherry-picked win. From that floor, we tested four plausible levers—**verification prompting**, **naming the target function**, **repository/size grouping**, and **high-temperature multi-rollout sampling**—plus a zero-GPU trace audit to decide whether any of our wins were clean enough for fine-tuning.
 
-Deterministic Sampling & Pre-Flight Validation: Sampling is locked at temperature=0.2, top_p=0.95, max_output_tokens fixed, and thinking_budget=4096 (verified across config files, notebook assertions, and kernel boot logs). At T=0.2, the agent behaves as a near-deterministic function of the task, ensuring repeated runs measure basin stability rather than sampling noise. Every run passes an automated manifest, brace-scan, and schema validator before GPU allocation.
+The result is a split, not a smooth curve. **Calibration**—picking well-scoped single-file bugs and freezing a disciplined workflow—lifted the solve rate from `0%` to `43.8%` across `32` tasks. **Interventions** moved nothing: `0/5` on verification prompts, `0/5` on target-function hints, and `0/5` (`0/15` runs) on `Best-of-3` sampling at `T=0.75`. A fresh `12`-task holdout then came back completely flat (`1/4` in every bucket), knocking out both repository-family and patch-size rules at once. What remains are two concrete failure patterns: a few bugs where the model locks onto the exact same wrong edit even at `T=0.75`, and a locality boundary where compact single-file patches succeed while multi-file or sprawling edits fail.
 
-2.2 Pre-Registration Discipline
-Each run is a standalone pre-registered arm with a frozen task set, frozen harness, and pre-committed decision threshold:
+---
 
-Pre-W1 & Injection Floor (7 arms, 0/47 = 0/37 E4B + 0/10 31B): Five E4B-era arms (DIAG 0/11, H1v6 0/10, ARM2 0/10, CAL 0/3, CALv3 0/3) plus two 31B-era injection arms (G2 0/5, G2v2 0/5). The same-checkpoint 31B floor is 0/10 on attractor tasks.
+## 2. Methods
 
-W1 (n=10) & W2A (n=22): The 32-task calibrated WIN-SLICE (single-file, adds-test, gold diff 271–1194 chars), partitioned into the first 10 tasks (W1) and the held-out 22 tasks (W2A, pre-registered generalization gate >= 6/22).
+### 2.1 The Frozen Agent
+Every run uses the same setup: a single-agent loop on the `31B` instruction-tuned quantized model (`gemma-4-31b-it-qat-w4a16-ct`) offline on `4 × L4` GPUs via `vLLM`. The agent has nine active tools inside fixed limits:
+* **Budgets:** `28` tool calls, `80` turns, `480 s` task limit, `240 s` per-command timeout, `300 s` grading timeout, compaction every `15` steps.
+* **Workflow:** Write a three-line `SPEC`, read targets before editing, best-guess edit by call `12`, test it, check `git diff`, `submit`.
+* **Locked Sampling:** `temperature=0.2`, `top_p=0.95`, fixed `max_output_tokens`, `thinking_budget=4096`. At `T=0.2` the agent is nearly deterministic, so repeats test bad habits, not noise. A pre-flight script validates hashes and schemas first.
 
-W2B (n=10): Exact W1 task set with VERIFY FIX instructions appended—a single-variable A/B test.
+### 2.2 Pre-Registered Experiments
+Every arm was defined on paper with a locked task list and pass/fail rule before running:
+* **Baseline Floor (`7` arms, `0/47` total = `0/37` E4B + `0/10` 31B):** Five early E4B-checkpoint runs (`DIAG` `0/11`, `H1v6` `0/10`, `ARM2` `0/10`, `CAL` `0/3`, `CALv3` `0/3`) plus two `31B` hint runs (`G2` `0/5`, `G2v2` `0/5`). The same-checkpoint `31B` floor is `0/10`.
+* **Calibrated Slice (`W1`, `n=10`, and `W2A`, `n=22`):** `32` single-file bugs (`adds-test` structure, gold patch `271–1194` chars), split into the first `10` (`W1`) and the held-out `22` (`W2A`, pre-registered bar: `>= 6/22` solves to prove calibration holds out-of-sample).
+* **Verification-Prompt Test (`W2B`, `n=10`):** Re-running `W1`'s exact `10` tasks with explicit `VERIFY-FIX` instructions added to the prompt—nothing else changed.
+* **Target-Function Hint Test (`G2v2`, `n=5`, counted in the `0/47` floor above):** Adding the exact target function name to the issue text on three misses (`requests_7309`, `requests_7328`, `rich_3296`) plus two stubborn controls (`requests_7205`, `requests_7315`), requiring `>= 1/3` probe conversions.
+* **Fresh Stratified Holdout (`FAM`, `n=12`):** Twelve never-before-seen tasks split `4/4/4` into `rich-small` (gold `<600` chars), `rich-large` (`800–1100` chars), and `non-rich` (`fastapi` and `requests`).
+* **High-Temperature Sampling Probe (`Best-of-3`, `n=5 × 3 = 15` runs):** Running three independent rollouts per task at `T=0.75` on the five `G2v2` failure tasks (without function hints) to see if higher temperature breaks them out of their wrong-patch habits.
 
-G2v2 (n=5): Target-function symbol injection on three variable/scope misses (requests_7309, requests_7328, rich_3296) and two fixed-attractor controls (requests_7205, requests_7315) (counted in the 0/47 floor above), requiring >= 1/3 probe conversions.
+### 2.3 Zero-GPU Trace Audit & Clean-Data Filter
+We inspected all `44` landed traces locally (`0` GPU hours), checking every modified file, `submit` call, `CONFIDENCE` line, and `pytest` command. A trace counts as a **surgical green** only if all six rules pass: (1) `resolved=true` (`exit=0`), (2) patch length `200–1200` chars, (3) `CONFIDENCE` line citing a passing check, (4) `files_changed == 1`, (5) zero edits to test files, and (6) zero edits to docs or config files. Only **`9` traces** survive across the entire dataset (`10` before cutting one docs-only fix in `FAM`).
 
-FAM (n=12): Twelve never-before-evaluated tasks balanced across three strata (4 × 3).
+---
 
-Best-of-3 Sampling Probe (n=5 × 3): High-temperature (T=0.75) multi-rollout probe testing whether the five G2v2 failure tasks escape their basins under sampling diversity.
+## 3. Experiments
 
-2.3 Surgical-Green Hygiene Filter and Zero-GPU Audit
-A fix the agent cannot cleanly reproduce in its own trace is unsafe post-training data. We audited all 44 unique landed traces locally (0 GPU hours), extracting every modified file path, submit call, CONFIDENCE line, and pytest invocation. A trajectory qualifies as a surgical green only if all six programmatic conditions hold: (1) resolved=true (exit=0), (2) 200 <= patch_chars <= 1200, (3) CONFIDENCE line citing a passing check, (4) files_changed == 1, (5) zero edits to test files, and (6) zero edits to documentation or configuration files.
+### 3.1 The Calibration Ladder: `0/47` to `14/32`
 
-2.4 Held-Out Stratified Probe (FAM)
-Because WIN-SLICE tasks were selected through calibration criteria, WIN solve rates represent public-set upper bounds. FAM tests out-of-sample transfer across 12 fresh tasks partitioned 4/4/4 into rich-small (gold <600 chars), rich-large (gold 800–1100 chars), and non-rich (fastapi and requests). Its pre-registered decision matrix separates three hypotheses: high rich-small with rich-large collapse supports a size cliff (G1); high rich across sizes with low non-rich supports a repository-family prior (G3); a flat low profile rejects both in favor of calibration selection.
+| Arm / Stage | What Was Tested | Solved | Rate | Wilson 95% CI | Notes |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **Baseline (`7` arms)** | Uncalibrated & hint arms | `0/47` | `0.0%` | `[0.0%, 7.6%]` | `0/37` E4B (`DIAG`, `H1v6`, `ARM2`, `CAL`, `CALv3`) + `0/10` 31B (`G2`, `G2v2`) |
+| **`MAIN10`** | Pre-calibration E4B slice | `0/10` | `0.0%` | `[0.0%, 27.8%]` | Subset of `H1v6`/`ARM2` with multi-file diffs up to `19 KB` (not extra runs) |
+| **`W1`** | First `10` calibrated tasks | `5/10` | `50.0%` | `[23.7%, 76.3%]` | `fastapi_14786`, `rich_2943`, `rich_3882`, `fastapi_13537`, `rich_3518` |
+| **`W2B`** | `W1` + `VERIFY-FIX` prompt | `5/10` | `50.0%` | `[23.7%, 76.3%]` | Exact same `5` wins and `5` losses (`10/10` match; `0/5` miss conversion) |
+| **`W2A`** | Held-out `22` calibrated tasks | `9/22` | `40.9%` | `[23.3%, 61.3%]` | `7/10` on gold `<= 569B`; `2/12` on gold `>= 629B` (`14372`, `5077`) |
+| **`WIN` Combined** | `W1 + W2A` calibrated slice | **`14/32`** | **`43.8%`** | **`[28.2%, 60.7%]`** | `+43.8` pp over the `0/10` 31B floor (two-sided Fisher exact `p = 0.017`) |
+| **`FAM` (Holdout)** | `12` brand-new tasks (`4 × 3`) | **`3/12`** | **`25.0%`** | **`[8.9%, 53.2%]`** | Flat `1/4 × 3` (`3/11 = 27.3%` excluding `rich_3506` sandbox lag kill) |
+| **`Best-of-3` (`T=0.75`)** | `5` misses × `3` high-temp rollouts | **`0/15`** | **`0.0%`** | **`[0.0%, 20.4%]`** | `0/5` tasks converted (`0/3` attractors, `0/2` variable-patch tasks) |
 
-3. Experiments
-3.1 The Calibration Ladder: 0/47 to 14/32
-Stage / Arm	Cohort	Resolved	Rate	Wilson 95% CI	Notes
-Baseline (7 arms)	Uncalibrated & injection arms	0/47	0.0%	[0.0%, 7.6%]	DIAG 0/11, H1v6 0/10, ARM2 0/10, CAL 0/3, CALv3 0/3, G2 0/5, G2v2 0/5 (0/37 E4B + 0/10 31B)
-MAIN10	Pre-calibration slice	0/10	0.0%	[0.0%, 27.8%]	Subset of the 5 E4B-era baseline arms (10 tasks common to H1v6 and ARM2); shown separately for pre-calibration context, not additional runs
-W1	First 10 of WIN-SLICE	5/10	50.0%	[23.7%, 76.3%]	fastapi_14786, rich_2943, rich_3882, fastapi_13537, rich_3518
-W2B	W1 + VERIFY FIX prompt	5/10	50.0%	[23.7%, 76.3%]	Identical 5/5 pass/fail set (10/10 agreement; 0/5 miss conversion)
-W2A	Held-out 22 of WIN-SLICE	9/22	40.9%	[23.3%, 61.3%]	7/10 on gold <= 569B; 2/12 on gold >= 629B (14372, 5077)
-WIN Combined	W1 + W2A (WIN-SLICE)	14/32	43.8%	[28.2%, 60.7%]	Overlapping CIs confirm W1 and W2A sample the same ~0.44 regime
-FAM (Held-Out)	Fresh 4 × 3 stratified probe	3/12	25.0%	[8.9%, 53.2%]	Flat 1/4 × 3 (3/11 = 27.3% excluding rich_3506 sandbox latency kill)
-￼
-The step from 0% to 43.8% (+43.8 percentage points over the 0/10 same-checkpoint 31B floor; two-sided Fisher exact p = 0.017, non-overlapping 95% CIs) comes from task selection paired with a frozen procedural envelope, not weight changes. Within WIN-SLICE, tasks with gold <= 600 chars solved at 12/20 (60.0%) versus 2/12 (16.7%) above 600 chars (OR = 7.50, two-sided Fisher exact p = 0.028), and Textualize/rich solved 8/9 (88.9%) versus 5/13 (38.5%) in fastapi and 1/10 (10.0%) in psf/requests. FAM tests whether those within-slice patterns hold out-of-sample. The p = 0.028 split is unadjusted for three family comparisons (Bonferroni-adjusted p = 0.084, not significant under a strict threshold); the family split is exploratory — consistent with FAM's replication failure.
+Picking well-scoped single-file tasks and freezing the workflow lifted the model from `0/10` to `14/32` (`43.8%`, `p = 0.017`) with zero weight updates. Two patterns looked strong:
+* **Patch size:** Tasks with gold diffs `<= 600` chars solved at `12/20` (`60.0%`) vs. `2/12` (`16.7%`) above `600` chars (`OR = 7.50`, two-sided Fisher exact `p = 0.028`).
+* **Repository:** `Textualize/rich` solved `8/9` (`88.9%`) vs. `5/13` (`38.5%`) in `fastapi` and `1/10` (`10.0%`) in `psf/requests` (exploratory; Bonferroni-adjusted `p = 0.084` across three repositories).
 
-3.2 Two Controlled Nulls
-Verification prompting does not convert (W2B: 0/5 misses converted, 5/10 identical set).
+Our fresh holdout (`FAM`) tested whether either pattern actually holds on new bugs.
 
-Appending explicit VERIFY FIX instructions to the W1 prompt left binary outcomes unchanged on all 10 tasks. Under independent rollouts at p=0.5, exact 10/10 agreement occurs with probability 0.5^10 = 9.8e-4 (Cohen's kappa = 1.00), confirming task-locked behavior. The 95% Wilson upper bound on miss conversion is 43.4% for W2B alone (0/5) and 27.8% across all 0/10 W2B + G2v2 single-rollout probes. Crucially, the prompt change did alter patch trajectories on three of the five misses—rich_3296 expanded from 539 to 1,737 chars, requests_7328 expanded from 884 to 3,127 chars (shifting its redirect guard from len(hist)-1 >= max to len(hist) > max), and fastapi_14258 shrank from 2,308 to 1,085 chars—while requests_7205 and requests_7315 converged to the exact same flawed guards (if _netrc and any(_netrc) and deleting the // collapse block). Verification prompting shifts trajectory length without converting outcomes.
+### 3.2 Two Controlled Prompt & Hint Nulls
 
-Target-function specification does not convert (G2v2: 0/5 converted).
+**1. Verification prompting converts nothing (`W2B`: `0/5` misses converted, `5/10` identical set).**  
+Adding explicit `VERIFY-FIX` instructions (re-run the failing reproducer after editing and verify the fix) to `W1` changed the pass/fail result on **zero tasks**: the exact same five passed and the exact same five failed (`Cohen's kappa = 1.00`; probability under independent `50/50` rollouts is `0.5^10 = 9.8e-4`; 95% Wilson upper bound on miss conversion is `43.4%` in `W2B` and `27.8%` across all `10` single-rollout probes). Interestingly, the agent *did* write very different patches on three of the five misses—`rich_3296` grew from `539` to `1,737` chars, `requests_7328` grew from `884` to `3,127` chars (changing its redirect guard from `len(hist)-1 >= max` to `len(hist) > max`), and `fastapi_14258` shrank from `2,308` to `1,085` chars—while `requests_7205` and `requests_7315` repeated the exact same wrong edits (`if _netrc and any(_netrc)` and deleting the `//` path-collapse block). Verification prompts change how much code the model writes, not whether it solves the bug.
 
-Appending the target function and file directly to the issue text ("The change required is in _parse_content_type_header in src/requests/utils.py. Other functions with similar patterns are out of scope.") converted 0/3 probes (requests_7309, requests_7328, rich_3296) and 0/2 attractor controls (requests_7205, requests_7315). Most tellingly, requests_7309 emitted the identical 687-character diff (16 calls) with the target function named as it had in W2A (21 calls) without it. One important scope caveat bounds this claim: on 7309, the gold patch also modifies the sister function parse_dict_header, which G2v2's wording fenced out. Thus G2v2 falsifies "naming the primary function converts", not "complete specification converts". In CALv3, providing both functions and behavioral facts moved 7309's diff from 687 to 1,326 chars with its second hunk aligned toward gold—and still failed assertions. Specification changes the patch distribution without converting the outcome (CALv3: 687 to 1,326 chars, second hunk in the gold direction, still fails) — insufficient to convert capability/prior misses.
+**2. Naming the target function converts nothing (`G2v2`: `0/5` converted).**  
+Appending the target function and file path to the issue text (*"The change required is in `_parse_content_type_header` in `src/requests/utils.py`. Other functions with similar patterns are out of scope."*) converted `0/3` probes (`requests_7309`, `requests_7328`, `rich_3296`) and `0/2` controls (`requests_7205`, `requests_7315`). On `requests_7309`, the agent wrote the **exact same `687`-character wrong patch** (`16` calls) with the function name handed to it as it had without the hint (`21` calls). One honest caveat bounds this finding: on `7309`, the true fix also edits the sister function `parse_dict_header`, which our hint wording ruled out of scope. So `G2v2` proves *naming the main function is not enough*, not that *full specification is useless*. In an earlier arm (`CALv3`) that named both functions and behavioral details, `7309`'s diff grew from `687` to `1,326` chars with its second hunk moving in the right direction—and still failed tests. Extra specification shifts the patch without converting the result.
 
-3.3 The Flat Held-Out Probe (FAM: 3/12, Exact 1/4 × 3)
-Stratum (n=4 each)	Resolved	Solved Task (patch, calls)	Failed Tasks (exit, patch, calls)
-rich-small	1/4 (25.0%)	rich_3470 (2970B, 28c)	rich_3471 (1, 1026B, 28c), rich_3472 (1, 0B, 28c), rich_3063 (1, 1212B, 25c)
-rich-large	1/4 (25.0%)	rich_3480 (2242B, 21c)	rich_3064 (1, 2074B, 28c), rich_3535 (1, 798B, 24c), rich_3506 (-1, 0B, 9c)
-non-rich	1/4 (25.0%)	fastapi_14492 (388B, 18c)	fastapi_14360 (2, 634B, 24c), fastapi_5624 (1, 2094B, 28c), requests_7502 (1, 2633B, 28c)
-￼
-A flat 1/4 × 3 readout (exact p = 1.00, per-stratum 95% CI [4.6%, 69.9%]) falsifies both structural hypotheses simultaneously: rich-small and rich-large tie (rejecting G1), and rich and non-rich tie (rejecting G3). Comparing Textualize/rich inside WIN-SLICE (8/9, 88.9%) against fresh rich tasks in FAM (2/8, 25.0%) yields a significant selection gap (two-sided Fisher exact p = 0.015), proving the 88.9% rich rate was an artifact of WIN's calibration filter, not intrinsic repository simplicity. Three trace-level findings sharpen this result:
+### 3.3 The Flat Fresh Holdout (`FAM`: `3/12`, Exact `1/4 × 3`)
 
-rich_3506 died at 9 tool calls (482.2s, exit=-1, patch=0) due to sandbox command latency (396s on a single grep and 250s on one-liners), making the capability rate 3/11 (27.3%) excluding harness latency kills.
+| Bucket (`n=4` each) | Solved | Winning Task (`patch`, `calls`) | Failed Tasks (`exit`, `patch`, `calls`) |
+| :--- | :---: | :--- | :--- |
+| **`rich-small`** | `1/4` (`25.0%`) | `rich_3470` (`2970B`, `28c`) | `rich_3471` (`1`, `1026B`, `28c`), `rich_3472` (`1`, `0B`, `28c`), `rich_3063` (`1`, `1212B`, `25c`) |
+| **`rich-large`** | `1/4` (`25.0%`) | `rich_3480` (`2242B`, `21c`) | `rich_3064` (`1`, `2074B`, `28c`), `rich_3535` (`1`, `798B`, `24c`), `rich_3506` (`-1`, `0B`, `9c`) |
+| **`non-rich`** | `1/4` (`25.0%`) | `fastapi_14492` (`388B`, `18c`) | `fastapi_14360` (`2`, `634B`, `24c`), `fastapi_5624` (`1`, `2094B`, `28c`), `requests_7502` (`1`, `2633B`, `28c`) |
 
-rich_3472 executed 28 read-only grep calls (165.1s) and submitted an empty diff—motivating an explicit empty-submit ban and read time-boxing.
+A flat `1/4 × 3` result (`exact p = 1.00`, 95% CI `[4.6%, 69.9%]` per bucket) rules out both group predictors at once: `rich-small` and `rich-large` tie (no size cliff), and `rich` and `non-rich` tie (no repository advantage). Comparing `Textualize/rich` inside `WIN-SLICE` (`8/9 = 88.9%`) against fresh `rich` tasks in `FAM` (`2/8 = 25.0%`) gives a sharp gap (two-sided Fisher exact `p = 0.015`), showing that the `88.9%` `rich` rate came from `WIN` task selection rather than `rich` being an easy codebase. Three trace details sharpen the score:
+1. **`rich_3506` died from sandbox lag (`3/11 = 27.3%` ex-timeout):** `482.2 s`, `exit=-1`, `0` edits after `9` calls — one `grep` took `396 s`.
+2. **`rich_3472` burned `28` read-only calls (`165.1 s`) and submitted an empty diff:** A simple **empty-submit ban** and per-command read timeout prevents both zero-diff losses without touching model weights.
+3. **`fastapi_14492` edited a docs file (`docs_src/metadata/tutorial001_1_py39.py`):** Valid for the `3/12` benchmark score, but excluded from our source-only training pool.
 
-fastapi_14492 resolved by editing a documentation example (docs_src/metadata/tutorial001_1_py39.py), counting in 3/12 as graded while being excluded from source-only training data.
+### 3.4 What the 44-Trace Audit Found
+Only **`9` of `14`** `WIN` solves are clean source-only surgical fixes (`10` of `44` before cutting `fastapi_14492`'s docs edit):
+* **Compact diffs win (`<= 1,200` chars):** Across `WIN-SLICE`, patches `<= 1,200` chars solved at **`11/17` (`64.7%`)** vs. **`3/15` (`20.0%`)** above `1,200` chars (`OR = 7.33`, two-sided Fisher exact `p = 0.016`). Three `WIN` wins exceeded `1,200` chars (`rich_3882` `1,475B`, `fastapi_14372` `2,110B`, `fastapi_5077` `3,803B`), and two edited test files (`fastapi_9425` touched `test_annotation.py`; `rich_3067` made `13` edits to `tests/test_highlighter.py`).
+* **All four `fastapi` `exit-2` crashes are logic errors, not syntax errors:** Every `exit-2` failure across all `44` traces (`fastapi_14360`, `14303`, `14430`, `11355`) Every `exit-2` across all `44` traces (`14360`, `14303`, `14430`, `11355`) is semantic, so a post-edit `py_compile` guard would save **`0/4`**: `14360` failed an HTTP `200` assertion, `14303` printed `"Test failed"` after already running `py_compile`, `14430` printed union-typing mismatches, and `11355` hit a `TypeError` in its own reproducer script.
+* **Self-verification theater:** Only `3/44` traces ever ran `pytest` (`2` crashed during test collection, `1` ran `48` tests and failed), while `11/12` `FAM` traces relied entirely on agent-written `repro.py` scripts, each ending with a confident `CONFIDENCE` line quoting its own output. Fine-tuning on `9` `rich`-skewed traces risks overfitting one library while frozen `31B` scores `27.3%` on fresh tasks.
 
-3.4 Forensic Audit Across All 44 Traces
-Applying the surgical-green filter across all 17 solves (14 WIN + 3 FAM) leaves 9 clean source-only surgical greens (10 before excluding fastapi_14492's docs edit). Across WIN-SLICE, patches <= 1,200 chars solved at 11/17 (64.7%) versus 3/15 (20.0%) above 1,200 chars (OR = 7.33, two-sided Fisher exact p = 0.016), backing the 1,200-char locality boundary with an exact test:
+### 3.5 High-Temperature Sampling Probe (`Best-of-3`, `T=0.75`)
+Because baseline runs at `T=0.2` are nearly deterministic, a single miss could just be a bad roll of the dice. We tested the five `G2v2` failure tasks across two groups—**Attractors (`requests_7205`, `requests_7315`, `requests_7309`)** and **Multi-Modal Misses (`requests_7328`, `rich_3296`)**—running **`K=3` independent rollouts at `T=0.75`** (`15` runs total, no issue hints) and hashing every final diff (`SHA-256`).
 
-Excluded for size (>1200B): rich_3882 (1475B), fastapi_14372 (2110B), fastapi_5077 (3803B), rich_3470 (2970B), and rich_3480 (2242B, which hit the 480s wall timeout before explicit submit).
+| Group | Task | Rollout 1 (`patch`, `calls`, `hash`) | Rollout 2 (`patch`, `calls`, `hash`) | Rollout 3 (`patch`, `calls`, `hash`) | Converted |
+| :--- | :--- | :--- | :--- | :--- | :---: |
+| **Attractor** | `requests_7205` | `3498B`, `28c` (`d3fb4e5f6136`) | `502B`, `23c` (`c0a47bd2c1b4`) | `502B`, `25c` (`c0a47bd2c1b4`) | `0/3` |
+| **Attractor** | `requests_7315` | `521B`, `21c` (`8a947f41a86f`) | `521B`, `14c` (`8a947f41a86f`) | `1352B`, `28c` (`64af87569ac6`) | `0/3` |
+| **Attractor** | `requests_7309` | `687B`, `13c` (`600a2da88433`) | `687B`, `12c` (`600a2da88433`) | `687B`, `18c` (`600a2da88433`) | `0/3` |
+| **Multi-Modal** | `requests_7328` | `4419B`, `28c` (`a7a17b132a4a`) | `5940B`, `28c` (`a7f82bf6a9bc`) | `2289B`, `28c` (`9f146015d241`) | `0/3` |
+| **Multi-Modal** | `rich_3296` | `539B`, `26c` (`51f248c709d3`) | `503B`, `28c` (`69c9aaf817b0`) | `4261B`, `28c` (`6e290e963a20`) | `0/3` |
 
-Excluded for test/docs edits: fastapi_9425 modified test_annotation.py, rich_3067 made 13 edits to tests/test_highlighter.py, and fastapi_14492 modified docs_src/....
+**Result (`0/15` runs, `0/5` tasks converted; 95% Wilson upper bound `20.4%`):**
+* **Attractors (`0/3`):** Even at `T=0.75`, `requests_7309` emitted the **exact byte-identical `687B` diff (`600a2da88433`) in `3/3` rollouts**, while `7205` and `7315` repeated identical wrong hashes (`c0a47bd2c1b4` and `8a947f41a86f`) in `2/3` rollouts. Weight-locked, not sampling noise.
+* **Multi-Modal Misses (`0/2`):** six distinct patches, `0/6` solved; `7328` runs bloated to `2.3–5.9 KB` at the `28`-call cap. With `W2B` (`0/5`) and `G2v2` (`0/5`), `0/15` across `30` runs rules out prompts, hints, and sampling on frozen `31B` weights.
 
-Semantic exit-2 failures refute a syntax guard: All four exit-2 losses across the 44 traces (fastapi_14303, 14430, 11355, 14360) were semantic assertion or custom reproducer errors (14360 asserted HTTP 200, 14303 printed "Test failed" after running py_compile, 14430 printed union-typing mismatches, and 11355 raised a TypeError in its own repro.py) with zero syntax or import collection breaks. A post-edit py_compile / --collect-only gate would recover 0/4.
+---
 
-Self-verification theater: Only 3/44 traces ever invoked pytest (2 failed collection, 1 selected 48 tests and still failed), while 11 of 12 FAM traces relied exclusively on hand-written repro.py scripts (rich_3506 wrote zero scripts before its harness kill). CONFIDENCE lines quoted reproducer stdout verbatim without exit codes or suite pass counts. Quarantine of small-N (n=9) LoRA fine-tuning follows directly: updating low-rank weights on 9 trajectories skewed toward one library (rich) risks out-of-distribution negative transfer while frozen base 31B already achieves 27.3% on fresh tasks.
+## 4. Related Work
 
-3.5 High-Temperature Sampling Basin Probe (Best-of-3, T=0.75)
-At T=0.2, near-deterministic decoding measures a single basin per task. To test whether the five G2v2 failures are escapable sampling basins or weight-locked attractors, we evaluate K=3 independent rollouts at T=0.75 across two pre-registered strata—Stratum A (Attractors): requests_7205, requests_7315, requests_7309; Stratum B (Multi-Modal): requests_7328, rich_3296—ranking non-empty candidate diffs via existing repository test suites with ties broken toward smaller patches. Pre-registered thresholds: >= 1/3 conversion in Stratum A indicates sampling-escapable basins (0/3 indicates weight lock); >= 1/2 conversion in Stratum B indicates execution-ranked Best-of-K harvests rollout variance.
+Prior coding-agent research points to three main reasons small models fail: finding the right code (**localization**), knowing whether a fix works (**verification**), and having enough domain examples (**training scale**). Bellam (2026) tested nine open-weight models (`0.6B–32B`, including Gemma 4 `E2B–12B`) across `500` SWE-bench tasks and found that code-graph and embedding search tools raise function localization (`Acc@10`) by `+0.06–0.10` on tiny models, with almost zero gain at `32B`—and random tool outputs actively hurt accuracy. Our traces confirm the flip side: the agent consistently finds and reads the right target symbols with `grep`, yet still fails at the same rate because finding the line is not the same as writing the right logic.
 
-Raising sampling temperature to T=0.75 across K=3 rollouts converted 0/5 tasks (0/3 in Stratum A, 0/2 in Stratum B; 0/15 rollouts resolved). Even under elevated temperature, requests_7205, requests_7315, and requests_7309 failed to escape their wrong-patch basins—7309 emitting the identical 687-char diff in all three reps—while requests_7328 and rich_3296 produced distinct candidate diffs (2,289–5,940 and 503–4,261 chars) that still failed boundary assertions. Together with W2B (0/5) and G2v2 (0/5), this closes all inference-time prompt, specification, and sampling levers on frozen 31B weights: breaking these failure modes requires weight-level updates at multi-repository scale.
+Live-benchmark and post-training papers explain both our holdout drop and why we avoided small-sample fine-tuning. Zhang et al. (2025) built *SWE-bench-Live* (`1,319` tasks across `93` repositories) because static benchmark scores (`43.2%`) overstate real-world pass rates (`19.3%`)—matching our drop from calibrated `WIN-SLICE` (`43.8%`) to fresh `FAM` tasks (`25.0%`). Meanwhile, Kim et al. (2026) (*FrogNano*) trained a `4B` coding agent using reinforcement learning across `~1,500` synthetic tasks matched to the model's difficulty frontier, showing that weight updates work when paired with large-scale, difficulty-matched environments—not `9` single-library traces.
 
-4. Related Work
-Prior coding-agent literature attributes small-model repair failures to three bottlenecks: fault localization, verification distinguishability, and domain priors (Yang et al., 2024; Xia et al., 2024). Locate-then-repair pipelines target localization, yet our traces routinely follow the prompt's SPEC and grep localization protocol on exact target symbols and still fail at identical rates—demonstrating that procedural compliance does not guarantee repair synthesis. Self-verification and execution-reranking studies (Jain et al., 2025; Ehrlich et al., 2025) show that single-rollout agent-authored tests exhibit low distinguishability between valid and invalid patches; our W2B null (0/5 conversion) and CONFIDENCE trace audit provide direct empirical confirmation. Finally, post-training scaling work (Yang et al., 2025; Pan et al., 2025) indicates that ~32B code-repair SFT requires hundreds to thousands of multi-repository trajectories to avoid out-of-distribution regression, motivating our quarantine of 9-trajectory LoRA updates in favor of distribution-invariant harness controls. Our 25–30% held-out rate sits between structural-tooling repair rates on small models (16.7% repair-given-gold with code-graph localization; Bellam, 2026) and live-benchmark small-patch rates (48%; Zhang et al., 2025), and below calibrated curriculum training (61.5%; Kim et al., 2026). The consistency with localization-only gains suggests our calibrated rate is a realistic small-model measurement; the gap to curriculum-trained agents suggests training-distribution design, not inference-time calibration, is the next lever.
+---
 
-5. Limitations
-Single Model & Harness Lineage: All 54 runs evaluate gemma-4-31b-it-qat-w4a16-ct inside one ADK tool envelope; methodology transfers across architectures, while absolute solve rates are model- and sandbox-specific.
+## 5. Limitations
 
-Stratum Power (n=4 per FAM cell): FAM is powered to detect large cliffs (>= 50 percentage-point gaps) and falsifies strong group predictors, but is blind to modest (10–15 pp) covariate effects: at n=4 per cell, Fisher exact reaches p < 0.05 only at 4/4 vs 0/4 (p = 0.029); 1/4 vs 1/4 gives p = 1.00 (95% CI [4.6%, 69.9%]).
+1. **One model and sandbox:** Our methodology transfers to any agent setup, while exact pass rates reflect `gemma-4-31b-it-qat-w4a16-ct` inside this ADK shell environment.
+2. **Small bucket size in `FAM` (`n=4` per group):** At `n=4` per bucket, Fisher's exact test only reaches `p < 0.05` for huge gaps (`4/4` vs. `0/4`, `p = 0.029`; `1/4` vs. `1/4` gives `p = 1.00`, 95% CI `[4.6%, 69.9%]`). `FAM` catches big cliffs, not small `10–15%` differences.
+3. **Self-written reproducers:** Most traces verified edits with custom `repro.py` scripts rather than the hidden grading test suite.
+4. **Public repositories:** `Textualize/rich`, `fastapi/fastapi`, and `psf/requests` are public codebases that may appear in pretraining data, making `WIN-SLICE` (`43.8%`) an upper bound.
+5. **Cross-checkpoint baseline:** Five of the seven baseline arms ran on Gemma 4 E4B (`37` runs); the `31B`-only floor is `0/10` on attractor tasks (`0/10 -> 14/32`, `p = 0.017`).
 
-Public Repository Contamination: Textualize/rich, fastapi/fastapi, and psf/requests are public open-source repositories potentially represented in pretraining data, making WIN-SLICE (43.8%) an upper bound relative to private evaluation repositories.
+---
 
-Partial Injection Coverage: fastapi_14258 was evaluated in W1 and W2B but not included in G2v2, and G2v2's requests_7309 prompt named only _parse_content_type_header while scoping out sister functions.
+## 6. Conclusion
 
-Cross-Checkpoint Floor: five of the seven baseline arms ran the E4B checkpoint (37 runs); the 31B-only floor is 0/10 on attractor tasks, so the same-checkpoint calibration step is 0/10 → 14/32. The E4B floor is prior-art context for the near-zero literature, not a controlled same-model comparison.
+Calibration works: freezing a clean workflow and choosing well-scoped single-file tasks moved a `31B` quantized agent from `0/10` same-checkpoint (`0/47` all-checkpoint) to `14/32` (`43.8%`, `p = 0.017`) and `3/11` (`27.3%` ex-latency) on fresh tasks. Verification prompting (`0/5`), target-function hints (`0/5`), and `T=0.75` `Best-of-3` sampling (`0/5`, `0/15` runs) all failed to convert a single miss (95% upper bound `20.4%`). No repository or size bucket predicted success on unseen tasks (`1/4 × 3` on `FAM`). What remains are weight-locked wrong-patch habits (`requests_7309` emitting the exact same `687B` diff across all three `T=0.75` rollouts) and a locality boundary around compact single-file edits (`<= 1,200` chars: `64.7%` vs. `20.0%`, `p = 0.016`). With only `9` clean traces, simple harness guards (empty-submit bans, read time-boxes, stopping `>1,500B` thrash runs) are the most reliable improvements to ship.
 
-6. Conclusion
-Calibration is real: freezing a disciplined procedure and filtering for single-file, well-scoped tasks lifted a 31B quantized agent from 0/10 same-checkpoint (0/47 all-checkpoint) to 14/32 (43.8%) and 3/11 (27.3% ex-latency) on fresh held-out tasks. Verification prompting (0/5), target-function naming (0/5), and high-temperature sampling (0/5 across 15 rollouts) are all insufficient, moving patch shape without converting outcomes. Group-level features—repository family and gold diff length—fail as out-of-sample predictors (1/4 × 3 on FAM). The two interventions the field assumes are the levers — verification discipline and target specification — both fail under controlled tests. Residual failures are governed by task-level parametric attractors and locality boundaries, making OOD-safe harness invariants (empty-submit bans, per-command read time-boxing, and thrash-stopping) and multi-rollout existing-suite selection — the practical contribution of this work: three distribution-invariant harness invariants, (1) an empty-submit ban, (2) per-command read time-boxing, and (3) existing-suite candidate selection, since the agent's own reproducer is theater. Each is a one-line harness change, none requires training, and all three address failure modes observed in the 44-trace audit.
+---
 
-References
-Gemma Team (2026). Gemma 4 Technical Report & Developer Agent Benchmark. Google DeepMind / Kaggle Competition Track (gemma-4-developer-agent, gemma-4-developer-agent-paper).
+## References
 
-Jimenez, C. E., Yang, J., Wettig, A., Yao, S., Pei, K., Press, O., & Narasimhan, K. (2024). SWE-bench: Can Language Models Resolve Real-World GitHub Issues? ICLR 2024.
+1. **Gemma Team (2026).** *Gemma 4 Technical Report & Developer Agent Benchmark.* Google DeepMind / Kaggle Competition (`gemma-4-developer-agent`, `gemma-4-developer-agent-paper`).
+2. **Jimenez, C. E., Yang, J., Wettig, A., Yao, S., Pei, K., Press, O., & Narasimhan, K. (2024).** *SWE-bench: Can Language Models Resolve Real-World GitHub Issues?* ICLR 2024.
+3. **Yang, J., Jimenez, C. E., Wettig, A., Lieret, K., Yao, S., Narasimhan, K., & Press, O. (2024).** *SWE-agent: Agent-Computer Interfaces Enable Automated Software Engineering.* NeurIPS 2024.
+4. **Zhang, L., He, S., Zhang, C., et al. (2025).** *SWE-bench Goes Live!* (`arXiv:2505.23419`).
+5. **Kim, M., Shi, Z., Penaloza, E., Cui, C., Castanyer, R. C., Hashemzadeh, M., et al. (2026).** *FrogNano: Training a 4B Coding Agent via Online Task Synthesis.* (`arXiv:2609.07925`).
+6. **Bellam, S. (2026).** *How Much Do Structural Tools Help Small Coding Agents? A Pre-Registered Scale Study of Code Localization.* (`arXiv:2610.33958`).
 
-Yang, J., Jimenez, C. E., Wettig, A., Lieret, K., Yao, S., Narasimhan, K., & Press, O. (2024). SWE-agent: Agent-Computer Interfaces Enable Automated Software Engineering. NeurIPS 2024.
+---
 
-Jain, N., et al. (2025). R2E-Gym: Procedural Environments and Hybrid Verifiers for Scaling Open-Weight SWE Agents. arXiv:2504.07164.
+## Appendix A — Honesty Notes & Reproducible Kaggle Artifacts
 
-Yang, J., et al. (2025). SWE-smith: Scaling Data for Software Engineering Agents. arXiv:2504.21798.
-
-Pan, J., et al. (2025). Training Software Engineering Agents and Verifiers with SWE-Gym. ICML 2025.
-
-Ehrlich, R., et al. (2025). CodeMonkeys: Scaling Test-Time Compute for Software Engineering. arXiv:2501.14723.
-
-Bellam, S. (2026). How Much Do Structural Tools Help Small Coding Agents? A Pre-Registered Scale Study of Code Localization. arXiv:2610.33958.
-
-Zhang, L., et al. (2025). SWE-bench Goes Live! arXiv:2505.23419.
-
-Kim, M., et al. (2026). FrogNano: Training a 4B Coding Agent via Online Task Synthesis. arXiv:2609.07925.
-
-Appendix A — Reproducibility & Honesty Notes
-Public-Set Bounds vs. Held-Out Rates: WIN-SLICE (14/32 = 43.8%) reflects calibrated public tasks and serves as an upper bound; FAM (3/12 = 25.0%; 3/11 = 27.3% excluding the 482.2s sandbox-latency kill on rich_3506) is the uncalibrated held-out baseline.
-
-Documentation-Only Solve (fastapi_14492): Counted in FAM's 3/12 graded score (exit=0) because the task's target edit resided in docs_src/metadata/tutorial001_1_py39.py, and excluded from the 9-trace source-only surgical green pool.
-
-Specification Caveat (requests_7309): G2v2 named _parse_content_type_header while scoping out sister functions (parse_dict_header), bounding G2v2's claim to primary-function naming; CALv3 supplied both functions and moved the diff (687B -> 1326B) without converting the outcome.
-
-Reproducible Kaggle Kernel Artifacts: 144573461 (W2A), 144573665 (W2B), 144590816 (G2v2), 144590833 (FAM), and 144607478 (Best-of-3 temperature probe).
+* **Public-set upper bounds vs. held-out rates:** `WIN-slice` (`14/32 = 43.8%`) is a calibrated public-set upper bound; `FAM` (`3/12 = 25.0%`; `3/11 = 27.3%` excluding the `482.2 s` sandbox-latency kill on `rich_3506`) is the uncalibrated held-out rate.
+* **Docs-only solve (`fastapi_14492`):** Counted in `FAM`'s `3/12` graded score (`exit=0`) because the target edit lived in `docs_src/metadata/tutorial001_1_py39.py`, and excluded from the `9`-trace source-only training pool.
+* **Hint scope caveat (`requests_7309`):** `G2v2` named `_parse_content_type_header` while ruling out sister functions (`parse_dict_header`), bounding `G2v2` to main-function naming; `CALv3` named both functions and shifted the diff (`687B -> 1326B`) without passing tests.
+* **Kaggle Kernel Execution Manifest:** `144573461` (`W2A`), `144573665` (`W2B`), `144590816` (`G2v2`), `144590833` (`FAM`), and `144607478` (`Best-of-3` temperature probe).
