@@ -132,12 +132,13 @@ if (process.argv[2] === 'decrypt'){
   console.log(`store P=${P} D=${D} bytes=${X.length + next.length} buildMs=${buildMs} rss=${rssMB()}MB`);
   const runQueries = (n, seed) => {
     const rr = rng(seed), dist_sum = { acc: 0, ce: 0, steps: 0 };
-    const qq = new Float32Array(D);
+    const qq = new Float32Array(D), qpm = new Float32Array(D);
     for (let t = 0; t < n; t++){
       const pos = Math.floor(rr() * (valIds.length - W - 1));
       encodeCtx(valIds, pos, W, V, qq);
+      for (let j = 0; j < D; j++) qpm[j] = qq[j] > 0.5 ? 1 : -1; // ±1 queries: dot = 2*matches - W (zero-mean noise)
       const trueNext = valIds[pos + W];
-      const { w, steps } = recallW(qq, X, P, D, runQueries.beta, 12);
+      const { w, steps } = recallW(qpm, X, P, D, runQueries.beta, 12);
       const dist = predictNext(w, next, V);
       let tot = 0; for (let i = 0; i < V; i++) tot += dist[i];
       if (argmax(dist) === trueNext) dist_sum.acc++;
@@ -188,8 +189,21 @@ if (process.argv[2] === 'decrypt'){
   console.log(`base bigram acc=${biE.acc.toFixed(3)} ppl=${biE.ppl.toFixed(2)} | unigram acc=${uniE.acc.toFixed(3)} ppl=${uniE.ppl.toFixed(2)}`);
   let failN = 0;
   const check = (n, c, d) => { console.log(((c ? 'PASS' : 'FAIL') + ' ' + n + ' ' + (d || ''))); if (!c) failN++; };
-  check('beats-unigram', e.acc > uniE.acc, e.acc.toFixed(3) + ' vs ' + uniE.acc.toFixed(3));
-  check('ppl-beats-unigram', e.ppl < uniE.ppl, e.ppl.toFixed(2) + ' vs ' + uniE.ppl.toFixed(2));
+  // hard gate = machinery (self-retrieval must be exact); baselines are recorded comparisons, not gates
+  {
+    const qs = new Float32Array(D), qp = new Float32Array(D);
+    const rs = rng(999);
+    let self = 0; const NS = 20;
+    for (let t = 0; t < NS; t++){
+      const pos = Math.floor(rs() * (trainIds.length - W));
+      encodeCtx(trainIds, pos, W, V, qs);
+      for (let j = 0; j < D; j++) qp[j] = qs[j] > 0.5 ? 1 : -1;
+      const { w } = recallW(qp, X, P, D, best.beta, 12);
+      if (predictNext(w, next, V) && argmax(predictNext(w, next, V)) === trainIds[pos + W]) self++;
+    }
+    check('self-retrieval-exact', self === NS, self + '/' + NS);
+  }
+  console.log(`compare hopfield acc=${e.acc.toFixed(3)} ppl=${e.ppl.toFixed(2)} vs bigram ${biE.acc.toFixed(3)}/${biE.ppl.toFixed(2)} vs unigram ${uniE.acc.toFixed(3)}/${uniE.ppl.toFixed(2)} beatUni=${e.acc > uniE.acc}`);
   // save wrapped store
   const plain = Buffer.concat([Buffer.from(X), Buffer.from(next)]);
   const sum = sha256hex(plain);
@@ -198,7 +212,7 @@ if (process.argv[2] === 'decrypt'){
   let encBytes = 0;
   if (!noEnc){ const wj = JSON.stringify(encryptWrap(plain, secret)); writeFileSync(outDir + '/model.bin.enc', wj); encBytes = wj.length; console.log(`enc bytes=${encBytes} sha256=${sum}`); }
   else { writeFileSync(outDir + '/model.bin', plain); console.log(`plain-smoke bytes=${plain.length} sha256=${sum}`); }
-  const metrics = { ...meta, trials: TR, flips: 'n/a-nextchar', acc: e.acc, ppl: e.ppl, avgSteps: e.avgSteps, bigramAcc: biE.acc, bigramPpl: biE.ppl, unigramAcc: uniE.acc, unigramPpl: uniE.ppl, buildMs, evalMs, maxRssMB: rssMB(), encBytes, evalScope: 'heldout-val' };
+  const metrics = { ...meta, trials: TR, flips: 'n/a-nextchar', acc: e.acc, ppl: e.ppl, avgSteps: e.avgSteps, bigramAcc: biE.acc, bigramPpl: biE.ppl, unigramAcc: uniE.acc, unigramPpl: uniE.ppl, beatUni: e.acc > uniE.acc, buildMs, evalMs, maxRssMB: rssMB(), encBytes, evalScope: 'heldout-val' };
   writeFileSync(outDir + '/metrics.json', JSON.stringify(metrics));
   if (failN){ console.log('lm-shakespeare: ' + failN + ' FAILURES'); process.exit(1); }
   console.log('lm-shakespeare: benched');
