@@ -1,0 +1,20 @@
+{
+ "data": "MNIST train binarized (>128), P=200 stored, corrupt 10% bits, 50 trials, modern Hopfield",
+ "betas": {
+  "beta0.005": {
+   "retrieval": 0,
+   "avgSteps": 4.18,
+   "avgHam": 66
+  },
+  "beta0.02": {
+   "retrieval": 0.02,
+   "avgSteps": 8.32,
+   "avgHam": 50
+  },
+  "beta0.1": {
+   "retrieval": 1,
+   "avgSteps": 2.88,
+   "avgHam": 0
+  }
+ }
+}
