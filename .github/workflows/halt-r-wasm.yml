@@ -19,3 +19,8 @@ jobs:
         run: cd halt-r/rust-recall && cargo build --release --target wasm32-unknown-unknown && cp target/wasm32-unknown-unknown/release/halt_r_recall.wasm recall.wasm && ls -l recall.wasm
       - name: test wasm vs JS reference
         run: cd halt-r/rust-recall && node test-recall.mjs
+      - name: upload wasm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: recall-wasm
+          path: halt-r/rust-recall/recall.wasm
