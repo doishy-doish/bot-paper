@@ -1,0 +1,26 @@
+{
+ "rung": "wasm-recall-core",
+ "date": "2026-11-12",
+ "source": ["rust-recall/Cargo.toml", "rust-recall/src/lib.rs", "rust-recall/test-recall.mjs"],
+ "build": {
+  "workflow": ".github/workflows/halt-r-wasm.yml",
+  "run_id": 43314419634,
+  "conclusion": "success",
+  "runner": "ubuntu-latest (public, CPU only, no secrets)",
+  "steps": ["checkout", "setup-node 20", "rustup target add wasm32-unknown-unknown", "cargo build --release --target wasm32-unknown-unknown", "node test-recall.mjs"]
+ },
+ "artifact": {
+  "file": "recall.wasm",
+  "bytes": 20675,
+  "under_50KB_claim": true
+ },
+ "test": {
+  "toy": "P=8, D=64, beta=8, 12 iters, query corrupt 8 bits",
+  "iters": "12,12 (deterministic rerun identical)",
+  "maxAbsDiff_wasm_vs_JSref": 0.0,
+  "note": "exact match: +/-1 arithmetic is exact in f32 and f64; winner-take-all softmax normalizes identically",
+  "retrieval": "nearest=3 target=3 hamDist=0.0",
+  "checks": ["wasm-runs-iters PASS", "wasm-matches-ref PASS", "wasm-retrieves PASS"]
+ },
+ "verdict": "Recall core verified bit-identical (this toy) between Rust/wasm and JS on a free Actions runner. Browser run next (same bytes via raw fetch)."
+}
