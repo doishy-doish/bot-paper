@@ -31,9 +31,9 @@
     "rep4": 0.9450171821305843,
     "wordValid": 1
    },
-   "buildMs": 11,
-   "evalMs": 1887,
-   "maxRssMB": 85.1,
+   "buildMs": 9,
+   "evalMs": 1903,
+   "maxRssMB": 83.9,
    "encBytes": 1397542,
    "evalScope": "heldout-val"
   },
@@ -66,9 +66,9 @@
     "rep4": 0.8178694158075602,
     "wordValid": 0.6538461538461539
    },
-   "buildMs": 13,
-   "evalMs": 5169,
-   "maxRssMB": 94.3,
+   "buildMs": 12,
+   "evalMs": 5066,
+   "maxRssMB": 91.6,
    "encBytes": 2784206,
    "evalScope": "heldout-val"
   },
@@ -101,9 +101,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 18,
-   "evalMs": 15004,
-   "maxRssMB": 97.3,
+   "buildMs": 19,
+   "evalMs": 14488,
+   "maxRssMB": 101.9,
    "encBytes": 5557542,
    "evalScope": "heldout-val"
   },
@@ -136,9 +136,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 35,
-   "evalMs": 22033,
-   "maxRssMB": 133.3,
+   "buildMs": 33,
+   "evalMs": 20511,
+   "maxRssMB": 133.8,
    "encBytes": 11104206,
    "evalScope": "heldout-val"
   },
@@ -171,9 +171,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 60,
-   "evalMs": 41500,
-   "maxRssMB": 200.3,
+   "buildMs": 62,
+   "evalMs": 38570,
+   "maxRssMB": 198.3,
    "encBytes": 22197543,
    "evalScope": "heldout-val"
   },
@@ -206,9 +206,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 10,
-   "evalMs": 3724,
-   "maxRssMB": 140.9,
+   "buildMs": 8,
+   "evalMs": 3017,
+   "maxRssMB": 135.2,
    "encBytes": 1696206,
    "evalScope": "heldout-val"
   },
@@ -241,9 +241,9 @@
     "rep4": 0.7628865979381443,
     "wordValid": 0.9696969696969697
    },
-   "buildMs": 9,
-   "evalMs": 2873,
-   "maxRssMB": 141.9,
+   "buildMs": 8,
+   "evalMs": 2691,
+   "maxRssMB": 138.1,
    "encBytes": 3381542,
    "evalScope": "heldout-val"
   },
@@ -276,9 +276,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 20,
-   "evalMs": 21071,
-   "maxRssMB": 127.8,
+   "buildMs": 27,
+   "evalMs": 25478,
+   "maxRssMB": 128.6,
    "encBytes": 6752206,
    "evalScope": "heldout-val"
   },
@@ -311,9 +311,9 @@
     "rep4": 0.9759450171821307,
     "wordValid": 0
    },
-   "buildMs": 40,
-   "evalMs": 38803,
-   "maxRssMB": 160.5,
+   "buildMs": 24,
+   "evalMs": 21041,
+   "maxRssMB": 158.3,
    "encBytes": 13493543,
    "evalScope": "heldout-val"
   },
@@ -346,9 +346,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 76,
-   "evalMs": 61585,
-   "maxRssMB": 249.6,
+   "buildMs": 77,
+   "evalMs": 60818,
+   "maxRssMB": 249.7,
    "encBytes": 26976207,
    "evalScope": "heldout-val"
   }
