@@ -1,0 +1,19 @@
+{
+ "rung": "ep-hidden-layers",
+ "date": "2026-11-12",
+ "method": "Equilibrium Propagation: free settle (input clamped) vs nudged settle (output nudged, strength beta); contrastive update (lr/beta)(outer_nudged - outer_free); symmetric W; tanh",
+ "recipe": "settle to true fixed point (25-50 steps, NOT 12); init +-0.3; beta 0.5-1.0. The earlier naive-CHL failure (59.7%) was under-settling, not a principled wall.",
+ "xor2bit": {
+  "arch": "2->8->1",
+  "backprop": "4/4",
+  "ep": "4/4 in 8/9 configs (beta 0.1-1.0 x lr 0.01-0.1, 500 epochs, 50 settle steps)"
+ },
+ "xorNeighbor8bit": {
+  "task": "y = x XOR east-shift(x), 8-bit 1D bipolar, K=300 train / 200 test",
+  "ep_H16_30ep": {"bit": 0.765, "exact": 0.1, "ms": 1589},
+  "ep_H32_60ep": {"bit": 0.7356, "exact": 0.115, "ms": 6236},
+  "backprop_H16_30ep": {"bit": 0.84, "exact": 0.23, "ms": 63},
+  "backprop_H32_100ep": {"bit": 0.8769, "exact": 0.29}
+ },
+ "verdict": "Hidden-layer credit assignment without backprop WORKS (2-bit XOR solved; 8-bit 73-77% vs chance 50% and naive-CHL 59.7%). Gap to backprop (~10 pts) + bigger-H brittleness + ~100x slower (settling) remain open. Architecture consequence: ELM closed-form covers hidden layers now (instant); EP is the principled online rule (demonstrated, CPU-feasible)."
+}
