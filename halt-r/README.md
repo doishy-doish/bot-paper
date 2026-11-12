@@ -259,3 +259,22 @@ trails backprop ~10 pts, bigger-H hurts (optimization brittleness), ~100x slower
 hidden layers now (instant); EP is the demonstrated principled online rule,
 CPU-feasible. Gap-closing stays open.
 (Rung file: rung-ep-hidden.json.)
+
+## Greedy-20 rung (scaling curve: 4 -> 5 -> 10 -> 20 nodes)
+Random 20-node DAG (p=0.15, 25 edges, seed 41), N=2000 obs. Greedy hill-climb
+BIC, best of 3: SHD 6 (add 4, flip 2, del 0), skeleton recall 1.0, 1.45s CPU,
+3362 cached fits. Curve: 4 nodes SHD 0 (1536 evals) -> 5 nodes SHD 0 (122880
+evals) -> 10 nodes SHD 3 (~0.1s) -> 20 nodes SHD 6 (~1.5s). Greedy never
+DELETES a true edge at this density (del 0 throughout 10- and 20-node runs);
+all errors are over-adds + flips — the regime interventions already fix.
+(Rung file: rung-causal-greedy20.json.)
+
+## ELM noise-robustness rung (bigger H hurts under noise)
+8-bit 1D mirror + xor-neighbor, ELM tanh, K=500, ridge 1e-3, noise on inputs
+train+test. Mirror clean: H=64 and H=256 both 100%/100%. Noise10: H=64
+90.5%/44.5% vs H=256 84.1%/27.5% — SMALLER net more robust (capacity overfits
+noise; ridge 1e-3 insufficient at H=256). Xor-neighbor clean: H=256 99.6%/97%
+vs H=64 85.4%/29.5%; noise10 ~71%/10-20%; noise20 ~57-58% (near chance) —
+nonlinearity + noise compound. Lesson: size H to the noise, not the task; or
+raise ridge with noise (untested, noted).
+(Rung file: rung-elm-noise.json.)
