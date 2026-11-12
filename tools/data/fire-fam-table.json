@@ -1,0 +1,110 @@
+[
+ {
+  "id": "rich_3471",
+  "repo": "Textualize/rich",
+  "resolved": false,
+  "exit_code": 1,
+  "patch_chars": 1026,
+  "tool_calls": 28,
+  "duration_s": 261.5
+ },
+ {
+  "id": "rich_3470",
+  "repo": "Textualize/rich",
+  "resolved": true,
+  "exit_code": 0,
+  "patch_chars": 2970,
+  "tool_calls": 28,
+  "duration_s": 389.1
+ },
+ {
+  "id": "rich_3472",
+  "repo": "Textualize/rich",
+  "resolved": false,
+  "exit_code": 1,
+  "patch_chars": 0,
+  "tool_calls": 28,
+  "duration_s": 165.1
+ },
+ {
+  "id": "rich_3063",
+  "repo": "Textualize/rich",
+  "resolved": false,
+  "exit_code": 1,
+  "patch_chars": 1212,
+  "tool_calls": 25,
+  "duration_s": 485.5
+ },
+ {
+  "id": "rich_3480",
+  "repo": "Textualize/rich",
+  "resolved": true,
+  "exit_code": 0,
+  "patch_chars": 2242,
+  "tool_calls": 21,
+  "duration_s": 485.8
+ },
+ {
+  "id": "rich_3064",
+  "repo": "Textualize/rich",
+  "resolved": false,
+  "exit_code": 1,
+  "patch_chars": 2074,
+  "tool_calls": 28,
+  "duration_s": 335.7
+ },
+ {
+  "id": "rich_3535",
+  "repo": "Textualize/rich",
+  "resolved": false,
+  "exit_code": 1,
+  "patch_chars": 798,
+  "tool_calls": 24,
+  "duration_s": 293.6
+ },
+ {
+  "id": "rich_3506",
+  "repo": "Textualize/rich",
+  "resolved": false,
+  "exit_code": -1,
+  "patch_chars": 0,
+  "tool_calls": 9,
+  "duration_s": 482.2
+ },
+ {
+  "id": "fastapi_14492",
+  "repo": "fastapi/fastapi",
+  "resolved": true,
+  "exit_code": 0,
+  "patch_chars": 388,
+  "tool_calls": 18,
+  "duration_s": 77.7
+ },
+ {
+  "id": "fastapi_14360",
+  "repo": "fastapi/fastapi",
+  "resolved": false,
+  "exit_code": 2,
+  "patch_chars": 634,
+  "tool_calls": 24,
+  "duration_s": 324.9
+ },
+ {
+  "id": "fastapi_5624",
+  "repo": "fastapi/fastapi",
+  "resolved": false,
+  "exit_code": 1,
+  "patch_chars": 2094,
+  "tool_calls": 28,
+  "duration_s": 261.3
+ },
+ {
+  "id": "requests_7502",
+  "repo": "psf/requests",
+  "resolved": false,
+  "exit_code": 1,
+  "patch_chars": 2633,
+  "tool_calls": 28,
+  "duration_s": 393.6
+ }
+]
