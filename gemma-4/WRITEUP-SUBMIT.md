@@ -118,6 +118,24 @@ Because baseline runs at `T=0.2` are nearly deterministic, a single miss could j
 
 ---
 
+### 3.6 Census-Guards Probe (pre-registered, kernel 144655910)
+Freezing the winner-shape harness and baking four census guards into system.md (edit-miss recovery, 60s read time-box, empty-submit ban, 1,500-char thrash-stop), we ran 6 valid-miss challenges (baseline 0/6 by construction) + 2 valid-resolve controls on the same 31B shape.
+
+| Arm | Task | Resolved | Patch | Calls | Time |
+| :--- | :--- | :---: | :--- | :---: | :--- |
+| challenge | fastapi_14258 | F | 1513B | 21 | 491s |
+| challenge | fastapi_14487 | F | 1148B | 28 | 181s |
+| challenge | fastapi_15589 | F | 3059B | 28 | 334s |
+| challenge | fastapi_5624 | T | 2880B | 28 | 303s |
+| challenge | rich_3471 | F | 753B | 25 | 485s |
+| challenge | rich_3506 | F | 575B | 10 | 485s |
+| control | rich_3518 | T | 528B | 26 | 92s |
+| control | rich_3470 | F | 2445B | 28 | 297s |
+
+Result (challenges 1/6, controls 1/2): Weak signal, needs larger n -- fastapi_5624 converted but control rich_3470 regressed, and rich_3506 still died submit-less under the read time-box.
+
+---
+
 ## 4. Related Work
 
 Small-model failures trace to three causes: finding code (**localization**), judging fixes (**verification**), and training breadth (**scale**). Bellam (2026) found code-graph and embedding search lift function `Acc@10` by `+0.06–0.10` on tiny models across `500` SWE-bench tasks (`0.6B–32B`, incl. Gemma 4 `E2B–12B`), with ~zero gain at `32B`—and random tool output hurts. Our traces confirm the flip side: the agent finds the right symbols with `grep` yet fails at the same rate, because locating a line is not writing the logic.
@@ -139,7 +157,7 @@ Holdout pessimism and our no-fine-tuning call match the literature. Zhang et al.
 
 ## 6. Conclusion
 
-Calibration works: freezing a clean workflow and choosing well-scoped single-file tasks moved a `31B` quantized agent from `0/10` same-checkpoint (`0/47` all-checkpoint) to `14/32` (`43.8%`, `p = 0.017`) and `3/11` (`27.3%` ex-latency) on fresh tasks. Verification prompting (`0/5`), target-function hints (`0/5`), and `T=0.75` `Best-of-3` sampling (`0/5`, `0/15` runs) all failed to convert a single miss (95% upper bound `20.4%`). No repository or size bucket predicted success on unseen tasks (`1/4 × 3` on `FAM`). What remains are weight-locked wrong-patch habits (`requests_7309` emitting the exact same `687B` diff across all three `T=0.75` rollouts) and a locality boundary around compact single-file edits (`<= 1,200` chars: `64.7%` vs. `20.0%`, `p = 0.016`). With only `9` clean traces, simple harness guards (empty-submit bans, read time-boxes, stopping `>1,500B` thrash runs) are the most reliable improvements to ship.
+Calibration works: freezing a clean workflow and choosing well-scoped single-file tasks moved a `31B` quantized agent from `0/10` same-checkpoint (`0/47` all-checkpoint) to `14/32` (`43.8%`, `p = 0.017`) and `3/11` (`27.3%` ex-latency) on fresh tasks. Verification prompting (`0/5`), target-function hints (`0/5`), and `T=0.75` `Best-of-3` sampling (`0/5`, `0/15` runs) all failed to convert a single miss (95% upper bound `20.4%`). No repository or size bucket predicted success on unseen tasks (`1/4 × 3` on `FAM`). What remains are weight-locked wrong-patch habits (`requests_7309` emitting the exact same `687B` diff across all three `T=0.75` rollouts) and a locality boundary around compact single-file edits (`<= 1,200` chars: `64.7%` vs. `20.0%`, `p = 0.016`). With only `9` clean traces, simple harness guards (empty-submit bans, read time-boxes, stopping `>1,500B` thrash runs) are the most reliable improvements to ship; a pre-registered guards probe on the same shape converted 1/6 misses (controls 1/2, weak signal, S3.6).
 
 ---
 
