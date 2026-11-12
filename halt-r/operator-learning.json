@@ -1,0 +1,44 @@
+[
+ {
+  "rule": "mirror",
+  "K": 500,
+  "exact": 1,
+  "bit": 1,
+  "noise": 0
+ },
+ {
+  "rule": "mirror-noisy10",
+  "K": 500,
+  "exact": 0.155,
+  "bit": 0.899,
+  "noise": 0.1
+ },
+ {
+  "rule": "moveBlock",
+  "K": 200,
+  "exact": 1,
+  "bit": 1,
+  "noise": 0
+ },
+ {
+  "rule": "moveBlock-noisy10",
+  "K": 200,
+  "exact": 0.355,
+  "bit": 0.889,
+  "noise": 0.1
+ },
+ {
+  "rule": "fill",
+  "K": 200,
+  "exact": 1,
+  "bit": 1,
+  "noise": 0
+ },
+ {
+  "rule": "fill-noisy10",
+  "K": 200,
+  "exact": 0.605,
+  "bit": 0.953,
+  "noise": 0.1
+ }
+]
