@@ -1,0 +1,70 @@
+{
+ "nodes": 5,
+ "edges": [
+  "0>2",
+  "0>4",
+  "1>3",
+  "1>4",
+  "2>3",
+  "2>4"
+ ],
+ "N": 500,
+ "note": "self-parent mask bug fixed; exhaustive BIC over 120 orders x 1024 subsets, cached OLS",
+ "obsOnly": {
+  "shd": {
+   "shd": 0,
+   "add": 0,
+   "del": 0,
+   "flip": 0
+  },
+  "ms": 106,
+  "unique": 29281,
+  "estEdges": [
+   "0>2",
+   "0>4",
+   "1>3",
+   "1>4",
+   "2>3",
+   "2>4"
+  ]
+ },
+ "plusSingle": {
+  "shd": {
+   "shd": 0,
+   "add": 0,
+   "del": 0,
+   "flip": 0
+  },
+  "estEdges": [
+   "0>2",
+   "0>4",
+   "1>3",
+   "1>4",
+   "2>3",
+   "2>4"
+  ]
+ },
+ "plusTwo": {
+  "shd": {
+   "shd": 0,
+   "add": 0,
+   "del": 0,
+   "flip": 0
+  },
+  "estEdges": [
+   "0>2",
+   "0>4",
+   "1>3",
+   "1>4",
+   "2>3",
+   "2>4"
+  ]
+ },
+ "effectX0onX4": {
+  "truth": -2.346,
+  "est": -2.443,
+  "err": 0.098,
+  "method": "path-traced total effect on learned weights, obs data only"
+ },
+ "verdict": "5-node scale-up: exhaustive BIC (29,281 DAGs, ~0.1s CPU) recovers exact graph obs-only (SHD 0); no ladder headroom on this instance. Total effect X0->X4 via learned weights accurate; interventional arms confirm stability (SHD 0 throughout). Next: harder instance with near-unfaithful weights for ladder headroom, or nonlinear SEM."
+}
