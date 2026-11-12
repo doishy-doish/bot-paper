@@ -200,7 +200,7 @@ if (process.argv[2] === 'decrypt'){
       const s = Math.floor(rs() * P), pos = spos[s]; // query an ACTUAL stored key
       encodeCtx(trainIds, pos, W, V, qs);
       for (let j = 0; j < D; j++) qp[j] = qs[j] > 0.5 ? 1 : -1;
-      const { w } = recallW(qp, X, P, D, best.beta, 12);
+      const { w } = recallW(qp, X, P, D, best.beta, 1); // single step: argmax must be the key itself
       let bi = 0; for (let i = 1; i < P; i++) if (w[i] > w[bi]) bi = i;
       let same = true;
       for (let j = 0; j < D; j++){ const bit = qp[j] > 0 ? 1 : 0; if (X[bi * D + j] !== bit){ same = false; break; } }
