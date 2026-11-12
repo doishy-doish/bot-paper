@@ -246,3 +246,16 @@ cubic extras). Winner: degree 2, exact feature set, ~580 BIC margin — discover
 needs no human-picked degree. The remaining frontier: cross-term/auto-basis
 selection (GAM-sieve) and orientation under expansion.
 (Rung file: rung-causal-polyauto.json.)
+
+## EP hidden-layer rung (credit assignment without backprop works; trails backprop)
+Equilibrium propagation (free vs nudged settling, contrastive update, symmetric
+W, tanh). Recipe correction on record: the earlier naive-CHL 59.7% failure was
+under-settling (12 steps), not a principled wall — settling to the true fixed
+point (25-50 steps), init +-0.3, beta 0.5-1.0. 2-bit XOR: EP 4/4 in 8/9 configs.
+8-bit xor-neighbor (K=300/200 test): EP H=16 76.5%/10%, H=32 73.6%/11.5% vs
+backprop H=16 84%/23% (63ms) and H=32 87.7%/29%. EP learns (>> chance 50%),
+trails backprop ~10 pts, bigger-H hurts (optimization brittleness), ~100x slower
+(settling: 1.6-6.2s vs 63ms). Architecture consequence: ELM closed-form covers
+hidden layers now (instant); EP is the demonstrated principled online rule,
+CPU-feasible. Gap-closing stays open.
+(Rung file: rung-ep-hidden.json.)
