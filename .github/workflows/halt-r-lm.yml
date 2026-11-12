@@ -61,6 +61,8 @@ jobs:
       - name: merge + table
         run: |
           node halt-r/lm-collect.mjs $(find models -name metrics.json) --out halt-r/lm-bench.json --md halt-r/lm-bench.md
+          mkdir -p halt-r/lm-samples
+          cp models/*/samples-*.txt halt-r/lm-samples/
           cat halt-r/lm-bench.md >> "$GITHUB_STEP_SUMMARY"
       - name: commit bench back
         run: |
@@ -70,7 +72,9 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             node halt-r/lm-collect.mjs $(find models -name metrics.json) --out halt-r/lm-bench.json --md halt-r/lm-bench.md
-            git add halt-r/lm-bench.json halt-r/lm-bench.md
+            mkdir -p halt-r/lm-samples
+            cp models/*/samples-*.txt halt-r/lm-samples/
+            git add halt-r/lm-bench.json halt-r/lm-bench.md halt-r/lm-samples
             git diff --cached --quiet && exit 0
             git commit -m "halt-r: lm bench $(date -u +%F)"
             git push origin main && exit 0
