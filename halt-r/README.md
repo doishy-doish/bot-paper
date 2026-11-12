@@ -76,3 +76,15 @@ Toy: 8x64-bit patterns, 8 flips, 200 trials unless noted. Reasoning: 4x4 binary 
 Frontier: multi-target interventional discovery on larger graphs (PC/GES scale-up),
 nonlinear SEMs (fill-rule needs hidden layer), encoder contrastive learning for
 noise-robust operators. Math-dataset fallback NOT needed - causal loop closed.
+
+## Rung results 2 (all CPU closed-form, no gradients)
+- Hebbian stack (denoise->operate vs direct, mirror): noise2%: direct 74.3%/98.1%
+  vs stacked 67.7%/97.7% (ceiling 72.4%); noise10%: 21.3%/90.3% vs 23.3%/90.4%
+  (ceiling 18.5%). Verdict: single map already AT the noise ceiling; stacking adds
+  nothing on redundancy-free data (denoiser~=identity). Bug caught mid-run
+  (involution mislabel) and corrected. Depth without structure is dead scaffolding.
+- Masked pretraining (3 bits of 16): random grids 62.5%/27% (~prior, learns nothing);
+  2x2-block grids 100%/100%. Self-supervision works iff the data has structure.
+- Systematicity (train d1+d2 shifts, test held-out d3): seen 68%/61%, held-out 24%.
+  Monolithic map can't compose; mixing primitives degrades even seen directions.
+  Fodor's challenge stands = the marked frontier. Next: factorized operators + router.
