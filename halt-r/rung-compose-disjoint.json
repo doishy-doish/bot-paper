@@ -1,0 +1,15 @@
+{
+ "linSpace": 9,
+ "boxSpace": 9,
+ "linearDisjoint": {
+  "train": 4,
+  "test": 5,
+  "exact": 0.2
+ },
+ "nonlinearDisjoint": {
+  "train": 4,
+  "test": 5,
+  "exact": 0.4,
+  "bit": 0.9
+ }
+}
