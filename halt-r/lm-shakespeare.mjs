@@ -92,6 +92,43 @@ function predictNext(w, next, V){
   return dist;
 }
 function normDist(d, V){ let t = 0; for (let i = 0; i < V; i++) t += d[i]; for (let i = 0; i < V; i++) d[i] /= (t + 1e-12 * V); return d; }
+// transplant: read frozen donor token embeddings from a tinygpt GGUF (pure JS, zero deps, zero training)
+function readGraftEmb(gpath, V){
+  const buf = readFileSync(gpath);
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const dec = new TextDecoder();
+  let o = 0;
+  const u32 = () => { const v = dv.getUint32(o, true); o += 4; return v; };
+  const u64 = () => { const v = Number(dv.getBigUint64(o, true)); o += 8; return v; };
+  const rstr = () => { const n = u64(); const s = dec.decode(buf.subarray(o, o + n)); o += n; return s; };
+  const magic = u32(), ver = u32(), nt = u64(), nk = u64();
+  if (magic !== 0x46554747 || ver !== 3) fail('graft: not GGUFv3 ' + gpath);
+  const kvr = () => {
+    const t = u32();
+    if (t === 4) return u32();
+    if (t === 8) return rstr();
+    if (t === 9){ const et = u32(), n = u64(), a = []; for (let i = 0; i < n; i++){ if (et === 8) a.push(rstr()); else fail('graft: unsupported kv array et=' + et); } return a; }
+    fail('graft: unsupported kv type ' + t);
+  };
+  const kv = {};
+  for (let i = 0; i < nk; i++){ const k = rstr(); kv[k] = kvr(); }
+  if (kv['general.architecture'] !== 'halt-tinygpt') fail('graft: arch ' + kv['general.architecture']);
+  const GE = kv['halt.n_embd'];
+  if (kv['halt.vocab_size'] !== V) fail(`graft: donor V ${kv['halt.vocab_size']} vs corpus V ${V}`);
+  let tokOff = -1, tokDims = null;
+  for (let i = 0; i < nt; i++){
+    const name = rstr(), nd = u32(), dims = [];
+    for (let j = 0; j < nd; j++) dims.push(u64());
+    const tt = u32(), off = u64();
+    if (name === 'tok.weight'){ tokOff = off; tokDims = dims; if (tt !== 0) fail('graft: tok.weight not F32'); }
+  }
+  if (tokOff < 0) fail('graft: tok.weight missing in ' + gpath);
+  if (!(tokDims.length === 2 && tokDims[0] === GE && tokDims[1] === V)) fail('graft: tok.weight dims ' + tokDims); // stored reversed; true shape [V, E]
+  const dataStart = o + ((32 - (o % 32)) % 32);
+  const emb = new Float32Array(V * GE);
+  for (let c = 0; c < V; c++) for (let e = 0; e < GE; e++) emb[c * GE + e] = dv.getFloat32(dataStart + tokOff + (c * GE + e) * 4, true);
+  return { emb, GE };
+}
 // ---- io ----
 if (process.argv[2] === 'decrypt'){
   const a = process.argv.slice(3), file = a[0];
@@ -114,7 +151,7 @@ if (process.argv[2] === 'decrypt'){
   const noEnc = a.includes('--no-encrypt');
   const noGen = a.includes('--no-gen'); // P-sweep: skip generation (costly, unneeded per-P)
   const dataPath = gv('data', null), outDir = gv('out', null);
-  if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100] [--proj raw|sim|sup] [--no-gen]');
+  if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100] [--proj raw|...|graft] [--graftgguf <tinygpt.gguf>] [--no-gen]');
   const W = parseInt(gv('W', DEF.W)), TR = parseInt(gv('trials', DEF.trials));
   let P = parseInt(gv('P', DEF.P));
   const P0 = P; // requested store size; P becomes Peff after B2 prune
@@ -138,6 +175,9 @@ if (process.argv[2] === 'decrypt'){
   if (PROV !== '0' && PROV !== '1') fail('usage: --prov 0|1');
   const TOK = gv('tok', 'char'); // H12 subword pilot: char (default, bit-identical), bpe (256 learned merges on train head)
   if (TOK !== 'char' && TOK !== 'bpe') fail('usage: --tok char|bpe');
+  const GRAFTGGUF = gv('graftgguf', null); // transplant: donor GGUF path (keys = frozen donor embeddings, zero training)
+  if (PROJ === 'graft' && TOK !== 'char') fail('usage: --proj graft needs --tok char (donor V is char-level)');
+  if (PROJ === 'graft' && !GRAFTGGUF) fail('usage: --proj graft needs --graftgguf <tinygpt.gguf>');
   const MIX = gv('mix', 'none'); // gmix: none (default, bit-identical), gpt (mix hop + tiny-GPT dists from q100-gpt file, joined on pos)
   if (MIX !== 'none' && MIX !== 'gpt') fail('usage: --mix none|gpt');
   const GPTQ = gv('gptq', null);
@@ -269,7 +309,14 @@ if (process.argv[2] === 'decrypt'){
   // store: seeded sampled train contexts (raw one-hot or SimHash-projected bits)
   const t0 = Date.now();
   const Din = W * V;
-  const D = PROJ === 'raw' ? Din : H;
+  let graftEmb = null, GE = 0; // transplant: frozen donor token rows (zero training)
+  if (PROJ === 'graft'){
+    const g = readGraftEmb(GRAFTGGUF, V);
+    graftEmb = g.emb; GE = g.GE;
+    console.log(`graft donor=${GRAFTGGUF} V=${V} E=${GE} D=${W * GE}`);
+  }
+  const D = PROJ === 'raw' ? Din : (PROJ === 'graft' ? GE : H);
+  const FW = PROJ === 'graft' ? GE : H; // feature width: graft keys live in donor-embedding space
   function gauss1(rr){ let u = 0, v = 0; while (!u) u = rr(); while (!v) v = rr(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
   let M = null; // projection matrix (sim: random Gaussian; sup: supervised from store labels)
   function orthCols(Mm, rows, cols){ // ORF: Gram-Schmidt on column (feature) directions, per-column norms preserved (scales survive rotation)
@@ -287,14 +334,21 @@ if (process.argv[2] === 'decrypt'){
     for (let i = 0; i < M.length; i++) M[i] = gauss1(rr2) * inv;
     if (ORF === '1') orthCols(M, Din, H);
   }
-  function featPM(ids, pos, out){ // ±1 features, length D (FIX: was sim|sup only — sup2 scored raw garbage; now every projected PROJ shares the path)
+  if (PROJ === 'graft'){ // transplant keys: frozen donor rows, shared across positions (order enters via the sum)
+    M = new Float32Array(Din * GE);
+    for (let k = 0; k < W; k++) for (let c = 0; c < V; c++){
+      const base = (k * V + c) * GE, src = c * GE;
+      for (let e = 0; e < GE; e++) M[base + e] = graftEmb[src + e];
+    }
+  }
+  function featPM(ids, pos, out){ // ±1 features, length D (every projected PROJ incl. graft shares the path)
     if (PROJ !== 'raw'){
-      for (let h = 0; h < H; h++) out[h] = 0;
+      for (let h = 0; h < FW; h++) out[h] = 0;
       for (let k = 0; k < W; k++){
-        const base = (k * V + ids[pos + k]) * H;
-        for (let h = 0; h < H; h++) out[h] += M[base + h];
+        const base = (k * V + ids[pos + k]) * FW;
+        for (let h = 0; h < FW; h++) out[h] += M[base + h];
       }
-      for (let h = 0; h < H; h++) out[h] = out[h] >= 0 ? 1 : -1;
+      for (let h = 0; h < FW; h++) out[h] = out[h] >= 0 ? 1 : -1;
     } else {
       out.fill(0);
       for (let k = 0; k < W; k++) out[k * V + ids[pos + k]] = 1;
@@ -1222,7 +1276,7 @@ if (process.argv[2] === 'decrypt'){
   const evalMflops = Math.round(flopSteps * P * D * 2 / 1e6 * 10) / 10; // 2 FLOP per MAC (dot+mix), measured steps
   const pkMflops = Math.round(pkMacs * 2 / 1e6 * 10) / 10; // H9 leaders-index MACs (routing + candidate dots), 0 unless pk=1
   const msMflops = Math.round(msOps * 2 / 1e6 * 10) / 10; // H7 maxsim char-compare ops (0 under whole)
-  const buildMflops = PROJ === 'raw' ? 0 : Math.round(P * W * H * 2 / 1e6 * 10) / 10; // feature-projection estimate (W*H adds per pattern)
+  const buildMflops = PROJ === 'raw' ? 0 : Math.round(P * W * D * 2 / 1e6 * 10) / 10; // feature-projection estimate (W*D adds per pattern; ==old W*H for every prior arm)
   console.log(`flops steps=${flopSteps} evalMflops=${evalMflops} buildMflops=${buildMflops}`);
   // save wrapped store
   const plain = Buffer.concat([Buffer.from(X), Buffer.from(next)]);
@@ -1253,6 +1307,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.tmp = parseInt(TMP) || 0; metrics.tmpT = tmpT; metrics.tmpAccSel = tmpAccSel; metrics.tmpPplSel = tmpPplSel; metrics.tmpAcc = tmpAcc; metrics.tmpPpl = tmpPpl;
   metrics.conf = parseInt(CONF) || 0; metrics.confAbs = confAbs; metrics.confAcc = confAcc; metrics.confPpl = confPpl;
   metrics.orf = parseInt(ORF) || 0;
+  metrics.graft = PROJ === 'graft' ? 1 : 0; metrics.graftE = GE; metrics.graftFile = PROJ === 'graft' ? GRAFTGGUF : null;
   metrics.c2d = parseInt(C2D) || 0; metrics.canRemDetail = canRemDetail; metrics.canEditDetail = canEditDetail;
   metrics.repHitH = repHitH;
   metrics.hedgeAcc = hedgeAcc; metrics.hedgePpl = hedgePpl; metrics.hedgeNeff = hedgeNeff;
