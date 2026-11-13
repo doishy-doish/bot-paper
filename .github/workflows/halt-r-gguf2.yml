@@ -1,0 +1,81 @@
+name: halt-r-gguf2
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/rust-tinygpt/**'
+      - '.github/workflows/halt-r-gguf2.yml'
+permissions:
+  contents: write
+jobs:
+  parity:
+    name: rust parity ${{ matrix.corpus }}
+    runs-on: ubuntu-latest # public runner, CPU only, no secrets (GGUF + ref are committed data)
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        corpus: [shakes, ts]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: build parity binary
+        run: cd halt-r/rust-tinygpt && cargo build --release --bin tinygpt-parity
+      - name: run parity vs committed GGUF + ref
+        run: cd halt-r/rust-tinygpt && ./target/release/tinygpt-parity --gguf ../tinygpt-${{ matrix.corpus }}.gguf --ref ../ref-${{ matrix.corpus }}.json | tee /tmp/parity-${{ matrix.corpus }}.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gguf2-${{ matrix.corpus }}
+          path: /tmp/parity-${{ matrix.corpus }}.txt
+          retention-days: 30
+  collect:
+    name: collect rust-twin parity verdict
+    needs: parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gguf2-*
+          path: models/
+      - name: parity table plus verdict
+        run: |
+          node - <<'EOF' | tee /tmp/gguf2.md
+          const fs = require('node:fs'), path = require('node:path');
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name.endsWith('.txt')) files.push(p); } };
+          walk('models');
+          const runs = files.map(f => {
+            const t = fs.readFileSync(f, 'utf8');
+            const m = t.match(/parity: refs=(\d+) worst_maxdiff=([0-9.eE+-]+) fails=(\d+) (PASS|FAIL)/);
+            const per = [...t.matchAll(/ref(\d+) n=(\d+) argmax got=(\d+) want=(\d+) maxdiff=([0-9.eE+-]+) (OK|FAIL)/g)].map(x => ({ref: +x[1], n: +x[2], got: +x[3], want: +x[4], diff: +x[5], ok: x[6]}));
+            return {file: f, refs: m ? +m[1] : 0, worst: m ? +m[2] : -1, fails: m ? +m[3] : -1, pass: m ? m[4] : 'MISSING', per};
+          });
+          fs.writeFileSync('/tmp/gguf2.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'gguf2-rust-parity', runs}, null, 1));
+          let md = '# GGUF rung 2: Rust f32 twin parity (measured, CI)\nSame committed tinygpt-*.gguf + ref-*.json the baseline exporter verified byte-exact. Rust reader parses GGUFv3 (no deps) and runs the exact rev-2 forward. PASS = all 5 argmax equal AND worst max|diff| < 1e-2 (warn only below).\n\n| corpus | refs | argmax | worst maxdiff | verdict |\n|---|---|---|---|---|\n';
+          for (const r of runs) {
+            const corpus = r.file.includes('shakes') ? 'shakes' : 'ts';
+            const ok = r.pass === 'PASS' && r.refs === 5;
+            md += '| ' + corpus + ' | ' + r.refs + ' | ' + (r.per.length ? r.per.filter(p => p.ok === 'OK').length + '/' + r.per.length : '?') + ' | ' + (r.worst >= 0 ? r.worst.toExponential(2) : '?') + ' | ' + (ok ? 'RUST PARITY PROVEN.' : 'PARITY FAILS.') + ' |\n';
+          }
+          process.stdout.write(md);
+          EOF
+          cp /tmp/gguf2.json halt-r/gguf2.json
+          cp /tmp/gguf2.md halt-r/gguf2.md
+          cat halt-r/gguf2.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit gguf2 back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/gguf2.json halt-r/gguf2.json
+            cp /tmp/gguf2.md halt-r/gguf2.md
+            git add halt-r/gguf2.json halt-r/gguf2.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: gguf2 rust-parity $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
