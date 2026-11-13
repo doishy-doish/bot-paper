@@ -1,0 +1,105 @@
+name: halt-r-h10
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/halt-r-h10.yml'
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: h10 ${{ matrix.corpus }} W${{ matrix.W }} pen-${{ matrix.pen }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        corpus: [shakes, ts]
+        W: [4, 8]
+        pen: [0, 0.5, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fetch corpus
+        run: |
+          if [ "${{ matrix.corpus }}" = ts ]; then
+            curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          else
+            curl -sSL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus.txt
+          fi
+          wc -c /tmp/corpus.txt
+          head -c 200 /tmp/corpus.txt
+      - name: bench degeneration penalty
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/h10-${{ matrix.corpus }}-W${{ matrix.W }}-p${{ matrix.pen }} --tag ${{ matrix.corpus }} --W ${{ matrix.W }} --P 8000 --trials 100 --proj sup --H 256 --ada 0 --score whole --capab none --h6 0 --split 0 --pen ${{ matrix.pen }} --prov 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: h10-${{ matrix.corpus }}-W${{ matrix.W }}-p${{ matrix.pen }}
+          path: out/h10-${{ matrix.corpus }}-W${{ matrix.W }}-p${{ matrix.pen }}/
+          retention-days: 30
+  collect:
+    name: collect penalty verdict
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: h10-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: penalty table plus verdict
+        run: |
+          node - <<'EOF' | tee /tmp/h10.md
+          const fs = require('node:fs'), path = require('node:path');
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          try { walk('models'); } catch (e) { console.log('no metrics found'); process.exit(0); }
+          const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+          runs.sort((a, b) => (a.corpus < b.corpus ? -1 : 1) || a.W - b.W || a.pen - b.pen);
+          fs.writeFileSync('/tmp/h10.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'h10-penalty-decoding', runs}, null, 1));
+          let md = '# H10: degeneration penalty vs argmax lock\nSame protocol (P=8000, sup, fixed lam) with generation ON. Penalty over top-8 candidates: score = log p - PEN * repeats-in-window. C3 provenance cites ride along (report-only).\n\n| corpus | W | pen | rep4 | wordValid |\n|---|---|---|---|---|\n';
+          for (const m of runs) {
+            md += '| ' + m.corpus + ' | ' + m.W + ' | ' + m.pen + ' | ' + m.quality.rep4.toFixed(3) + ' | ' + m.quality.wordValid.toFixed(3) + ' |\n';
+          }
+          for (const corpus of ['shakes', 'ts']) for (const W of [4, 8]) {
+            const g = runs.filter(m => m.corpus === corpus && m.W === W);
+            if (g.length < 2) continue;
+            const f = g.find(m => m.pen === 0);
+            const rest = g.filter(m => m.pen !== 0);
+            if (!f || !rest.length) continue;
+            const rep4ok = r => (f.quality.rep4 - r.quality.rep4) >= 0.1 && Math.abs(r.quality.wordValid - f.quality.wordValid) <= 0.1;
+            const win = rest.filter(rep4ok).sort((x, y) => x.quality.rep4 - y.quality.rep4);
+            md += '\n' + corpus + ' W' + W + ': argmax rep4=' + f.quality.rep4.toFixed(3) + ' wordValid=' + f.quality.wordValid.toFixed(3) + '. ';
+            md += win.length ? ('VERDICT: DECODING MOVES (pen=' + win[0].pen + ' rep4=' + win[0].quality.rep4.toFixed(3) + ' wordValid=' + win[0].quality.wordValid.toFixed(3) + ').') : 'VERDICT: PENALTY FAILS (lock is distributional, not argmax-greedy).';
+            md += '\n';
+          }
+          process.stdout.write(md);
+          EOF
+          cp /tmp/h10.json halt-r/h10.json
+          cp /tmp/h10.md halt-r/h10.md
+          cat halt-r/h10.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit h10 back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/h10.json halt-r/h10.json
+            cp /tmp/h10.md halt-r/h10.md
+            git add halt-r/h10.json halt-r/h10.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: h10 penalty-decoding $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
