@@ -144,6 +144,18 @@ if (process.argv[2] === 'decrypt'){
   if (SPARSE !== '0' && SPARSE !== '1') fail('usage: --sparse 0|1');
   const HEDGE = gv('hedge', '0'); // Hedge/experts adaptive lambda: 0=off (default, bit-identical), 1=online Hedge over the LAMBDAS grid (frozen on select stream, evaluated on report stream; regret-bounded mixing)
   if (HEDGE !== '0' && HEDGE !== '1') fail('usage: --hedge 0|1');
+  const HYB = gv('hyb', '0'); // H8 rare-exact hybrid: 0=off (default, bit-identical), 1=mix dense dots + rare-char exact-match (alpha grid 0.25/0.5, select/lock discipline)
+  if (HYB !== '0' && HYB !== '1') fail('usage: --hyb 0|1');
+  const PK = gv('pk', '0'); // H9 leaders-index: 0=dense scan (default, bit-identical), 1=route via 256 seeded leaders + top-2 member rerank (sublinear eval MACs)
+  if (PK !== '0' && PK !== '1') fail('usage: --pk 0|1');
+  const TMP = gv('tmp', '0'); // H11 post-hoc temperature on the MIXED dist: 0=off (default, bit-identical), 1=fit T on select, locked report
+  if (TMP !== '0' && TMP !== '1') fail('usage: --tmp 0|1');
+  const CONF = gv('conf', '0'); // conformal abstention gate (alpha=0.1): 0=off (default, bit-identical), 1=calibrate non-answer rate on select, abstain->bigram on report
+  if (CONF !== '0' && CONF !== '1') fail('usage: --conf 0|1');
+  const ORF = gv('orf', '0'); // ORF variance cut: 0=iid Gaussian M (default, bit-identical), 1=Gram-Schmidt orthogonalized feature directions (norms preserved)
+  if (ORF !== '0' && ORF !== '1') fail('usage: --orf 0|1');
+  const C2D = gv('c2d', '0'); // C2 per-implant detail: 0=off (default, bit-identical), 1=emit per-implant remember/edit bit strings
+  if (C2D !== '0' && C2D !== '1') fail('usage: --c2d 0|1');
   const kei = a.indexOf('--key-env');
   const secret = process.env[kei >= 0 ? a[kei + 1] : 'SCRAMBLE'];
   if (!secret && !noEnc) fail('SCRAMBLE key missing (refuses plaintext save; --no-encrypt for smoke only)');
@@ -225,7 +237,10 @@ if (process.argv[2] === 'decrypt'){
   console.log(`corpus chars=${raw.length} train=${train.length} val=${val.length} V=${V} W=${W} P=${P} proj=${PROJ}${PROJ === 'raw' ? '' : ' H=' + H} score=${SCORE} tok=${TOK}${TOK === 'bpe' ? ' merges=' + bpeMerges : ''}`);
   // baselines on full train
   const uni = new Float64Array(V);
-  for (let i = 0; i < trainIds.length; i++) uni[trainIds[i]]++;
+  const tFreq = new Uint32Array(V); // H8: rare-char set = bottom-quartile train frequency (exact-match rescue signal)
+  for (let i = 0; i < trainIds.length; i++){ uni[trainIds[i]]++; tFreq[trainIds[i]]++; }
+  const rareC = new Uint8Array(V);
+  { const ord = [...Array(V).keys()].sort((a, b) => tFreq[a] - tFreq[b]); for (let i = 0; i < Math.max(1, Math.floor(V / 4)); i++) rareC[ord[i]] = 1; }
   for (let i = 0; i < V; i++) uni[i] /= trainIds.length;
   const uniPred = argmax(uni);
   const bi = new Float64Array(V * V);
@@ -252,10 +267,20 @@ if (process.argv[2] === 'decrypt'){
   const D = PROJ === 'raw' ? Din : H;
   function gauss1(rr){ let u = 0, v = 0; while (!u) u = rr(); while (!v) v = rr(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
   let M = null; // projection matrix (sim: random Gaussian; sup: supervised from store labels)
+  function orthCols(Mm, rows, cols){ // ORF: Gram-Schmidt on column (feature) directions, per-column norms preserved (scales survive rotation)
+    const n0 = new Float64Array(cols);
+    for (let h = 0; h < cols; h++){ let s = 0; for (let j = 0; j < rows; j++) s += Mm[j * cols + h] * Mm[j * cols + h]; n0[h] = Math.sqrt(s) || 1; }
+    for (let h = 0; h < cols; h++){
+      for (let g = 0; g < h; g++){ let d = 0; for (let j = 0; j < rows; j++) d += Mm[j * cols + h] * Mm[j * cols + g]; for (let j = 0; j < rows; j++) Mm[j * cols + h] -= d * Mm[j * cols + g]; }
+      let s = 0; for (let j = 0; j < rows; j++) s += Mm[j * cols + h] * Mm[j * cols + h]; s = Math.sqrt(s) || 1;
+      for (let j = 0; j < rows; j++) Mm[j * cols + h] *= n0[h] / s;
+    }
+  }
   if (PROJ === 'sim'){ // deterministic random projection (own rng stream); sign bits = SimHash
     M = new Float32Array(Din * H);
     const rr2 = rng(SEED + 1), inv = Math.sqrt(1 / Din);
     for (let i = 0; i < M.length; i++) M[i] = gauss1(rr2) * inv;
+    if (ORF === '1') orthCols(M, Din, H);
   }
   function featPM(ids, pos, out){ // ±1 features, length D (FIX: was sim|sup only — sup2 scored raw garbage; now every projected PROJ shares the path)
     if (PROJ !== 'raw'){
@@ -331,6 +356,7 @@ if (process.argv[2] === 'decrypt'){
       const sc = PROJ === 'sup2' ? A2[k * V + c] : aK[k], base = (k * V + c) * H;
       for (let h = 0; h < H; h++) M[base + h] = gauss1(rr3) * inv * sc;
     }
+    if (ORF === '1') orthCols(M, Din, H);
     console.log(`sup position scales a=[${[...aK].map(a => a.toFixed(2)).join(' ')}]`);
     console.log(`sup position scales a=[${[...aK].map(a => a.toFixed(2)).join(' ')}]`);
     for (let s = 0; s < P; s++){
@@ -402,6 +428,7 @@ if (process.argv[2] === 'decrypt'){
         for (let h = 0; h < H; h++) M[base + h] -= ELR * G[i * H + h];
       }
     }
+    if (ORF === '1') orthCols(M, Din, H); // ORF applies to the trained encoder too (geometry change, same code path)
     console.log(`enc contrastive steps=${ESTEPS} loss ${encLossFirst.toFixed(3)}->${encLossLast.toFixed(3)}`);
     for (let s = 0; s < P; s++){
       featPM(trainIds, spos[s], q);
@@ -426,6 +453,28 @@ if (process.argv[2] === 'decrypt'){
   }
   const buildMs = Date.now() - t0;
   console.log(`store P=${P} D=${D} bytes=${X.length + next.length} buildMs=${buildMs} rss=${rssMB()}MB`);
+  // H9 leaders-index (sublinear eval): 256 seeded leaders, one assignment pass at build.
+  // Eval = leaders (L*D) + top-2 leader members (~2P/L full dots). Build cost is one-time; eval is the series.
+  const PK_L = 256;
+  let pkLead = null, pkMembers = null, pkMacs = 0;
+  if (PK === '1'){
+    const tPk = Date.now(), lr5 = rng(SEED + 5);
+    pkLead = new Int32Array(PK_L);
+    for (let l = 0; l < PK_L; l++) pkLead[l] = Math.floor(lr5() * P);
+    const asg = new Uint16Array(P), mem = Array.from({length: PK_L}, () => []);
+    const lv = new Float32Array(D);
+    for (let s = 0; s < P; s++){
+      let bl = 0, bld = -1e18;
+      for (let l = 0; l < PK_L; l++){
+        const li = pkLead[l]; let d = 0; const off = li * D;
+        for (let j = 0; j < D; j++) d += (X[off + j] ? 1 : -1) * (X[s * D + j] ? 1 : -1);
+        if (d > bld){ bld = d; bl = l; }
+      }
+      asg[s] = bl; mem[bl].push(s);
+    }
+    pkMembers = mem;
+    console.log(`pk leaders=${PK_L} buildMs=${Date.now() - tPk} rss=${rssMB()}MB`);
+  }
   let msOps = 0; // H7 char-compare ops under maxsim scoring (cost axis, cf flopSteps)
   function maxsimW(qIds, qpos, beta){
     const sc = new Float32Array(P);
@@ -443,8 +492,84 @@ if (process.argv[2] === 'decrypt'){
     msOps += P * W * W;
     return { w, steps: 1 };
   }
+  let hybAlpha = 0.25; // H8: locked alpha for the hybrid arm (grid-selected on select stream)
+  function hybRecall(qq, qIds, qpos, alpha, beta, maxS){
+    // H8: dense dots + static rare-exact term E (fraction of query rare positions matched, scaled by D to sit in dot units)
+    let nR = 0;
+    for (let k = 0; k < W; k++) if (rareC[qIds[qpos + k]]) nR++;
+    const E = new Float32Array(P);
+    if (nR > 0) for (let s = 0; s < P; s++){ let m = 0; const base = spos[s]; for (let k = 0; k < W; k++) if (rareC[qIds[qpos + k]] && trainIds[base + k] === qIds[qpos + k]) m++; E[s] = m / nR; msOps += W; }
+    let x = Float32Array.from(qq);
+    const w = new Float32Array(P);
+    let steps = 0;
+    for (let s = 0; s < maxS; s++){
+      let m = -1e30;
+      for (let i = 0; i < P; i++){
+        let d = 0; const off = i * D;
+        for (let j = 0; j < D; j++) d += (X[off + j] ? 1 : -1) * x[j];
+        d = beta * (d + alpha * E[i] * D); w[i] = d; if (d > m) m = d;
+      }
+      let t = 0;
+      if (SPARSE === '1'){
+        let mx = -1e30;
+        for (let i = 0; i < P; i++) if (w[i] > mx) mx = w[i];
+        let lo = mx - 4, hi = mx;
+        for (let it = 0; it < 40; it++){ const mid = (lo + hi) / 2; let sm = 0; for (let i = 0; i < P; i++){ const v = w[i] - mid; if (v > 0) sm += v * v; } if (sm > 1) lo = mid; else hi = mid; }
+        const tau = (lo + hi) / 2;
+        for (let i = 0; i < P; i++){ const v = w[i] - tau; w[i] = v > 0 ? v * v : 0; t += w[i]; }
+        if (!(t > 0)){ t = P; for (let i = 0; i < P; i++) w[i] = 1; }
+      } else {
+        for (let i = 0; i < P; i++){ w[i] = Math.exp(w[i] - m); t += w[i]; }
+      }
+      const nx = new Float32Array(D);
+      for (let i = 0; i < P; i++){ const c = w[i] / t; const off = i * D; for (let j = 0; j < D; j++) nx[j] += c * (X[off + j] ? 1 : -1); }
+      let maxd = 0;
+      for (let j = 0; j < D; j++){ const dd = Math.abs(nx[j] - x[j]); if (dd > maxd) maxd = dd; }
+      x = nx; steps++;
+      if (maxd < 1e-3) break;
+    }
+    return { w, steps };
+  }
+  function pkRecall(qq, beta, maxS){
+    // H9: route via leaders, iterate only over top-2 leaders' members (sublinear eval MACs, counted in pkMacs)
+    const ls = new Array(PK_L);
+    for (let l = 0; l < PK_L; l++){ const li = pkLead[l]; let d = 0; const off = li * D; for (let j = 0; j < D; j++) d += (X[off + j] ? 1 : -1) * qq[j]; ls[l] = [d, l]; }
+    pkMacs += PK_L * D;
+    ls.sort((a, b) => b[0] - a[0]);
+    const cand = [];
+    for (let k = 0; k < 2; k++) for (const i of pkMembers[ls[k][1]]) cand.push(i);
+    let x = Float32Array.from(qq);
+    const w = new Float32Array(P);
+    let steps = 0;
+    for (let s = 0; s < maxS; s++){
+      let m = -1e30;
+      for (const i of cand){ let d = 0; const off = i * D; for (let j = 0; j < D; j++) d += (X[off + j] ? 1 : -1) * x[j]; d *= beta; w[i] = d; if (d > m) m = d; }
+      pkMacs += cand.length * D;
+      let t = 0;
+      if (SPARSE === '1'){
+        let mx = -1e30;
+        for (const i of cand) if (w[i] > mx) mx = w[i];
+        let lo = mx - 4, hi = mx;
+        for (let it = 0; it < 40; it++){ const mid = (lo + hi) / 2; let sm = 0; for (const i of cand){ const v = w[i] - mid; if (v > 0) sm += v * v; } if (sm > 1) lo = mid; else hi = mid; }
+        const tau = (lo + hi) / 2;
+        for (const i of cand){ const v = w[i] - tau; w[i] = v > 0 ? v * v : 0; t += w[i]; }
+        if (!(t > 0)){ t = cand.length; for (const i of cand) w[i] = 1; }
+      } else {
+        for (const i of cand){ w[i] = Math.exp(w[i] - m); t += w[i]; }
+      }
+      const nx = new Float32Array(D);
+      for (const i of cand){ const c = w[i] / t; const off = i * D; for (let j = 0; j < D; j++) nx[j] += c * (X[off + j] ? 1 : -1); }
+      let maxd = 0;
+      for (let j = 0; j < D; j++){ const dd = Math.abs(nx[j] - x[j]); if (dd > maxd) maxd = dd; }
+      x = nx; steps++;
+      if (maxd < 1e-3) break;
+    }
+    return { w, steps };
+  }
   function scoreW(qq, qIds, qpos, beta, maxS){
     if (SCORE === 'maxsim') return maxsimW(qIds, qpos, beta);
+    if (PK === '1') return pkRecall(qq, beta, maxS);
+    if (HYB === '1') return hybRecall(qq, qIds, qpos, hybAlpha, beta, maxS);
     return recallW(qq, X, P, D, beta, maxS, SPARSE);
   }
   let trainWinSet = null; // C5: memorized-vs-novel split (descriptive, no lam mix)
@@ -536,6 +661,7 @@ if (process.argv[2] === 'decrypt'){
   const split = SPLIT === '1' ? splitEval(TR, 2002) : null;
   // ---- C1+C2 canary: implanted facts, edit flips, exact forget (store surgery, zero gradients) ----
   let canRemember = -1, canEditFlip = -1, canForgetLeak = -1, collatBase = -1, collatAfter = -1;
+  let canRemDetail = '', canEditDetail = '';
   if (CAPAB === 'canary'){
     const CAN_N = 20, crr = rng(SEED + 99);
     const cfreq = new Uint32Array(V);
@@ -558,12 +684,14 @@ if (process.argv[2] === 'decrypt'){
     collatBase = e.acc;
     for (const s of cidx) next[s] = rare;
     canRemember = askRare(cpos);
+    if (C2D === '1'){ for (const p of cpos){ featPM(trainIds, p, cqq); const rw = scoreW(cqq, trainIds, p, cbeta, 12); flopSteps += rw.steps; canRemDetail += argmax(predictNext(rw.w, next, V)) === rare ? '1' : '0'; } }
     for (let i = 0; i < CAN_N / 2; i++) next[cidx[i]] = common;
     let flip = 0;
     for (let i = 0; i < CAN_N / 2; i++){
       featPM(trainIds, cpos[i], cqq);
       const rw = scoreW(cqq, trainIds, cpos[i], cbeta, 12);
       if (argmax(predictNext(rw.w, next, V)) === common) flip++;
+      if (C2D === '1'){ flopSteps += rw.steps; canEditDetail += argmax(predictNext(rw.w, next, V)) === common ? '1' : '0'; }
     }
     canEditFlip = flip / (CAN_N / 2);
     const drop = new Set(cidx);
@@ -715,6 +843,61 @@ if (process.argv[2] === 'decrypt'){
   for (const s of selStats) if (s.ppl < bestLam.ppl || (s.ppl === bestLam.ppl && s.acc > bestLam.acc)) bestLam = s;
   const repRows = hopBiDists(TR, 2001), repStats = lamStats(repRows);
   const repLocked = repStats[LAMBDAS.indexOf(bestLam.lam)];
+  // H8 hybrid arm: alpha grid on select (same beta probe as dense arm; probe ran with hybAlpha=0.25 default), locked report
+  let hybA = 0.25, hybLamSel = -1, hybAccSel = 0, hybPplSel = 0, hybAcc = 0, hybPpl = 0, repHitH = '';
+  if (HYB === '1'){
+    let bestHyb = null;
+    for (const a of [0.25, 0.5]){
+      hybAlpha = a;
+      const hSel = hopBiDists(TR, 2000), hSelStats = lamStats(hSel);
+      let b = hSelStats[0];
+      for (const s of hSelStats) if (s.ppl < b.ppl || (s.ppl === b.ppl && s.acc > b.acc)) b = s;
+      if (!bestHyb || b.ppl < bestHyb.ppl || (b.ppl === bestHyb.ppl && b.acc > bestHyb.acc)) bestHyb = { a, ...b };
+    }
+    hybAlpha = bestHyb.a; hybA = bestHyb.a; hybLamSel = bestHyb.lam; hybAccSel = bestHyb.acc; hybPplSel = bestHyb.ppl;
+    const hRep = hopBiDists(TR, 2001), hRepStats = lamStats(hRep);
+    const hr = hRepStats[LAMBDAS.indexOf(bestHyb.lam)]; hybAcc = hr.acc; hybPpl = hr.ppl;
+    for (const qr of hRep){ const lam = bestHyb.lam; let ip = -1, ici = 0; for (let c = 0; c < V; c++){ const p = lam * qr.hd[c] + (1 - lam) * qr.bd[c]; if (p > ip){ ip = p; ici = c; } } repHitH += ici === qr.trueNext ? '1' : '0'; }
+    console.log(`hyb select alpha=${bestHyb.a} lam=${bestHyb.lam} acc=${bestHyb.acc.toFixed(3)} ppl=${bestHyb.ppl.toFixed(2)} report acc=${hr.acc.toFixed(3)} ppl=${hr.ppl.toFixed(2)}`);
+  }
+  // H11 post-hoc temperature on the MIXED distribution (lam*): fit T on select, locked report
+  const TMPS = [0.5, 0.75, 1, 1.5, 2];
+  let tmpT = 1, tmpAccSel = 0, tmpPplSel = 0, tmpAcc = 0, tmpPpl = 0;
+  function tmpStats(rows, Tx, lam){
+    let acc = 0, ce = 0;
+    for (const qr of rows){
+      let s = 0; const pw = new Float64Array(V);
+      for (let c = 0; c < V; c++){ const p = lam * qr.hd[c] + (1 - lam) * qr.bd[c]; const v = Math.pow(p, 1 / Tx); pw[c] = v; s += v; }
+      let bp = -1, bci = 0;
+      for (let c = 0; c < V; c++){ const p = pw[c] / s; if (p > bp){ bp = p; bci = c; } }
+      if (bci === qr.trueNext) acc++;
+      ce += -Math.log(Math.max(pw[qr.trueNext] / s, 1e-12));
+    }
+    return { acc: acc / rows.length, ppl: Math.exp(ce / rows.length) };
+  }
+  if (TMP === '1'){
+    let bT = null;
+    for (const Tx of TMPS){ const st = tmpStats(selRows, Tx, bestLam.lam); if (!bT || st.ppl < bT.ppl || (st.ppl === bT.ppl && st.acc > bT.acc)) bT = { T: Tx, ...st }; }
+    tmpT = bT.T; tmpAccSel = bT.acc; tmpPplSel = bT.ppl;
+    const rt = tmpStats(repRows, tmpT, bestLam.lam); tmpAcc = rt.acc; tmpPpl = rt.ppl;
+    console.log(`tmp select T=${tmpT} acc=${tmpAccSel.toFixed(3)} ppl=${tmpPplSel.toFixed(2)} report acc=${rt.acc.toFixed(3)} ppl=${rt.ppl.toFixed(2)}`);
+  }
+  // Conformal abstention (alpha=0.1): nonconformity s = 1 - max_c p_mix; qhat = 90th pct on select; abstain -> bigram on report
+  let confAbs = 0, confAcc = 0, confPpl = 0;
+  if (CONF === '1'){
+    const lamC = bestLam.lam;
+    const sSel = selRows.map(qr => { let m = 0; for (let c = 0; c < V; c++){ const p = lamC * qr.hd[c] + (1 - lamC) * qr.bd[c]; if (p > m) m = p; } return 1 - m; }).sort((a, b) => a - b);
+    const qhat = sSel[Math.min(sSel.length - 1, Math.floor(0.9 * sSel.length))];
+    let acc = 0, ce = 0, abs = 0;
+    for (const qr of repRows){
+      let m = 0, mci = 0;
+      for (let c = 0; c < V; c++){ const p = lamC * qr.hd[c] + (1 - lamC) * qr.bd[c]; if (p > m){ m = p; mci = c; } }
+      if (1 - m <= qhat){ if (mci === qr.trueNext) acc++; ce += -Math.log(Math.max(m, 1e-12)); }
+      else { abs++; let bp = -1, bci = 0; for (let c = 0; c < V; c++) if (qr.bd[c] > bp){ bp = qr.bd[c]; bci = c; } if (bci === qr.trueNext) acc++; ce += -Math.log(Math.max(qr.bd[qr.trueNext], 1e-12)); }
+    }
+    confAbs = abs / repRows.length; confAcc = acc / repRows.length; confPpl = Math.exp(ce / repRows.length);
+    console.log(`conf qhat=${qhat.toFixed(3)} absRate=${confAbs.toFixed(3)} report acc=${confAcc.toFixed(3)} ppl=${confPpl.toFixed(2)}`);
+  }
   // gmix: hop + tiny-GPT (the paper's actual prescription — kNN mixed with a real LM,
   // not a bigram). Joined on pos: full coverage iff W == trainer block (32).
   function gmixStats(rows, stream) {
@@ -898,6 +1081,7 @@ if (process.argv[2] === 'decrypt'){
   }
   console.log(`compare hopfield acc=${e.acc.toFixed(3)} ppl=${e.ppl.toFixed(2)} vs bigram ${biE.acc.toFixed(3)}/${biE.ppl.toFixed(2)} vs unigram ${uniE.acc.toFixed(3)}/${uniE.ppl.toFixed(2)} beatUni=${e.acc > uniE.acc}`);
   const evalMflops = Math.round(flopSteps * P * D * 2 / 1e6 * 10) / 10; // 2 FLOP per MAC (dot+mix), measured steps
+  const pkMflops = Math.round(pkMacs * 2 / 1e6 * 10) / 10; // H9 leaders-index MACs (routing + candidate dots), 0 unless pk=1
   const msMflops = Math.round(msOps * 2 / 1e6 * 10) / 10; // H7 maxsim char-compare ops (0 under whole)
   const buildMflops = PROJ === 'raw' ? 0 : Math.round(P * W * H * 2 / 1e6 * 10) / 10; // feature-projection estimate (W*H adds per pattern)
   console.log(`flops steps=${flopSteps} evalMflops=${evalMflops} buildMflops=${buildMflops}`);
@@ -922,8 +1106,16 @@ if (process.argv[2] === 'decrypt'){
   // PARADIGM LADDER (user, 2026-11-13): every verdict carries its cost-class. Same
   // equation, different series: exact brute-force is linear-O(P·D) (whole) or
   // linear-O(P·W²) (maxsim); H9 product-key/ANN will register 'sublinear' here.
-  metrics.costClass = SCORE === 'maxsim' ? 'linear-O(P·W²)' : 'linear-O(P·D)';
+  metrics.costClass = PK === '1' ? 'sublinear-O(sqrt(P)·D)' : (SCORE === 'maxsim' ? 'linear-O(P·W²)' : 'linear-O(P·D)');
   metrics.sparse = parseInt(SPARSE) || 0; metrics.hedge = parseInt(HEDGE) || 0;
+  metrics.hyb = parseInt(HYB) || 0; metrics.hybA = hybA; metrics.hybLamSel = hybLamSel;
+  metrics.hybAccSel = hybAccSel; metrics.hybPplSel = hybPplSel; metrics.hybAcc = hybAcc; metrics.hybPpl = hybPpl;
+  metrics.pk = parseInt(PK) || 0; metrics.pkMflops = pkMflops;
+  metrics.tmp = parseInt(TMP) || 0; metrics.tmpT = tmpT; metrics.tmpAccSel = tmpAccSel; metrics.tmpPplSel = tmpPplSel; metrics.tmpAcc = tmpAcc; metrics.tmpPpl = tmpPpl;
+  metrics.conf = parseInt(CONF) || 0; metrics.confAbs = confAbs; metrics.confAcc = confAcc; metrics.confPpl = confPpl;
+  metrics.orf = parseInt(ORF) || 0;
+  metrics.c2d = parseInt(C2D) || 0; metrics.canRemDetail = canRemDetail; metrics.canEditDetail = canEditDetail;
+  metrics.repHitH = repHitH;
   metrics.hedgeAcc = hedgeAcc; metrics.hedgePpl = hedgePpl; metrics.hedgeNeff = hedgeNeff;
   metrics.repHitI = repHitI; metrics.repHitB = repHitB; metrics.repHitG = repHitG;
   metrics.hopAccRep = repStats[LAMBDAS.length - 1].acc; metrics.hopPplRep = repStats[LAMBDAS.length - 1].ppl;
