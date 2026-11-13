@@ -18,43 +18,28 @@ jobs:
         with:
           node-version: 20
       - name: pull, check, ingest, save
-        run: node halt-r/demo-ingest.mjs --model both --pull --dir /tmp/demo-cache --out out/demo | tee /tmp/demo-log.txt
+        run: |
+          set -o pipefail
+          mkdir -p out/demo
+          node halt-r/demo-ingest.mjs --model both --pull --dir /tmp/demo-cache --out out/demo 2>&1 | tee out/demo/demo-log.txt
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: demo-ingest
           path: out/demo/
           retention-days: 30
-  collect:
-    name: collect demo artifact
-    needs: demo
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: demo-ingest
-          path: models/
-      - name: stage post-ingestion model
-        run: |
-          MODEL=$(find models -name demo-ingest-model.json | head -1)
-          MDOC=$(find models -name demo-ingest.md | head -1)
-          test -n "$MODEL" && test -n "$MDOC"
-          cp "$MODEL" /tmp/demo-ingest-model.json
-          cp "$MDOC" /tmp/demo-ingest.md
-          cp /tmp/demo-ingest-model.json halt-r/demo-ingest-model.json
-          cp /tmp/demo-ingest.md halt-r/demo-ingest.md
-          cat halt-r/demo-ingest.md >> "$GITHUB_STEP_SUMMARY"
-      - name: commit demo back
+      - name: commit demo back (log always, model on green)
+        if: always()
         run: |
           git config user.name "halt-r-sweep"
           git config user.email "halt-r-sweep@users.noreply.github.com"
           for i in 1 2 3; do
             git fetch origin main
             git reset --hard origin/main
-            cp /tmp/demo-ingest-model.json halt-r/demo-ingest-model.json
-            cp /tmp/demo-ingest.md halt-r/demo-ingest.md
-            git add halt-r/demo-ingest-model.json halt-r/demo-ingest.md
+            cp out/demo/demo-log.txt halt-r/demo-log.md
+            test -f out/demo/demo-ingest-model.json && cp out/demo/demo-ingest-model.json halt-r/demo-ingest-model.json
+            test -f out/demo/demo-ingest.md && cp out/demo/demo-ingest.md halt-r/demo-ingest.md
+            git add halt-r/demo-log.md halt-r/demo-ingest-model.json halt-r/demo-ingest.md
             git diff --cached --quiet && exit 0
             git commit -m "halt-r: ingest demo pull-check-save $(date -u +%F)" && git push origin main && exit 0
             sleep 5
