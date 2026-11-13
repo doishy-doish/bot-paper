@@ -96,7 +96,7 @@ if (process.argv[2] === 'decrypt'){
   const noEnc = a.includes('--no-encrypt');
   const noGen = a.includes('--no-gen'); // P-sweep: skip generation (costly, unneeded per-P)
   const dataPath = gv('data', null), outDir = gv('out', null);
-  if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100] [--proj raw|sim] [--no-gen]');
+  if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100] [--proj raw|sim|sup] [--no-gen]');
   const W = parseInt(gv('W', DEF.W)), TR = parseInt(gv('trials', DEF.trials));
   let P = parseInt(gv('P', DEF.P));
   const P0 = P; // requested store size; P becomes Peff after B2 prune
@@ -112,7 +112,7 @@ if (process.argv[2] === 'decrypt'){
   const train = raw.slice(0, cut), val = raw.slice(cut);
   const { chars, toI, V } = buildVocab(train);
   if (V > 200) fail('vocab blowup V=' + V);
-  console.log(`corpus chars=${raw.length} train=${train.length} val=${val.length} V=${V} W=${W} P=${P} proj=${PROJ}${PROJ === 'sim' ? ' H=' + H : ''}`);
+  console.log(`corpus chars=${raw.length} train=${train.length} val=${val.length} V=${V} W=${W} P=${P} proj=${PROJ}${PROJ === 'raw' ? '' : ' H=' + H}`);
   const trainIds = new Uint16Array(train.length);
   for (let i = 0; i < train.length; i++) trainIds[i] = toI[train[i]];
   const valIds = new Uint16Array(val.length);
@@ -127,19 +127,20 @@ if (process.argv[2] === 'decrypt'){
   // store: seeded sampled train contexts (raw one-hot or SimHash-projected bits)
   const t0 = Date.now();
   const Din = W * V;
-  const D = PROJ === 'sim' ? H : Din;
-  let R = null;
+  const D = PROJ === 'raw' ? Din : H;
+  function gauss1(rr){ let u = 0, v = 0; while (!u) u = rr(); while (!v) v = rr(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  let M = null; // projection matrix (sim: random Gaussian; sup: supervised from store labels)
   if (PROJ === 'sim'){ // deterministic random projection (own rng stream); sign bits = SimHash
-    R = new Float32Array(Din * H);
+    M = new Float32Array(Din * H);
     const rr2 = rng(SEED + 1), inv = Math.sqrt(1 / Din);
-    for (let i = 0; i < R.length; i++){ let u = 0, v = 0; while (!u) u = rr2(); while (!v) v = rr2(); R[i] = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v) * inv; }
+    for (let i = 0; i < M.length; i++) M[i] = gauss1(rr2) * inv;
   }
   function featPM(ids, pos, out){ // ±1 features, length D
-    if (PROJ === 'sim'){
+    if (PROJ === 'sim' || PROJ === 'sup'){
       for (let h = 0; h < H; h++) out[h] = 0;
       for (let k = 0; k < W; k++){
         const base = (k * V + ids[pos + k]) * H;
-        for (let h = 0; h < H; h++) out[h] += R[base + h];
+        for (let h = 0; h < H; h++) out[h] += M[base + h];
       }
       for (let h = 0; h < H; h++) out[h] = out[h] >= 0 ? 1 : -1;
     } else {
@@ -152,12 +153,56 @@ if (process.argv[2] === 'decrypt'){
   let X = new Int8Array(P * D), next = new Uint8Array(P), spos = new Int32Array(P);
   let flopSteps = 0; // recall iterations actually executed (all phases) -> evalMflops
   const r = rng(SEED), q = new Float32Array(D);
+  if (PROJ === 'sup'){
+    // H1 learned encoder: positions that predict the label get bigger projection
+    // magnitude, so dots are dominated by predictive (usually suffix) positions and
+    // partial matches concentrate instead of diffusing. Same random-direction code
+    // path as sim (featPM identical) — the ONLY difference is learned per-position
+    // scales a_k from single-position accuracy on the store sample (W params, seconds).
+    for (let s = 0; s < P; s++){
+      const pos = Math.floor(r() * (trainIds.length - W));
+      spos[s] = pos;
+      next[s] = trainIds[pos + W];
+    }
+    const aK = new Float64Array(W); // learned position scales: single-position accuracy
+    for (let k = 0; k < W; k++){
+      const groups = new Map(); // char -> counts per next-char
+      for (let s = 0; s < P; s++){
+        const c = trainIds[spos[s] + k], n = next[s];
+        let g = groups.get(c); if (!g){ g = new Uint32Array(V); groups.set(c, g); }
+        g[n]++;
+      }
+      let correct = 0;
+      for (let s = 0; s < P; s++){
+        const g = groups.get(trainIds[spos[s] + k]);
+        let b = 0; for (let c = 1; c < V; c++) if (g[c] > g[b]) b = c;
+        if (b === next[s]) correct++;
+      }
+      aK[k] = Math.max(0, correct / P - 1 / V);
+    }
+    let aMean = 0; for (let k = 0; k < W; k++) aMean += aK[k]; aMean /= W;
+    if (aMean > 1e-9){ for (let k = 0; k < W; k++) aK[k] /= aMean; }
+    else { for (let k = 0; k < W; k++) aK[k] = 1; } // no signal: fall back to sim
+    const rr3 = rng(SEED + 3), inv = Math.sqrt(1 / Din);
+    M = new Float32Array(Din * H);
+    for (let k = 0; k < W; k++) for (let c = 0; c < V; c++){
+      const sc = aK[k], base = (k * V + c) * H;
+      for (let h = 0; h < H; h++) M[base + h] = gauss1(rr3) * inv * sc;
+    }
+    console.log(`sup position scales a=[${[...aK].map(a => a.toFixed(2)).join(' ')}]`);
+    console.log(`sup position scales a=[${[...aK].map(a => a.toFixed(2)).join(' ')}]`);
+    for (let s = 0; s < P; s++){
+      featPM(trainIds, spos[s], q);
+      for (let j = 0; j < D; j++) X[s * D + j] = q[j] > 0 ? 1 : 0;
+    }
+  } else {
   for (let s = 0; s < P; s++){
     const pos = Math.floor(r() * (trainIds.length - W));
     spos[s] = pos;
     featPM(trainIds, pos, q);
     for (let j = 0; j < D; j++) X[s * D + j] = q[j] > 0 ? 1 : 0;
     next[s] = trainIds[pos + W];
+  }
   }
   if (KEEP < 1){ // B2: seeded nested random prune (keep=0.25 subset of 0.5 subset of full)
     const pr = rng(SEED + 2), keep = [];
@@ -353,7 +398,7 @@ if (process.argv[2] === 'decrypt'){
   }
   console.log(`compare hopfield acc=${e.acc.toFixed(3)} ppl=${e.ppl.toFixed(2)} vs bigram ${biE.acc.toFixed(3)}/${biE.ppl.toFixed(2)} vs unigram ${uniE.acc.toFixed(3)}/${uniE.ppl.toFixed(2)} beatUni=${e.acc > uniE.acc}`);
   const evalMflops = Math.round(flopSteps * P * D * 2 / 1e6 * 10) / 10; // 2 FLOP per MAC (dot+mix), measured steps
-  const buildMflops = PROJ === 'sim' ? Math.round(P * W * H * 2 / 1e6 * 10) / 10 : 0; // feature-projection estimate (W*H adds per pattern)
+  const buildMflops = PROJ === 'raw' ? 0 : Math.round(P * W * H * 2 / 1e6 * 10) / 10; // feature-projection estimate (W*H adds per pattern)
   console.log(`flops steps=${flopSteps} evalMflops=${evalMflops} buildMflops=${buildMflops}`);
   // save wrapped store
   const plain = Buffer.concat([Buffer.from(X), Buffer.from(next)]);
