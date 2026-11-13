@@ -259,8 +259,10 @@ fn db_post(c: &Connection, pid: i64) -> Result<Response<Full<Bytes>>, String> {
 }
 
 fn db_create(c: &Connection, auth: Authed, raw: &[u8]) -> Result<Response<Full<Bytes>>, String> {
-    let v: serde_json::Value =
-        serde_json::from_slice(raw).map_err(|_| "ERR malformed JSON body".to_string())?;
+    let v: serde_json::Value = match serde_json::from_slice(raw) {
+        Ok(v) => v,
+        Err(_) => return Ok(err(StatusCode::BAD_REQUEST, "malformed JSON body")),
+    };
     let body = match v.get("body").and_then(|b| b.as_str()) {
         Some(s) => s.trim().to_string(),
         None => return Ok(err(StatusCode::BAD_REQUEST, "body is required")),
