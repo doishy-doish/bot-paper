@@ -681,6 +681,64 @@ if (process.argv[2] === 'decrypt'){
       featPM(trainIds, spos[s], q);
       for (let j = 0; j < D; j++) X[s * D + j] = q[j] > 0 ? 1 : 0;
     }
+  } else if (PROJ === 'ict'){ // Contriever-style (moved before final else; raw stays last)
+    for (let s = 0; s < P; s++){
+      const pos = Math.floor(r() * (trainIds.length - W));
+      spos[s] = pos;
+      next[s] = trainIds[pos + W];
+    }
+    const rrI = rng(SEED + 3), invI = Math.sqrt(1 / Din);
+    M = new Float32Array(Din * H);
+    for (let i = 0; i < M.length; i++) M[i] = gauss1(rrI) * invI;
+    const IB = 128, ISTEPS = 200, ILR = 0.08, IET = 0.2, IDROP = 0.15;
+    const brI = rng(SEED + 4);
+    const eidx = new Uint32Array(IB);
+    const Z1 = new Float32Array(IB * H), Z2 = new Float32Array(IB * H);
+    const n1 = new Float64Array(IB), n2 = new Float64Array(IB);
+    const sims = new Float32Array(IB);
+    const G = new Float32Array(Din * H);
+    for (let st = 0; st < ISTEPS; st++){
+      for (let i = 0; i < IB; i++) eidx[i] = Math.floor(brI() * P);
+      for (let i = 0; i < IB; i++){
+        for (let h = 0; h < H; h++) Z1[i * H + h] = 0;
+        for (let h = 0; h < H; h++) Z2[i * H + h] = 0;
+        for (let k = 0; k < W; k++){
+          const c = trainIds[spos[eidx[i]] + k];
+          if (!(brI() < IDROP)){ const base = (k * V + c) * H; for (let h = 0; h < H; h++) Z1[i * H + h] += M[base + h]; }
+          if (!(brI() < IDROP)){ const base = (k * V + c) * H; for (let h = 0; h < H; h++) Z2[i * H + h] += M[base + h]; }
+        }
+        let s1 = 0, s2 = 0;
+        for (let h = 0; h < H; h++){ s1 += Z1[i * H + h] * Z1[i * H + h]; s2 += Z2[i * H + h] * Z2[i * H + h]; }
+        n1[i] = Math.sqrt(s1) + 1e-9; n2[i] = Math.sqrt(s2) + 1e-9;
+      }
+      G.fill(0);
+      let loss = 0;
+      for (let i = 0; i < IB; i++){
+        let m = -1e30;
+        for (let j = 0; j < IB; j++){ let d = 0; for (let h = 0; h < H; h++) d += Z1[i * H + h] * Z2[j * H + h]; sims[j] = d / (n1[i] * n2[j] * IET); if (sims[j] > m) m = sims[j]; }
+        let tt = 0;
+        for (let j = 0; j < IB; j++){ sims[j] = Math.exp(sims[j] - m); tt += sims[j]; }
+        if (!(tt > 0)) continue;
+        loss += -Math.log(Math.max(sims[i] / tt, 1e-12));
+        for (let j = 0; j < IB; j++){
+          const dd = ((sims[j] / tt) - (j === i ? 1 : 0)) / (n1[i] * n2[j] * IET);
+          for (let k = 0; k < W; k++){
+            const b1 = (k * V + trainIds[spos[eidx[i]] + k]) * H, b2 = (k * V + trainIds[spos[eidx[j]] + k]) * H;
+            for (let h = 0; h < H; h++){ G[b1 + h] += dd * Z2[j * H + h]; G[b2 + h] += dd * Z1[i * H + h]; }
+          }
+        }
+      }
+      loss /= IB;
+      if (st === 0) encLossFirst = loss;
+      if (st === ISTEPS - 1) encLossLast = loss;
+      for (let i = 0; i < G.length; i++) M[i] -= ILR * G[i] / IB;
+    }
+    if (ORF === '1') orthCols(M, Din, H);
+    console.log(`ict contrastive steps=${ISTEPS} loss ${encLossFirst.toFixed(3)}->${encLossLast.toFixed(3)}`);
+    for (let s = 0; s < P; s++){
+      featPM(trainIds, spos[s], q);
+      for (let j = 0; j < D; j++) X[s * D + j] = q[j] > 0 ? 1 : 0;
+    }
   } else {
   for (let s = 0; s < P; s++){
     const pos = Math.floor(r() * (trainIds.length - W));
