@@ -106,6 +106,8 @@ if (process.argv[2] === 'decrypt'){
   const BSEL = gv('betaSel', 'acc');
   if (BSEL !== 'acc' && BSEL !== 'ppl') fail('usage: --betaSel acc|ppl');
   const ADA = gv('ada', '0'); // H4/H5 adaptive-lambda: 0=off(fixed lam), 1=L=lam*top1frac(g), 2=L=lam*negentropy(1-h); default 0
+  const SCORE = gv('score', 'whole'); // H7: whole=window dot (default, bit-identical), maxsim=late-interaction sum_j max_k match
+  if (SCORE !== 'whole' && SCORE !== 'maxsim') fail('usage: --score whole|maxsim');
   const kei = a.indexOf('--key-env');
   const secret = process.env[kei >= 0 ? a[kei + 1] : 'SCRAMBLE'];
   if (!secret && !noEnc) fail('SCRAMBLE key missing (refuses plaintext save; --no-encrypt for smoke only)');
@@ -115,7 +117,7 @@ if (process.argv[2] === 'decrypt'){
   const train = raw.slice(0, cut), val = raw.slice(cut);
   const { chars, toI, V } = buildVocab(train);
   if (V > 200) fail('vocab blowup V=' + V);
-  console.log(`corpus chars=${raw.length} train=${train.length} val=${val.length} V=${V} W=${W} P=${P} proj=${PROJ}${PROJ === 'raw' ? '' : ' H=' + H}`);
+  console.log(`corpus chars=${raw.length} train=${train.length} val=${val.length} V=${V} W=${W} P=${P} proj=${PROJ}${PROJ === 'raw' ? '' : ' H=' + H} score=${SCORE}`);
   const trainIds = new Uint16Array(train.length);
   for (let i = 0; i < train.length; i++) trainIds[i] = toI[train[i]];
   const valIds = new Uint16Array(val.length);
@@ -217,6 +219,27 @@ if (process.argv[2] === 'decrypt'){
   }
   const buildMs = Date.now() - t0;
   console.log(`store P=${P} D=${D} bytes=${X.length + next.length} buildMs=${buildMs} rss=${rssMB()}MB`);
+  let msOps = 0; // H7 char-compare ops under maxsim scoring (cost axis, cf flopSteps)
+  function maxsimW(qIds, qpos, beta){
+    const sc = new Float32Array(P);
+    let m = -1e30;
+    for (let s = 0; s < P; s++){
+      let sum = 0; const base = spos[s];
+      for (let j = 0; j < W; j++){
+        const qc = qIds[qpos + j];
+        for (let k = 0; k < W; k++){ if (trainIds[base + k] === qc){ sum++; break; } }
+      }
+      sc[s] = sum; if (sum > m) m = sum;
+    }
+    const w = new Float32Array(P);
+    for (let s = 0; s < P; s++) w[s] = Math.exp(beta * (sc[s] - m));
+    msOps += P * W * W;
+    return { w, steps: 1 };
+  }
+  function scoreW(qq, qIds, qpos, beta, maxS){
+    if (SCORE === 'maxsim') return maxsimW(qIds, qpos, beta);
+    return recallW(qq, X, P, D, beta, maxS);
+  }
   const runQueries = (n, seed) => {
     const rr = rng(seed), dist_sum = { acc: 0, ce: 0, steps: 0 };
     const qq = new Float32Array(D);
@@ -224,7 +247,7 @@ if (process.argv[2] === 'decrypt'){
       const pos = Math.floor(rr() * (valIds.length - W - 1));
       featPM(valIds, pos, qq);
       const trueNext = valIds[pos + W];
-      const { w, steps } = recallW(qq, X, P, D, runQueries.beta, 12);
+      const { w, steps } = scoreW(qq, valIds, pos, runQueries.beta, 12);
       const dist = predictNext(w, next, V);
       let tot = 0; for (let i = 0; i < V; i++) tot += dist[i];
       if (argmax(dist) === trueNext) dist_sum.acc++;
@@ -287,7 +310,7 @@ if (process.argv[2] === 'decrypt'){
     const ids = distOf.ids || (distOf.ids = new Uint16Array(4096));
     for (let k = 0; k < W; k++) ids[k] = win[k];
     featPM(ids, 0, qq);
-    const { w, steps: stG } = recallW(qq, X, P, D, best.beta, 12);
+    const { w, steps: stG } = scoreW(qq, win, 0, best.beta, 12);
     flopSteps += stG;
     const dist = predictNext(w, next, V);
     let tot = 0; for (let i = 0; i < V; i++) tot += dist[i];
@@ -342,7 +365,7 @@ if (process.argv[2] === 'decrypt'){
       const pos = Math.floor(rr() * (valIds.length - W - 1));
       featPM(valIds, pos, qq);
       const trueNext = valIds[pos + W];
-      const { w, steps: stI } = recallW(qq, X, P, D, best.beta, 12);
+      const { w, steps: stI } = scoreW(qq, valIds, pos, best.beta, 12);
       flopSteps += stI;
       let wmax = 0, wsum = 0; // B1: top-1 weight fraction = match confidence
       for (let i = 0; i < w.length; i++){ wsum += w[i]; if (w[i] > wmax) wmax = w[i]; }
@@ -423,7 +446,7 @@ if (process.argv[2] === 'decrypt'){
     for (let t = 0; t < NS; t++){
       const s = Math.floor(rs() * P), pos = spos[s]; // query an ACTUAL stored key
       featPM(trainIds, pos, qp);
-      const { w } = recallW(qp, X, P, D, best.beta, 1); // single step: argmax must be the key itself
+      const { w } = recallW(qp, X, P, D, best.beta, 1); // single step: argmax must be the key itself (store machinery: always whole-path, independent of SCORE)
       let bi = 0; for (let i = 1; i < P; i++) if (w[i] > w[bi]) bi = i;
       let same = true;
       for (let j = 0; j < D; j++){ const bit = qp[j] > 0 ? 1 : 0; if (X[bi * D + j] !== bit){ same = false; break; } }
@@ -433,17 +456,18 @@ if (process.argv[2] === 'decrypt'){
   }
   console.log(`compare hopfield acc=${e.acc.toFixed(3)} ppl=${e.ppl.toFixed(2)} vs bigram ${biE.acc.toFixed(3)}/${biE.ppl.toFixed(2)} vs unigram ${uniE.acc.toFixed(3)}/${uniE.ppl.toFixed(2)} beatUni=${e.acc > uniE.acc}`);
   const evalMflops = Math.round(flopSteps * P * D * 2 / 1e6 * 10) / 10; // 2 FLOP per MAC (dot+mix), measured steps
+  const msMflops = Math.round(msOps * 2 / 1e6 * 10) / 10; // H7 maxsim char-compare ops (0 under whole)
   const buildMflops = PROJ === 'raw' ? 0 : Math.round(P * W * H * 2 / 1e6 * 10) / 10; // feature-projection estimate (W*H adds per pattern)
   console.log(`flops steps=${flopSteps} evalMflops=${evalMflops} buildMflops=${buildMflops}`);
   // save wrapped store
   const plain = Buffer.concat([Buffer.from(X), Buffer.from(next)]);
   const sum = sha256hex(plain);
-  const meta = { task: 'nextchar-heldout', corpus: tag, proj: PROJ, W, P: P0, P0, Peff: P, V, D, seed: SEED, beta: BSEL === 'ppl' ? bestPpl.beta : best.beta, betaSel: BSEL, bytes: plain.length, sha256: sum, enc: noEnc ? 'none-smoke' : 'AES-256-GCM-v1', chars: raw.length };
+  const meta = { task: 'nextchar-heldout', corpus: tag, proj: PROJ, W, P: P0, P0, Peff: P, V, D, seed: SEED, score: SCORE, beta: BSEL === 'ppl' ? bestPpl.beta : best.beta, betaSel: BSEL, bytes: plain.length, sha256: sum, enc: noEnc ? 'none-smoke' : 'AES-256-GCM-v1', chars: raw.length };
   writeFileSync(outDir + '/meta.json', JSON.stringify(meta));
   let encBytes = 0;
   if (!noEnc){ const wj = JSON.stringify(encryptWrap(plain, secret)); writeFileSync(outDir + '/model.bin.enc', wj); encBytes = wj.length; console.log(`enc bytes=${encBytes} sha256=${sum}`); }
   else { writeFileSync(outDir + '/model.bin', plain); console.log(`plain-smoke bytes=${plain.length} sha256=${sum}`); }
-  const metrics = { ...meta, trials: TR, flips: 'n/a-nextchar', acc: e.acc, ppl: e.ppl, avgSteps: e.avgSteps, bigramAcc: biE.acc, bigramPpl: biE.ppl, unigramAcc: uniE.acc, unigramPpl: uniE.ppl, beatUni: e.acc > uniE.acc, quality, buildMs, evalMs, maxRssMB: rssMB(), encBytes, evalScope: 'heldout-val', evalMflops, buildMflops, flopSteps, betaSel: BSEL, betaAcc: best.beta, betaPpl: bestPpl.beta, ada: parseInt(ADA) || 0, adaLamSel, adaAccSel, adaPplSel, adaAcc, adaPpl };
+  const metrics = { ...meta, trials: TR, flips: 'n/a-nextchar', acc: e.acc, ppl: e.ppl, avgSteps: e.avgSteps, bigramAcc: biE.acc, bigramPpl: biE.ppl, unigramAcc: uniE.acc, unigramPpl: uniE.ppl, beatUni: e.acc > uniE.acc, quality, buildMs, evalMs, maxRssMB: rssMB(), encBytes, evalScope: 'heldout-val', evalMflops, buildMflops, flopSteps, msOps, msMflops, score: SCORE, betaSel: BSEL, betaAcc: best.beta, betaPpl: bestPpl.beta, ada: parseInt(ADA) || 0, adaLamSel, adaAccSel, adaPplSel, adaAcc, adaPpl };
   // kNN-LM interpolation results (locked-lam report on fresh seed-2001 queries)
   metrics.interpLambda = bestLam.lam;
   metrics.interpAccSel = bestLam.acc; metrics.interpPplSel = bestLam.ppl;
