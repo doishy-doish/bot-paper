@@ -1,0 +1,102 @@
+name: halt-r-h4
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/halt-r-h4.yml'
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: h4 ${{ matrix.corpus }} W${{ matrix.W }} ada-${{ matrix.ada }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        corpus: [shakes, ts]
+        W: [8, 16]
+        ada: [0, 1]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fetch corpus
+        run: |
+          if [ "${{ matrix.corpus }}" = ts ]; then
+            curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          else
+            curl -sSL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus.txt
+          fi
+          wc -c /tmp/corpus.txt
+          head -c 200 /tmp/corpus.txt
+      - name: bench fixed vs adaptive lambda
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/h4-${{ matrix.corpus }}-W${{ matrix.W }}-ada${{ matrix.ada }} --tag ${{ matrix.corpus }} --W ${{ matrix.W }} --P 8000 --trials 100 --proj sup --H 256 --ada ${{ matrix.ada }} --no-gen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: h4-${{ matrix.corpus }}-W${{ matrix.W }}-ada${{ matrix.ada }}
+          path: out/h4-${{ matrix.corpus }}-W${{ matrix.W }}-ada${{ matrix.ada }}/
+          retention-days: 30
+  collect:
+    name: collect adaptive lambda ablation
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: h4-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: adaptive table plus verdict
+        run: |
+          node - <<'EOF' | tee /tmp/h4.md
+          const fs = require('node:fs'), path = require('node:path');
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          try { walk('models'); } catch (e) { console.log('no metrics found'); process.exit(0); }
+          const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+          runs.sort((a, b) => (a.corpus < b.corpus ? -1 : 1) || a.W - b.W || a.ada - b.ada);
+          fs.writeFileSync('/tmp/h4.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'h4-adaptive-lambda', runs}, null, 1));
+          let md = '# H4: per-query adaptive lambda (L=lam*confidence) vs fixed lambda\nSame protocol as H1 (P=8000, H=256, no-gen, sup only). Adaptive scales each query by top-1 weight fraction g.\n\n| corpus | W | mode | interp acc/ppl (lam*) |\n|---|---|---|---|\n';
+          for (const m of runs) {
+            const v = m.ada === 1 ? (m.adaAcc.toFixed(3) + '/' + m.adaPpl.toFixed(2) + ' (' + m.adaLamSel + ')') : (m.interpAcc.toFixed(3) + '/' + m.interpPpl.toFixed(2) + ' (' + m.interpLambda + ')');
+            md += '| ' + m.corpus + ' | ' + m.W + ' | ' + (m.ada === 1 ? 'adaptive' : 'fixed') + ' | ' + v + ' |\n';
+          }
+          for (const corpus of ['shakes', 'ts']) for (const W of [8, 16]) {
+            const g = runs.filter(m => m.corpus === corpus && m.W === W);
+            if (g.length < 2) continue;
+            const f = g.find(m => m.ada === 0), a = g.find(m => m.ada === 1);
+            md += '\n' + corpus + ' W' + W + ': fixed interpPpl=' + f.interpPpl.toFixed(2) + ' vs adaptive interpPpl=' + a.adaPpl.toFixed(2) + '. ';
+            md += (a.adaPpl < f.interpPpl) ? 'VERDICT: ADAPTIVE WINS (per-query confidence fixes the dilution).' : 'VERDICT: ADAPTIVE FAILS (fixed lam still better; dilution is not confidence-shaped).';
+            md += '\n';
+          }
+          process.stdout.write(md);
+          EOF
+          cp /tmp/h4.json halt-r/h4.json
+          cp /tmp/h4.md halt-r/h4.md
+          cat halt-r/h4.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit h4 back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/h4.json halt-r/h4.json
+            cp /tmp/h4.md halt-r/h4.md
+            git add halt-r/h4.json halt-r/h4.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: h4 adaptive-lambda $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
