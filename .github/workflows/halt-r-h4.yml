@@ -62,7 +62,7 @@ jobs:
           node - <<'EOF' | tee /tmp/h4.md
           const fs = require('node:fs'), path = require('node:path');
           const files = [];
-          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
           try { walk('models'); } catch (e) { console.log('no metrics found'); process.exit(0); }
           const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
           runs.sort((a, b) => (a.corpus < b.corpus ? -1 : 1) || a.W - b.W || a.ada - b.ada);
