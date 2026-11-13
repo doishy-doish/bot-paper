@@ -16,7 +16,7 @@ jobs:
       max-parallel: 20
       matrix:
         corpus: [ts, shakes]
-        W: [8, 16]
+        W: [32]
         arm: [interp, gpt]
     steps:
       - uses: actions/checkout@v4
@@ -81,9 +81,9 @@ jobs:
           walk('models');
           const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
           runs.sort((a, b) => (a.corpus < b.corpus ? -1 : 1) || a.W - b.W);
-          fs.writeFileSync('/tmp/combo.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'combo', preReg: 'combo (graft5 K=256 keys + donor values via --mix gpt, same seeds) wins iff gptMixPpl beats same-config interpPpl by >0.2 AND cross-job paired McNemar (repHitG vs interp repHitI) p<0.05. Primary ts W8 (the won config). Router discipline: lam selected on seed-2000, locked on seed-2001 (same as every arm).', runs}, null, 1));
+          fs.writeFileSync('/tmp/combo.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'combo', preReg: 'combo (graft5 K=256 keys + donor values via --mix gpt, same seeds) wins iff gptMixPpl beats same-config interpPpl by >0.2 AND cross-job paired McNemar (repHitG vs interp repHitI) p<0.05. Primary ts W32 (the gmix-won config; W8/16 void 2026-11-13: trainer q100 joins on pos iff bench W == trainer block 32). Router discipline: lam selected on seed-2000, locked on seed-2001 (same as every arm).', runs}, null, 1));
           let md = '# COMBO: grafted keys (K=256) + donor values + router (measured, CI)\nSame protocol (P=8000, char, no-gen, T100). interp arm = graft5 keys + bigram (absorption alone). gpt arm = graft5 keys + frozen donor dists (absorption + delegation, the feast). Cross-job paired test (same seeds/queries).\n\n| corpus | W | arm | interp acc/ppl (lam*) | gpt-mix acc/ppl (lam*) | cover |\n|---|---|---|---|---|---|\n';
-          for (const corpus of ['ts', 'shakes']) for (const W of [8, 16]) {
+          for (const corpus of ['ts', 'shakes']) for (const W of [32]) {
             const ii = runs.find(r => r.corpus === corpus && r.W === W && r.mix === 'none');
             const gg = runs.find(r => r.corpus === corpus && r.W === W && r.mix === 'gpt');
             if (!ii || !gg) continue;
