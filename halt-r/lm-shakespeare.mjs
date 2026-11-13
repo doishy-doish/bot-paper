@@ -47,7 +47,7 @@ function encodeCtx(textIds, pos, W, V, out){
   return out;
 }
 // recall returns normalized store weights + mixed state
-function recallW(q, X, P, D, beta, maxS){
+function recallW(q, X, P, D, beta, maxS, sparse){
   let x = Float32Array.from(q);
   const w = new Float32Array(P);
   let steps = 0;
@@ -59,7 +59,7 @@ function recallW(q, X, P, D, beta, maxS){
       d *= beta; w[i] = d; if (d > m) m = d;
     }
     let t = 0;
-    if (SPARSE === '1'){
+    if (sparse === '1'){
       // entmax-1.5 (Correia et al. 2019): p_i = [(s_i - tau)]_+^2 / Z, tau via bisection.
       // Same argmax as softmax (monotone), compact support: dilutes nothing, sharpens votes.
       let mx = -1e30;
@@ -445,7 +445,7 @@ if (process.argv[2] === 'decrypt'){
   }
   function scoreW(qq, qIds, qpos, beta, maxS){
     if (SCORE === 'maxsim') return maxsimW(qIds, qpos, beta);
-    return recallW(qq, X, P, D, beta, maxS);
+    return recallW(qq, X, P, D, beta, maxS, SPARSE);
   }
   let trainWinSet = null; // C5: memorized-vs-novel split (descriptive, no lam mix)
   function wkey(ids, p){
@@ -888,7 +888,7 @@ if (process.argv[2] === 'decrypt'){
     for (let t = 0; t < NS; t++){
       const s = Math.floor(rs() * P), pos = spos[s]; // query an ACTUAL stored key
       featPM(trainIds, pos, qp);
-      const { w } = recallW(qp, X, P, D, best.beta, 1); // single step: argmax must be the key itself (store machinery: always whole-path, independent of SCORE)
+      const { w } = recallW(qp, X, P, D, best.beta, 1, SPARSE); // single step: argmax must be the key itself (store machinery: always whole-path, independent of SCORE)
       let bi = 0; for (let i = 1; i < P; i++) if (w[i] > w[bi]) bi = i;
       let same = true;
       for (let j = 0; j < D; j++){ const bit = qp[j] > 0 ? 1 : 0; if (X[bi * D + j] !== bit){ same = false; break; } }
