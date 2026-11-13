@@ -47,16 +47,38 @@ function encodeCtx(textIds, pos, W, V, out){
   return out;
 }
 // recall returns normalized store weights + mixed state
-function recallW(q, X, P, D, beta, maxS, sparse){
+let rawFastChecked = false;
+function recallW(q, X, P, D, beta, maxS, sparse, rawFast, ones, Wd){
   let x = Float32Array.from(q);
   const w = new Float32Array(P);
   let steps = 0;
   for (let s = 0; s < maxS; s++){
     let m = -1e30;
-    for (let i = 0; i < P; i++){
-      let d = 0; const off = i * D;
-      for (let j = 0; j < D; j++) d += (X[off + j] ? 1 : -1) * x[j];
-      d *= beta; w[i] = d; if (d > m) m = d;
+    if (rawFast === 1){
+      let qsum = 0; for (let j = 0; j < D; j++) qsum += x[j];
+      for (let i = 0; i < P; i++){
+        let part = 0; const ob = i * Wd;
+        for (let k = 0; k < Wd; k++) part += x[ones[ob + k]];
+        const d = (2 * part - qsum) * beta; w[i] = d; if (d > m) m = d;
+      }
+      if (!rawFastChecked){
+        rawFastChecked = true;
+        let maxDiff = 0;
+        for (let i = 0; i < P; i++){
+          let d = 0; const off = i * D;
+          for (let j = 0; j < D; j++) d += (X[off + j] ? 1 : -1) * x[j];
+          d *= beta;
+          const df = Math.abs(d - w[i]); if (df > maxDiff) maxDiff = df;
+        }
+        console.log('rawfast self-check maxAbsDiff=' + maxDiff);
+        if (!(maxDiff < 1e-3)) fail('rawfast diverged diff=' + maxDiff);
+      }
+    } else {
+      for (let i = 0; i < P; i++){
+        let d = 0; const off = i * D;
+        for (let j = 0; j < D; j++) d += (X[off + j] ? 1 : -1) * x[j];
+        d *= beta; w[i] = d; if (d > m) m = d;
+      }
     }
     let t = 0;
     if (sparse === '1'){
@@ -78,7 +100,14 @@ function recallW(q, X, P, D, beta, maxS, sparse){
       for (let i = 0; i < P; i++){ w[i] = Math.exp(w[i] - m); t += w[i]; }
     }
     const nx = new Float32Array(D);
-    for (let i = 0; i < P; i++){ const c = w[i] / t; const off = i * D; for (let j = 0; j < D; j++) nx[j] += c * (X[off + j] ? 1 : -1); }
+    if (rawFast === 1){
+      let csum = 0;
+      for (let i = 0; i < P; i++) csum += w[i] / t;
+      for (let i = 0; i < P; i++){ const c = (w[i] / t) * 2, ob = i * Wd; for (let k = 0; k < Wd; k++) nx[ones[ob + k]] += c; }
+      for (let j = 0; j < D; j++) nx[j] -= csum;
+    } else {
+      for (let i = 0; i < P; i++){ const c = w[i] / t; const off = i * D; for (let j = 0; j < D; j++) nx[j] += c * (X[off + j] ? 1 : -1); }
+    }
     let maxd = 0;
     for (let j = 0; j < D; j++){ const dd = Math.abs(nx[j] - x[j]); if (dd > maxd) maxd = dd; }
     x = nx; steps++;
@@ -226,6 +255,8 @@ if (process.argv[2] === 'decrypt'){
   const GPTQ = gv('gptq', null);
   const SPARSE = gv('sparse', '0'); // S-rung: 0=softmax (default, bit-identical), 1=entmax-1.5 sparse assignment (same argmax, 100x sparser support; prototype: identical convergence/acc, support 253->2)
   if (SPARSE !== '0' && SPARSE !== '1') fail('usage: --sparse 0|1');
+  const RAWFAST = gv('rawfast', '0'); // raw sparse-dot fast path: 0=off (default, bit-identical), 1=O(P·W) dots for raw one-hot rows (fp-equivalent, self-checked)
+  if (RAWFAST !== '0' && RAWFAST !== '1') fail('usage: --rawfast 0|1');
   const HEDGE = gv('hedge', '0'); // Hedge/experts adaptive lambda: 0=off (default, bit-identical), 1=online Hedge over the LAMBDAS grid (frozen on select stream, evaluated on report stream; regret-bounded mixing)
   if (HEDGE !== '0' && HEDGE !== '1') fail('usage: --hedge 0|1');
   const HYB = gv('hyb', '0'); // H8 rare-exact hybrid: 0=off (default, bit-identical), 1=mix dense dots + rare-char exact-match (alpha grid 0.25/0.5, select/lock discipline)
@@ -667,6 +698,12 @@ if (process.argv[2] === 'decrypt'){
     X = nX; next = nN; spos = nS; P = keep.length;
     console.log(`prune keep=${KEEP} Peff=${P}`);
   }
+  let onesList = null; // rawfast: per-row one-hot positions (W per row), built post-prune
+  if (RAWFAST === '1' && PROJ === 'raw'){
+    onesList = new Int32Array(P * W);
+    for (let s = 0; s < P; s++){ let k = 0; for (let j = 0; j < D && k < W; j++) if (X[s * D + j]) onesList[s * W + k++] = j; if (k !== W) fail('rawfast: row ' + s + ' has ' + k + ' ones'); }
+    console.log('rawfast ones built P=' + P + ' W=' + W);
+  }
   const buildMs = Date.now() - t0;
   console.log(`store P=${P} D=${D} bytes=${X.length + next.length} buildMs=${buildMs} rss=${rssMB()}MB`);
   // H9 leaders-index (sublinear eval): 256 seeded leaders, one assignment pass at build.
@@ -786,7 +823,7 @@ if (process.argv[2] === 'decrypt'){
     if (SCORE === 'maxsim') return maxsimW(qIds, qpos, beta);
     if (PK === '1') return pkRecall(qq, beta, maxS);
     if (HYB === '1') return hybRecall(qq, qIds, qpos, hybAlpha, beta, maxS);
-    return recallW(qq, X, P, D, beta, maxS, SPARSE);
+    return recallW(qq, X, P, D, beta, maxS, SPARSE, (RAWFAST === '1' && PROJ === 'raw') ? 1 : 0, onesList, W);
   }
   let trainWinSet = null; // C5: memorized-vs-novel split (descriptive, no lam mix)
   function wkey(ids, p){
@@ -1360,7 +1397,7 @@ if (process.argv[2] === 'decrypt'){
     for (let t = 0; t < NS; t++){
       const s = Math.floor(rs() * P), pos = spos[s]; // query an ACTUAL stored key
       featPM(trainIds, pos, qp);
-      const { w } = recallW(qp, X, P, D, best.beta, 1, SPARSE); // single step: argmax must be the key itself (store machinery: always whole-path, independent of SCORE)
+      const { w } = recallW(qp, X, P, D, best.beta, 1, SPARSE, (RAWFAST === '1' && PROJ === 'raw') ? 1 : 0, onesList, W); // single step: argmax must be the key itself (store machinery: always whole-path, independent of SCORE)
       let bi = 0; for (let i = 1; i < P; i++) if (w[i] > w[bi]) bi = i;
       let same = true;
       for (let j = 0; j < D; j++){ const bit = qp[j] > 0 ? 1 : 0; if (X[bi * D + j] !== bit){ same = false; break; } }
@@ -1403,6 +1440,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.tmp = parseInt(TMP) || 0; metrics.tmpT = tmpT; metrics.tmpAccSel = tmpAccSel; metrics.tmpPplSel = tmpPplSel; metrics.tmpAcc = tmpAcc; metrics.tmpPpl = tmpPpl;
   metrics.conf = parseInt(CONF) || 0; metrics.confAbs = confAbs; metrics.confAcc = confAcc; metrics.confPpl = confPpl;
   metrics.orf = parseInt(ORF) || 0;
+  metrics.rawfast = parseInt(RAWFAST) || 0;
   metrics.graft = PROJ === 'graft4' ? 4 : (PROJ === 'graft3' ? 3 : (PROJ === 'graft2' ? 2 : (PROJ === 'graft' ? 1 : 0))); metrics.graftE = PROJ === 'graft3' ? V : GE; metrics.graftFile = (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4') ? GRAFTGGUF : null;
   metrics.c2d = parseInt(C2D) || 0; metrics.canRemDetail = canRemDetail; metrics.canEditDetail = canEditDetail;
   metrics.repHitH = repHitH;
