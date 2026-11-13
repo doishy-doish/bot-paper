@@ -1,0 +1,99 @@
+name: halt-r-baseline
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/torch-tiny-lm.py'
+      - '.github/workflows/halt-r-baseline.yml'
+permissions:
+  contents: write
+jobs:
+  tiny:
+    name: tiny-transformer ${{ matrix.corpus }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - corpus: shakes
+            iters: 2000
+          - corpus: ts
+            iters: 3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: install torch CPU
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: fetch corpus (public domain / public research text)
+        run: |
+          if [ "${{ matrix.corpus }}" = ts ]; then
+            curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          else
+            curl -sSL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus.txt
+          fi
+          wc -c /tmp/corpus.txt
+      - name: train + eval tiny transformer (CPU)
+        run: python3 halt-r/torch-tiny-lm.py --data /tmp/corpus.txt --out out/base-${{ matrix.corpus }} --tag ${{ matrix.corpus }} --iters ${{ matrix.iters }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lm-base-${{ matrix.corpus }}
+          path: out/base-${{ matrix.corpus }}/
+          retention-days: 30
+  collect:
+    name: collect baseline
+    needs: tiny
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: lm-base-*
+          path: models/
+      - name: merge + table
+        run: |
+          python3 - <<'EOF'
+          import json, glob
+          runs = []
+          for f in glob.glob('models/*/baseline.json'):
+              runs.append(json.load(open(f)))
+          runs.sort(key=lambda r: r['corpus'])
+          json.dump({'date': __import__('datetime').date.today().isoformat(), 'task': 'tiny-transformer-baseline', 'runs': runs}, open('halt-r/baseline.json', 'w'), indent=1)
+          md = '# HALT-R baseline: tiny transformer (measured, CI)\nSame data, same 90/10 split, same 100-query seed-2000 protocol as the HALT-R bench (q100 uses trailing-32 context). Full-val is the whole held-out 10%.\n\n| corpus | params | iters | trainSec | full-val acc/ppl | q100 acc/ppl |\n|---|---|---|---|---|---|\n'
+          for r in runs:
+              md += '| %s | %d | %d | %d | %.3f/%.2f | %.3f/%.2f |\n' % (r['corpus'], r['params'], r['iters'], r['trainSec'], r['fullVal']['acc'], r['fullVal']['ppl'], r['q100']['acc'], r['q100']['ppl'])
+          open('halt-r/baseline.md', 'w').write(md)
+          print(md)
+          EOF
+          cat halt-r/baseline.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit baseline back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            python3 - <<'EOF'
+          import json, glob
+          runs = []
+          for f in glob.glob('models/*/baseline.json'):
+              runs.append(json.load(open(f)))
+          runs.sort(key=lambda r: r['corpus'])
+          json.dump({'date': __import__('datetime').date.today().isoformat(), 'task': 'tiny-transformer-baseline', 'runs': runs}, open('halt-r/baseline.json', 'w'), indent=1)
+          md = '# HALT-R baseline: tiny transformer (measured, CI)\nSame data, same 90/10 split, same 100-query seed-2000 protocol as the HALT-R bench (q100 uses trailing-32 context). Full-val is the whole held-out 10%.\n\n| corpus | params | iters | trainSec | full-val acc/ppl | q100 acc/ppl |\n|---|---|---|---|---|---|\n'
+          for r in runs:
+              md += '| %s | %d | %d | %d | %.3f/%.2f | %.3f/%.2f |\n' % (r['corpus'], r['params'], r['iters'], r['trainSec'], r['fullVal']['acc'], r['fullVal']['ppl'], r['q100']['acc'], r['q100']['ppl'])
+          open('halt-r/baseline.md', 'w').write(md)
+          print(md)
+          EOF
+            git add halt-r/baseline.json halt-r/baseline.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: tiny-transformer baseline $(date -u +%F)"
+            git push origin main && exit 0
+            sleep 10
+          done
+          exit 1
