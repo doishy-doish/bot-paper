@@ -1,0 +1,39 @@
+{
+ "task": "arith-carry-corpus",
+ "trainRange": [
+  0,
+  74
+ ],
+ "testRange": [
+  75,
+  99
+ ],
+ "lineFmt": "%02d+%02d=%03d\\n",
+ "lineLen": 10,
+ "trainLines": 5625,
+ "testLines": 625,
+ "totalChars": 62500,
+ "cut": 56250,
+ "boundaryExact": true,
+ "vocab": [
+  "\n",
+  "+",
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "="
+ ],
+ "V": 13,
+ "W": 8,
+ "testWindows": 6243,
+ "matchFree": 1.0,
+ "shaFull": "79fff1bea22601c17eb20a938cf8feaf1800c4af93e26c756c750a779def27bd",
+ "shaTrain": "d2bbadc479aaea67868e89f126e7580189bcf349ca449a3dedc7dd9528b60b6b"
+}
