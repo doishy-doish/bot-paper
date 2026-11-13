@@ -51,6 +51,9 @@ def main():
     ap.add_argument('--batch', type=int, default=32)
     ap.add_argument('--block', type=int, default=32)
     ap.add_argument('--seed', type=int, default=7)
+    ap.add_argument('--n-embd', type=int, default=64)
+    ap.add_argument('--n-head', type=int, default=2)
+    ap.add_argument('--n-layer', type=int, default=2)
     a = ap.parse_args()
     torch.manual_seed(a.seed)
     t0 = time.time()
@@ -65,9 +68,9 @@ def main():
     train_ids = torch.tensor([stoi[c] for c in train], dtype=torch.long)
     val_ids = torch.tensor([stoi.get(c, 0) for c in val], dtype=torch.long)
     print('corpus chars=%d train=%d val=%d V=%d iters=%d' % (len(raw), len(train), len(val), V, a.iters), flush=True)
-    model = TinyGPT(V, n_embd=64, n_head=2, n_layer=2, block=a.block)
+    model = TinyGPT(V, n_embd=a.n_embd, n_head=a.n_head, n_layer=a.n_layer, block=a.block)
     n_params = sum(p.numel() for p in model.parameters())
-    opt = torch.optim.AdamW(model.parameters(), lr=3e-4)
+    opt = torch.optim.AdamW(model.parameters(), lr=3e-4 if a.n_embd <= 64 else 2e-4)
     rng = lcg(a.seed)
     model.train()
     best = None
@@ -137,6 +140,7 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, 'baseline.json'), 'w') as f:
         json.dump({'task': 'tiny-transformer-baseline', 'corpus': a.tag, 'V': V, 'params': n_params,
+                   'arch': {'n_embd': a.n_embd, 'n_head': a.n_head, 'n_layer': a.n_layer},
                    'iters': a.iters, 'block': a.block, 'seed': a.seed, 'chars': len(raw),
                    'fullVal': full, 'q100': q100, 'trainSec': train_sec}, f)
     print('torch-tiny-lm: done')
