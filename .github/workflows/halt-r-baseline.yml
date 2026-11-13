@@ -18,9 +18,9 @@ jobs:
       matrix:
         include:
           - corpus: shakes
-            iters: 2000
+            iters: 6000
           - corpus: ts
-            iters: 3000
+            iters: 9000
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
