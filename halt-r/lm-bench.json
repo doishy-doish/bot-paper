@@ -36,9 +36,9 @@
     "rep4": 0.9450171821305843,
     "wordValid": 1
    },
-   "buildMs": 8,
-   "evalMs": 908,
-   "maxRssMB": 95.4,
+   "buildMs": 13,
+   "evalMs": 1901,
+   "maxRssMB": 92,
    "encBytes": 1397542,
    "evalScope": "heldout-val",
    "evalMflops": 1872,
@@ -71,7 +71,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -107,9 +114,9 @@
     "rep4": 0.9450171821305843,
     "wordValid": 1
    },
-   "buildMs": 33,
-   "evalMs": 2341,
-   "maxRssMB": 102.3,
+   "buildMs": 53,
+   "evalMs": 4816,
+   "maxRssMB": 113.7,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 2830.3,
@@ -142,7 +149,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -178,9 +192,9 @@
     "rep4": 0.8178694158075602,
     "wordValid": 0.6538461538461539
    },
-   "buildMs": 15,
-   "evalMs": 4105,
-   "maxRssMB": 98.9,
+   "buildMs": 12,
+   "evalMs": 2526,
+   "maxRssMB": 101.5,
    "encBytes": 2784206,
    "evalScope": "heldout-val",
    "evalMflops": 7621.1,
@@ -213,7 +227,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -249,9 +270,9 @@
     "rep4": 0.7285223367697595,
     "wordValid": 0.7450738916256158
    },
-   "buildMs": 56,
-   "evalMs": 5576,
-   "maxRssMB": 86.7,
+   "buildMs": 53,
+   "evalMs": 5587,
+   "maxRssMB": 96.5,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 4341.8,
@@ -284,7 +305,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -320,9 +348,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 28,
-   "evalMs": 17561,
-   "maxRssMB": 101.4,
+   "buildMs": 35,
+   "evalMs": 18108,
+   "maxRssMB": 122.9,
    "encBytes": 5557542,
    "evalScope": "heldout-val",
    "evalMflops": 33895.7,
@@ -355,7 +383,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -391,9 +426,9 @@
     "rep4": 0.8281786941580757,
     "wordValid": 0.4666666666666666
    },
-   "buildMs": 96,
-   "evalMs": 21769,
-   "maxRssMB": 84.4,
+   "buildMs": 75,
+   "evalMs": 18852,
+   "maxRssMB": 111.4,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 22863.9,
@@ -426,7 +461,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -462,9 +504,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 51,
-   "evalMs": 25271,
-   "maxRssMB": 136.6,
+   "buildMs": 39,
+   "evalMs": 20063,
+   "maxRssMB": 150.9,
    "encBytes": 11104206,
    "evalScope": "heldout-val",
    "evalMflops": 45244.2,
@@ -497,7 +539,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -533,9 +582,9 @@
     "rep4": 0.9621993127147767,
     "wordValid": 0.3333333333333333
    },
-   "buildMs": 110,
-   "evalMs": 21718,
-   "maxRssMB": 90.2,
+   "buildMs": 83,
+   "evalMs": 18437,
+   "maxRssMB": 107.1,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 18640.9,
@@ -568,7 +617,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -604,9 +660,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 47,
-   "evalMs": 22035,
-   "maxRssMB": 200.3,
+   "buildMs": 74,
+   "evalMs": 39786,
+   "maxRssMB": 208,
    "encBytes": 22197543,
    "evalScope": "heldout-val",
    "evalMflops": 93982.7,
@@ -639,7 +695,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -675,9 +738,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 157,
-   "evalMs": 18387,
-   "maxRssMB": 89,
+   "buildMs": 231,
+   "evalMs": 23910,
+   "maxRssMB": 104.4,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 15532,
@@ -710,7 +773,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -746,9 +816,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 13,
-   "evalMs": 2999,
-   "maxRssMB": 140.6,
+   "buildMs": 18,
+   "evalMs": 3020,
+   "maxRssMB": 141.1,
    "encBytes": 1696206,
    "evalScope": "heldout-val",
    "evalMflops": 6600.6,
@@ -781,7 +851,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -817,9 +894,9 @@
     "rep4": 0.872852233676976,
     "wordValid": 0.9871794871794872
    },
-   "buildMs": 32,
-   "evalMs": 2038,
-   "maxRssMB": 145.3,
+   "buildMs": 36,
+   "evalMs": 2100,
+   "maxRssMB": 150.6,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 2764.8,
@@ -852,7 +929,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -888,9 +972,9 @@
     "rep4": 0.7628865979381443,
     "wordValid": 0.9696969696969697
    },
-   "buildMs": 12,
-   "evalMs": 2857,
-   "maxRssMB": 149.7,
+   "buildMs": 26,
+   "evalMs": 6126,
+   "maxRssMB": 143.1,
    "encBytes": 3381542,
    "evalScope": "heldout-val",
    "evalMflops": 6461.6,
@@ -923,7 +1007,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -959,9 +1050,9 @@
     "rep4": 0.7628865979381443,
     "wordValid": 0.9696969696969697
    },
-   "buildMs": 61,
-   "evalMs": 6623,
-   "maxRssMB": 141.7,
+   "buildMs": 59,
+   "evalMs": 6619,
+   "maxRssMB": 142.7,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 4456.4,
@@ -994,7 +1085,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -1030,9 +1128,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 40,
-   "evalMs": 26782,
-   "maxRssMB": 133.5,
+   "buildMs": 30,
+   "evalMs": 21026,
+   "maxRssMB": 183.7,
    "encBytes": 6752206,
    "evalScope": "heldout-val",
    "evalMflops": 47324.2,
@@ -1065,7 +1163,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -1101,9 +1206,9 @@
     "rep4": 0.9450171821305843,
     "wordValid": 0.6666666666666666
    },
-   "buildMs": 97,
-   "evalMs": 16591,
-   "maxRssMB": 132,
+   "buildMs": 58,
+   "evalMs": 11378,
+   "maxRssMB": 117.4,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 20897.8,
@@ -1136,7 +1241,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -1172,9 +1284,9 @@
     "rep4": 0.9759450171821307,
     "wordValid": 0
    },
-   "buildMs": 64,
-   "evalMs": 50052,
-   "maxRssMB": 178.2,
+   "buildMs": 68,
+   "evalMs": 50169,
+   "maxRssMB": 174.4,
    "encBytes": 13493543,
    "evalScope": "heldout-val",
    "evalMflops": 93879.8,
@@ -1207,7 +1319,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -1243,9 +1362,9 @@
     "rep4": 0.9759450171821306,
     "wordValid": 0
    },
-   "buildMs": 140,
-   "evalMs": 25138,
-   "maxRssMB": 99.4,
+   "buildMs": 115,
+   "evalMs": 21897,
+   "maxRssMB": 129.7,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 22290.4,
@@ -1278,7 +1397,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -1314,9 +1440,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 93,
-   "evalMs": 51642,
-   "maxRssMB": 250.4,
+   "buildMs": 196,
+   "evalMs": 65548,
+   "maxRssMB": 269.6,
    "encBytes": 26976207,
    "evalScope": "heldout-val",
    "evalMflops": 121586.7,
@@ -1349,7 +1475,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -1385,9 +1518,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 268,
-   "evalMs": 23319,
-   "maxRssMB": 126.1,
+   "buildMs": 143,
+   "evalMs": 17113,
+   "maxRssMB": 121,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 16670.7,
@@ -1420,7 +1553,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   }
  ]
 }
