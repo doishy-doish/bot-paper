@@ -1,0 +1,16 @@
+[package]
+name = "twelve-direct"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "=1.47.1", features = ["rt-multi-thread", "net", "time", "macros"] }
+hyper = { version = "=1.6.0", features = ["server", "http1"] }
+hyper-util = { version = "=0.1.11", features = ["tokio"] }
+http-body-util = "=0.1.2"
+bytes = "=1.10.1"
+rusqlite = { version = "=0.32.1", features = ["bundled"] }
+serde_json = "=1.0.140"
+hmac = "=0.12.1"
+sha2 = "=0.10.8"
+base64 = "=0.22.1"
