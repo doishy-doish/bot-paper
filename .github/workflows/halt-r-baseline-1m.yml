@@ -1,0 +1,129 @@
+name: halt-r-baseline-1m
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/torch-tiny-lm.py'
+      - '.github/workflows/halt-r-baseline-1m.yml'
+permissions:
+  contents: write
+jobs:
+  bout:
+    name: bout ${{ matrix.corpus }} ${{ matrix.model }} s${{ matrix.seed }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include:
+          - {corpus: shakes, model: tiny, seed: 7, iters: 6000, n_embd: 64, n_head: 2, n_layer: 2, block: 32}
+          - {corpus: shakes, model: tiny, seed: 11, iters: 6000, n_embd: 64, n_head: 2, n_layer: 2, block: 32}
+          - {corpus: shakes, model: tiny, seed: 13, iters: 6000, n_embd: 64, n_head: 2, n_layer: 2, block: 32}
+          - {corpus: shakes, model: tiny, seed: 17, iters: 6000, n_embd: 64, n_head: 2, n_layer: 2, block: 32}
+          - {corpus: shakes, model: tiny, seed: 19, iters: 6000, n_embd: 64, n_head: 2, n_layer: 2, block: 32}
+          - {corpus: shakes, model: onem, seed: 7, iters: 6000, n_embd: 128, n_head: 4, n_layer: 4, block: 64}
+          - {corpus: shakes, model: onem, seed: 11, iters: 6000, n_embd: 128, n_head: 4, n_layer: 4, block: 64}
+          - {corpus: shakes, model: onem, seed: 13, iters: 6000, n_embd: 128, n_head: 4, n_layer: 4, block: 64}
+          - {corpus: shakes, model: onem, seed: 17, iters: 6000, n_embd: 128, n_head: 4, n_layer: 4, block: 64}
+          - {corpus: shakes, model: onem, seed: 19, iters: 6000, n_embd: 128, n_head: 4, n_layer: 4, block: 64}
+          - {corpus: ts, model: tiny, seed: 7, iters: 9000, n_embd: 64, n_head: 2, n_layer: 2, block: 32}
+          - {corpus: ts, model: tiny, seed: 11, iters: 9000, n_embd: 64, n_head: 2, n_layer: 2, block: 32}
+          - {corpus: ts, model: tiny, seed: 13, iters: 9000, n_embd: 64, n_head: 2, n_layer: 2, block: 32}
+          - {corpus: ts, model: tiny, seed: 17, iters: 9000, n_embd: 64, n_head: 2, n_layer: 2, block: 32}
+          - {corpus: ts, model: tiny, seed: 19, iters: 9000, n_embd: 64, n_head: 2, n_layer: 2, block: 32}
+          - {corpus: ts, model: onem, seed: 7, iters: 9000, n_embd: 128, n_head: 4, n_layer: 4, block: 64}
+          - {corpus: ts, model: onem, seed: 11, iters: 9000, n_embd: 128, n_head: 4, n_layer: 4, block: 64}
+          - {corpus: ts, model: onem, seed: 13, iters: 9000, n_embd: 128, n_head: 4, n_layer: 4, block: 64}
+          - {corpus: ts, model: onem, seed: 17, iters: 9000, n_embd: 128, n_head: 4, n_layer: 4, block: 64}
+          - {corpus: ts, model: onem, seed: 19, iters: 9000, n_embd: 128, n_head: 4, n_layer: 4, block: 64}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: install torch CPU
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: fetch corpus (public domain / public research text)
+        run: |
+          if [ "${{ matrix.corpus }}" = ts ]; then
+            curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          else
+            curl -sSL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus.txt
+          fi
+          wc -c /tmp/corpus.txt
+      - name: train and eval bout
+        run: python3 halt-r/torch-tiny-lm.py --data /tmp/corpus.txt --out out/bout-${{ matrix.corpus }}-${{ matrix.model }}-${{ matrix.seed }} --tag ${{ matrix.corpus }} --iters ${{ matrix.iters }} --seed ${{ matrix.seed }} --n-embd ${{ matrix.n_embd }} --n-head ${{ matrix.n_head }} --n-layer ${{ matrix.n_layer }} --block ${{ matrix.block }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lm-bout-${{ matrix.corpus }}-${{ matrix.model }}-${{ matrix.seed }}
+          path: out/bout-${{ matrix.corpus }}-${{ matrix.model }}-${{ matrix.seed }}/
+          retention-days: 30
+  collect:
+    name: collect 1m bout
+    needs: bout
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: lm-bout-*
+          path: models/
+      - name: merge table with mean and std
+        run: |
+          python3 - <<'EOF'
+          import json, glob, statistics
+          runs = []
+          for f in glob.glob('models/*/baseline.json'):
+              runs.append(json.load(open(f)))
+          def agg(rs):
+              a = [r['q100']['acc'] for r in rs]; p = [r['q100']['ppl'] for r in rs]
+              return (sum(a)/len(a), statistics.pstdev(a) if len(a)>1 else 0.0, sum(p)/len(p), statistics.pstdev(p) if len(p)>1 else 0.0, rs[0]['params'], rs[0].get('arch', {}), rs[0]['iters'])
+          runs.sort(key=lambda r: (r['corpus'], r['params'], r['seed']))
+          json.dump({'date': __import__('datetime').date.today().isoformat(), 'task': 'tiny-vs-1m-bout-20way', 'runs': runs}, open('halt-r/baseline-1m.json', 'w'), indent=1)
+          md = '# HALT-R bout: tiny-110K vs 1M-frontier (measured, CI, 20-way)\nSame data, same 90/10 split, same 100-query seed-2000 protocol (q100 trailing-block context). 5 train seeds per cell; mean plus stdev over seeds.\n\n| corpus | model | params | iters | q100 acc mean+-sd | q100 ppl mean+-sd |\n|---|---|---|---|---|---|\n'
+          for corpus in ['shakes', 'ts']:
+              for model in ['tiny', 'onem']:
+                  cell = [r for r in runs if r['corpus']==corpus and (('onem' in model and r['params']>300000) or ('tiny' in model and r['params']<300000))]
+                  if not cell: continue
+                  ma, sa, mp, sp, np_, arch, it = agg(cell)
+                  md += '| %s | %s | %d | %d | %.3f+-%.3f | %.2f+-%.2f |\n' % (corpus, model, np_, it, ma, sa, mp, sp)
+          open('halt-r/baseline-1m.md', 'w').write(md)
+          print(md)
+          EOF
+          cat halt-r/baseline-1m.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit bout back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            python3 - <<'EOF'
+          import json, glob, statistics
+          runs = []
+          for f in glob.glob('models/*/baseline.json'):
+              runs.append(json.load(open(f)))
+          def agg(rs):
+              a = [r['q100']['acc'] for r in rs]; p = [r['q100']['ppl'] for r in rs]
+              return (sum(a)/len(a), statistics.pstdev(a) if len(a)>1 else 0.0, sum(p)/len(p), statistics.pstdev(p) if len(p)>1 else 0.0, rs[0]['params'], rs[0].get('arch', {}), rs[0]['iters'])
+          runs.sort(key=lambda r: (r['corpus'], r['params'], r['seed']))
+          json.dump({'date': __import__('datetime').date.today().isoformat(), 'task': 'tiny-vs-1m-bout-20way', 'runs': runs}, open('halt-r/baseline-1m.json', 'w'), indent=1)
+          md = '# HALT-R bout: tiny-110K vs 1M-frontier (measured, CI, 20-way)\nSame data, same 90/10 split, same 100-query seed-2000 protocol (q100 trailing-block context). 5 train seeds per cell; mean plus stdev over seeds.\n\n| corpus | model | params | iters | q100 acc mean+-sd | q100 ppl mean+-sd |\n|---|---|---|---|---|---|\n'
+          for corpus in ['shakes', 'ts']:
+              for model in ['tiny', 'onem']:
+                  cell = [r for r in runs if r['corpus']==corpus and (('onem' in model and r['params']>300000) or ('tiny' in model and r['params']<300000))]
+                  if not cell: continue
+                  ma, sa, mp, sp, np_, arch, it = agg(cell)
+                  md += '| %s | %s | %d | %d | %.3f+-%.3f | %.2f+-%.2f |\n' % (corpus, model, np_, it, ma, sa, mp, sp)
+          open('halt-r/baseline-1m.md', 'w').write(md)
+          print(md)
+          EOF
+            git add halt-r/baseline-1m.json halt-r/baseline-1m.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: tiny-vs-1m 20-way bout $(date -u +%F)"
+            git push origin main && exit 0
+            sleep 10
+          done
+          exit 1
