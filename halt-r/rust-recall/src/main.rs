@@ -388,9 +388,10 @@ fn cmd_lm(args: &[String]) {
             .collect()
     };
     let sel = lam_stats(&paired(2000, &mut flop_steps, &mut state, &mut scratch, &mut qq));
+    // ppl-guarded: minimize select-set ppl first (kNN-LM tunes for ppl), tie-break higher acc.
     let mut best_lam = sel[0];
     for s in &sel {
-        if s.1 > best_lam.1 || (s.1 == best_lam.1 && s.2 < best_lam.2) {
+        if s.2 < best_lam.2 || (s.2 == best_lam.2 && s.1 > best_lam.1) {
             best_lam = *s;
         }
     }
