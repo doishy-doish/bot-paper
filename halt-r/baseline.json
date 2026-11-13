@@ -1,0 +1,44 @@
+{
+ "date": "2026-11-13",
+ "task": "tiny-transformer-baseline",
+ "runs": [
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "shakes",
+   "V": 65,
+   "params": 110464,
+   "iters": 2000,
+   "block": 32,
+   "seed": 7,
+   "chars": 1115394,
+   "fullVal": {
+    "acc": 0.3802698485296887,
+    "ppl": 8.193972532065878
+   },
+   "q100": {
+    "acc": 0.38,
+    "ppl": 7.997397347997536
+   },
+   "trainSec": 167
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "ts",
+   "V": 79,
+   "params": 112256,
+   "iters": 3000,
+   "block": 32,
+   "seed": 7,
+   "chars": 2998738,
+   "fullVal": {
+    "acc": 0.5346949508239367,
+    "ppl": 4.652115948920705
+   },
+   "q100": {
+    "acc": 0.51,
+    "ppl": 5.435243009986198
+   },
+   "trainSec": 424
+  }
+ ]
+}
