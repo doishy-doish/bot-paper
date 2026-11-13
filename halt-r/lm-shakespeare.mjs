@@ -129,6 +129,49 @@ function readGraftEmb(gpath, V){
   for (let c = 0; c < V; c++) for (let e = 0; e < GE; e++) emb[c * GE + e] = dv.getFloat32(dataStart + tokOff + (c * GE + e) * 4, true);
   return { emb, GE };
 }
+function zcaWhiten(flatEmb, NV, NE){ // full-covariance whitening (zero training): out = U diag(1/sqrt(lam)) U^T (x - mu), Jacobi eigen, deterministic
+  const mu = new Float64Array(NE);
+  for (let c = 0; c < NV; c++) for (let e = 0; e < NE; e++) mu[e] += flatEmb[c * NE + e];
+  for (let e = 0; e < NE; e++) mu[e] /= NV;
+  const C = new Float64Array(NE * NE);
+  for (let c = 0; c < NV; c++) for (let i = 0; i < NE; i++){ const xi = flatEmb[c * NE + i] - mu[i]; for (let j = 0; j <= i; j++) C[i * NE + j] += xi * (flatEmb[c * NE + j] - mu[j]); }
+  for (let i = 0; i < NE; i++) for (let j = 0; j <= i; j++){ const v = C[i * NE + j] / NV + (i === j ? 1e-6 : 0); C[i * NE + j] = v; C[j * NE + i] = v; }
+  const U = new Float64Array(NE * NE);
+  for (let i = 0; i < NE; i++) U[i * NE + i] = 1;
+  for (let sweep = 0; sweep < 50; sweep++){
+    let off = 0;
+    for (let i = 0; i < NE; i++) for (let j = i + 1; j < NE; j++) off += C[i * NE + j] * C[i * NE + j];
+    if (!(off > 1e-20)) break;
+    for (let p = 0; p < NE - 1; p++) for (let q = p + 1; q < NE; q++){
+      const apq = C[p * NE + q];
+      if (Math.abs(apq) < 1e-30) continue;
+      const app = C[p * NE + p], aqq = C[q * NE + q];
+      const theta = (aqq - app) / (2 * apq);
+      const t = (theta >= 0 ? 1 : -1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+      const c = 1 / Math.sqrt(t * t + 1), s = t * c;
+      for (let k = 0; k < NE; k++){ const akp = C[k * NE + p], akq = C[k * NE + q]; C[k * NE + p] = c * akp - s * akq; C[k * NE + q] = s * akp + c * akq; }
+      for (let k = 0; k < NE; k++){ const apk = C[p * NE + k], aqk = C[q * NE + k]; C[p * NE + k] = c * apk - s * aqk; C[q * NE + k] = s * apk + c * aqk; }
+      for (let k = 0; k < NE; k++){ const ukp = U[k * NE + p], ukq = U[k * NE + q]; U[k * NE + p] = c * ukp - s * ukq; U[k * NE + q] = s * ukp + c * ukq; }
+    }
+  }
+  const inv = new Float64Array(NE);
+  for (let i = 0; i < NE; i++) inv[i] = 1 / Math.sqrt(Math.max(C[i * NE + i], 1e-12));
+  const out = new Float32Array(NV * NE), y = new Float64Array(NE);
+  for (let c = 0; c < NV; c++){
+    for (let i = 0; i < NE; i++){ let d = 0; for (let e = 0; e < NE; e++) d += U[e * NE + i] * (flatEmb[c * NE + e] - mu[e]); y[i] = d * inv[i]; }
+    for (let e = 0; e < NE; e++){ let d = 0; for (let i = 0; i < NE; i++) d += U[e * NE + i] * y[i]; out[c * NE + e] = d; }
+  }
+  return out;
+}
+function orthSquare(view, N){ // deterministic orthogonal binding basis: Gram-Schmidt on seeded Gaussian square (columns orthonormal)
+  const Q = new Float32Array(view);
+  for (let j = 0; j < N; j++){
+    for (let i = 0; i < j; i++){ let d = 0; for (let r = 0; r < N; r++) d += Q[r * N + j] * Q[r * N + i]; for (let r = 0; r < N; r++) Q[r * N + j] -= d * Q[r * N + i]; }
+    let s = 0; for (let r = 0; r < N; r++) s += Q[r * N + j] * Q[r * N + j]; s = Math.sqrt(s) || 1;
+    for (let r = 0; r < N; r++) Q[r * N + j] /= s;
+  }
+  return Q;
+}
 // ---- io ----
 if (process.argv[2] === 'decrypt'){
   const a = process.argv.slice(3), file = a[0];
@@ -176,8 +219,8 @@ if (process.argv[2] === 'decrypt'){
   const TOK = gv('tok', 'char'); // H12 subword pilot: char (default, bit-identical), bpe (256 learned merges on train head)
   if (TOK !== 'char' && TOK !== 'bpe') fail('usage: --tok char|bpe');
   const GRAFTGGUF = gv('graftgguf', null); // transplant: donor GGUF path (keys = frozen donor embeddings, zero training)
-  if ((PROJ === 'graft' || PROJ === 'graft2') && TOK !== 'char') fail('usage: --proj graft needs --tok char (donor V is char-level)');
-  if ((PROJ === 'graft' || PROJ === 'graft2') && !GRAFTGGUF) fail('usage: --proj graft needs --graftgguf <tinygpt.gguf>');
+  if ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4') && TOK !== 'char') fail('usage: --proj graft needs --tok char (donor V is char-level)');
+  if ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4') && !GRAFTGGUF) fail('usage: --proj graft needs --graftgguf <tinygpt.gguf>');
   const MIX = gv('mix', 'none'); // gmix: none (default, bit-identical), gpt (mix hop + tiny-GPT dists from q100-gpt file, joined on pos)
   if (MIX !== 'none' && MIX !== 'gpt') fail('usage: --mix none|gpt');
   const GPTQ = gv('gptq', null);
@@ -310,13 +353,13 @@ if (process.argv[2] === 'decrypt'){
   const t0 = Date.now();
   const Din = W * V;
   let graftEmb = null, GE = 0, graftWhite = null, graftBind = null; // transplant: frozen donor token rows (zero training)
-  if (PROJ === 'graft' || PROJ === 'graft2'){
+  if (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4'){
     const g = readGraftEmb(GRAFTGGUF, V);
     graftEmb = g.emb; GE = g.GE;
     console.log(`graft donor=${GRAFTGGUF} V=${V} E=${GE} D=${W * GE}`);
   }
-  const D = PROJ === 'raw' ? Din : ((PROJ === 'graft' || PROJ === 'graft2') ? GE : H);
-  const FW = (PROJ === 'graft' || PROJ === 'graft2') ? GE : H; // feature width: graft keys live in donor-embedding space
+  const D = PROJ === 'raw' ? Din : (PROJ === 'graft3' ? V : (((PROJ === 'graft' || PROJ === 'graft2') || PROJ === 'graft4') ? GE : H));
+  const FW = PROJ === 'graft3' ? V : ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft4') ? GE : H); // feature width: graft keys live in donor space (graft3: anchor space)
   function gauss1(rr){ let u = 0, v = 0; while (!u) u = rr(); while (!v) v = rr(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
   let M = null; // projection matrix (sim: random Gaussian; sup: supervised from store labels)
   function orthCols(Mm, rows, cols){ // ORF: Gram-Schmidt on column (feature) directions, per-column norms preserved (scales survive rotation)
@@ -358,6 +401,41 @@ if (process.argv[2] === 'decrypt'){
       for (let e = 0; e < GE; e++) M[base + e] = graftWhite[src + e] * graftBind[k * GE + e];
     }
     console.log('graft2 whiten+bind ready V=' + V + ' E=' + GE + ' W=' + W);
+  }
+  if (PROJ === 'graft3'){ // relative transplant: cosine-to-anchors rows, centered, bound per position (zero training, translation-free)
+    const nn = new Float64Array(V);
+    for (let c = 0; c < V; c++){ let s = 0; for (let e = 0; e < GE; e++) s += graftEmb[c * GE + e] * graftEmb[c * GE + e]; nn[c] = Math.sqrt(s) + 1e-12; }
+    const rel = new Float32Array(V * V);
+    for (let c = 0; c < V; c++) for (let a = 0; a < V; a++){ let d = 0; for (let e = 0; e < GE; e++) d += graftEmb[c * GE + e] * graftEmb[a * GE + e]; rel[c * V + a] = d / (nn[c] * nn[a]); }
+    const rm = new Float64Array(V);
+    for (let c = 0; c < V; c++) for (let a = 0; a < V; a++) rm[a] += rel[c * V + a];
+    for (let a = 0; a < V; a++) rm[a] /= V;
+    const br3 = rng(SEED + 11);
+    const bind3 = new Float32Array(W * V);
+    for (let k = 0; k < W; k++) for (let a = 0; a < V; a++) bind3[k * V + a] = br3() < 0.5 ? 1 : -1;
+    M = new Float32Array(Din * V);
+    for (let k = 0; k < W; k++) for (let c = 0; c < V; c++){
+      const base = (k * V + c) * V;
+      for (let a = 0; a < V; a++) M[base + a] = (rel[c * V + a] - rm[a]) * bind3[k * V + a];
+    }
+    console.log('graft3 relative ready V=' + V + ' E=' + GE + ' W=' + W);
+  }
+  if (PROJ === 'graft4'){ // procrustes-side transplant: full ZCA + orthogonal position binding (zero training, deterministic)
+    const zw = zcaWhiten(graftEmb, V, GE);
+    const rr4 = rng(SEED + 12);
+    const G = new Float32Array(W * GE * GE);
+    for (let i = 0; i < G.length; i++){ let u = 0, v = 0; while (!u) u = rr4(); while (!v) v = rr4(); G[i] = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+    M = new Float32Array(Din * GE);
+    const tmp = new Float32Array(GE);
+    for (let k = 0; k < W; k++){
+      const Rk = orthSquare(G.subarray(k * GE * GE, (k + 1) * GE * GE), GE);
+      for (let c = 0; c < V; c++){
+        const base = (k * V + c) * GE, src = c * GE;
+        for (let e = 0; e < GE; e++){ let d = 0; for (let j = 0; j < GE; j++) d += Rk[e * GE + j] * zw[src + j]; tmp[e] = d; }
+        for (let e = 0; e < GE; e++) M[base + e] = tmp[e];
+      }
+    }
+    console.log('graft4 zca+orth ready V=' + V + ' E=' + GE + ' W=' + W);
   }
   function featPM(ids, pos, out){ // ±1 features, length D (every projected PROJ incl. graft shares the path)
     if (PROJ !== 'raw'){
@@ -1325,7 +1403,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.tmp = parseInt(TMP) || 0; metrics.tmpT = tmpT; metrics.tmpAccSel = tmpAccSel; metrics.tmpPplSel = tmpPplSel; metrics.tmpAcc = tmpAcc; metrics.tmpPpl = tmpPpl;
   metrics.conf = parseInt(CONF) || 0; metrics.confAbs = confAbs; metrics.confAcc = confAcc; metrics.confPpl = confPpl;
   metrics.orf = parseInt(ORF) || 0;
-  metrics.graft = PROJ === 'graft2' ? 2 : (PROJ === 'graft' ? 1 : 0); metrics.graftE = GE; metrics.graftFile = (PROJ === 'graft' || PROJ === 'graft2') ? GRAFTGGUF : null;
+  metrics.graft = PROJ === 'graft4' ? 4 : (PROJ === 'graft3' ? 3 : (PROJ === 'graft2' ? 2 : (PROJ === 'graft' ? 1 : 0))); metrics.graftE = PROJ === 'graft3' ? V : GE; metrics.graftFile = (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4') ? GRAFTGGUF : null;
   metrics.c2d = parseInt(C2D) || 0; metrics.canRemDetail = canRemDetail; metrics.canEditDetail = canEditDetail;
   metrics.repHitH = repHitH;
   metrics.hedgeAcc = hedgeAcc; metrics.hedgePpl = hedgePpl; metrics.hedgeNeff = hedgeNeff;
