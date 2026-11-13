@@ -1,0 +1,103 @@
+name: halt-r-graft5c
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/halt-r-graft5c.yml'
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: graft5c ${{ matrix.corpus }} W${{ matrix.W }} ${{ matrix.proj }} T200
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        corpus: [ts]
+        W: [8]
+        proj: [raw, graft2, graft5]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fetch corpus (public domain / public research text)
+        run: |
+          curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          wc -c /tmp/corpus.txt
+      - name: bench confirm (powered replicate, 200 trials)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/graft5c-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.proj }} --tag ${{ matrix.corpus }} --W ${{ matrix.W }} --P 8000 --trials 200 --proj ${{ matrix.proj }} --H 256 --graftgguf halt-r/tinygpt-${{ matrix.corpus }}.gguf --no-gen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: graft5c-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.proj }}
+          path: out/graft5c-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.proj }}/
+          retention-days: 30
+  collect:
+    name: collect confirm verdict
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: graft5c-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: confirm verdict (powered replicate)
+        run: |
+          node - <<'EOF' | tee /tmp/graft5c.md
+          const fs = require('node:fs'), path = require('node:path');
+          const mcP = (b, c) => { const n = b + c; if (!n) return 1; const lo = Math.min(b, c);
+            let pk = Math.pow(0.5, n), tail = pk;
+            for (let k = 1; k <= lo; k++){ pk = pk * (n - k + 1) / k; tail += pk; }
+            return Math.min(1, 2 * tail); };
+          const pair = (s1, s2) => { let b = 0, c = 0;
+            for (let i = 0; i < Math.min(s1.length, s2.length); i++){ const a = s1[i], d = s2[i];
+              if (a === 'x' || d === 'x') continue;
+              if (a === '1' && d === '0') b++; if (a === '0' && d === '1') c++; }
+            return {b, c, p: mcP(b, c)}; };
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          walk('models');
+          const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+          fs.writeFileSync('/tmp/graft5c.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'graft5-confirm', preReg: 'CONFIRM of run 43460562247 ts-W8 win at 200 trials (powered replicate, same SEED streams extended): graft5 wins iff lam*>0 AND d>0.2ppl vs raw AND McNemar p<0.05. graft2 rows = old-lean reference at 200 trials.', runs}, null, 1));
+          let md = '# GRAFT5C: powered confirm of the ts-W8 transplant win (200 trials, measured, CI)\nSame protocol at double queries (P=8000, char, no-gen, SEED streams extended). graft5 K=512 anchor-energy vs same-workflow raw; graft2 = old-lean reference.\n\n| corpus | W | proj | trials | interp acc/ppl (lam*) |\n|---|---|---|---|---|\n';
+          for (const r of runs) md += '| ' + r.corpus + ' | ' + r.W + ' | ' + r.proj + ' | ' + r.trials + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + ' (' + r.interpLambda + ') |\n';
+          const o = runs.find(r => r.proj === 'raw');
+          for (const pname of ['graft5', 'graft2']) {
+            const g = runs.find(r => r.proj === pname);
+            if (!o || !g) continue;
+            const d = o.interpPpl - g.interpPpl;
+            const pm = pair(g.repHitI || '', o.repHitI || '');
+            const wins = g.interpLambda > 0 && d > 0.2 && pm.p < 0.05;
+            md += '\n' + pname + ' T200: raw ' + o.interpPpl.toFixed(2) + ' (lam*=' + o.interpLambda + ') vs ' + pname + ' ' + g.interpPpl.toFixed(2) + ' (lam*=' + g.interpLambda + ') d=' + d.toFixed(2) + '. McNemar b/c=' + pm.b + '/' + pm.c + ' p=' + pm.p.toFixed(3) + (pm.p < 0.05 ? ' SIGNIFICANT.' : '.') + ' ' + (wins ? 'VERDICT: WIN CONFIRMED (' + pname + ' replicates at 200 trials).' : g.interpLambda === 0 ? 'VERDICT: WALL STANDS at 200 trials.' : 'VERDICT: not confirmed (leans or melts).') + '\n';
+          }
+          process.stdout.write(md);
+          EOF
+          cp /tmp/graft5c.json halt-r/graft5c.json
+          cp /tmp/graft5c.md halt-r/graft5c.md
+          cat halt-r/graft5c.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit confirm back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/graft5c.json halt-r/graft5c.json
+            cp /tmp/graft5c.md halt-r/graft5c.md
+            git add halt-r/graft5c.json halt-r/graft5c.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: graft5 200-trial confirm $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
