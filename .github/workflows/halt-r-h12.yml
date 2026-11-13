@@ -67,8 +67,8 @@ jobs:
           const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
           runs.sort((a, b) => (a.corpus < b.corpus ? -1 : 1) || a.W - b.W || (a.proj < b.proj ? -1 : 1));
           fs.writeFileSync('/tmp/h12.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'h12-bpe-pilot', runs}, null, 1));
-          let md = '# H12: BPE subword pilot (measured, CI)\n256 merges, JS-only. Verdict is INTERNAL (lam* + interp vs base under the SAME tokenizer) — id-level ppl is not comparable across tokenizers, so no BPC claims here.\n\n| corpus | W | proj | V | tokLen | base acc/ppl | interp acc/ppl (lam*) |\n|---|---|---|---|---|---|---|\n';
-          for (const r of runs) md += '| ' + r.corpus + ' | ' + r.W + ' | ' + r.proj + ' | ' + r.V + ' | ' + r.bpeMeanLen.toFixed(2) + ' | ' + r.bigramAcc.toFixed(3) + '/' + r.bigramPpl.toFixed(2) + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + ' (' + r.interpLambda + ') |\n';
+          let md = '# H12: BPE subword pilot (measured, CI)\n256 merges, JS-only. Verdict is INTERNAL (lam* + interp vs base under the SAME tokenizer) — id-level ppl is not comparable across tokenizers, so no BPC claims here.\n\n| corpus | W | proj | cost | V | tokLen | base acc/ppl | interp acc/ppl (lam*) |\n|---|---|---|---|---|---|---|---|\n';
+          for (const r of runs) md += '| ' + r.corpus + ' | ' + r.W + ' | ' + r.proj + ' | ' + (r.costClass || 'linear-O(P·D)') + ' | ' + r.V + ' | ' + r.bpeMeanLen.toFixed(2) + ' | ' + r.bigramAcc.toFixed(3) + '/' + r.bigramPpl.toFixed(2) + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + ' (' + r.interpLambda + ') |\n';
           for (const r of runs) {
             md += '\n' + r.corpus + ' W' + r.W + ' ' + r.proj + ': ' + (r.interpLambda > 0 && r.interpPpl < r.bigramPpl ? 'VERDICT: SUBWORD MOVES (lam*=' + r.interpLambda + ').' : 'VERDICT: WALL STANDS across tokenizers (lam*=' + r.interpLambda + ').') + '\n';
           }

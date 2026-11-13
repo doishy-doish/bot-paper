@@ -67,8 +67,8 @@ jobs:
           const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
           runs.sort((a, b) => (a.corpus < b.corpus ? -1 : 1) || a.W - b.W || (a.proj < b.proj ? -1 : 1));
           fs.writeFileSync('/tmp/henc.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'henc-trunk', runs}, null, 1));
-          let md = '# H-enc: contrastive-learned encoder vs sup scales (measured, CI)\nSame protocol (P=8000, H=256, no-gen). enc: 100 SGD steps, batch 128, InfoNCE same-next attract (JS-only, zero python). sup rows are same-workflow controls.\n\n| corpus | W | proj | encLoss first->last | interp acc/ppl (lam*) |\n|---|---|---|---|---|\n';
-          for (const r of runs) md += '| ' + r.corpus + ' | ' + r.W + ' | ' + r.proj + ' | ' + r.encLossFirst.toFixed(3) + '->' + r.encLossLast.toFixed(3) + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + ' (' + r.interpLambda + ') |\n';
+          let md = '# H-enc: contrastive-learned encoder vs sup scales (measured, CI)\nSame protocol (P=8000, H=256, no-gen). enc: 100 SGD steps, batch 128, InfoNCE same-next attract (JS-only, zero python). sup rows are same-workflow controls. Cost-class is first-class: both linear-O(P·D) — the encoder changes the constant and the geometry, not the series; sublinear is H9.\n\n| corpus | W | proj | cost | encLoss first->last | interp acc/ppl (lam*) |\n|---|---|---|---|---|---|\n';
+          for (const r of runs) md += '| ' + r.corpus + ' | ' + r.W + ' | ' + r.proj + ' | ' + (r.costClass || 'linear-O(P·D)') + ' | ' + r.encLossFirst.toFixed(3) + '->' + r.encLossLast.toFixed(3) + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + ' (' + r.interpLambda + ') |\n';
           for (const corpus of ['shakes', 'ts']) for (const W of [8, 16]) {
             const s = runs.find(r => r.corpus === corpus && r.W === W && r.proj === 'sup');
             const e = runs.find(r => r.corpus === corpus && r.W === W && r.proj === 'enc');

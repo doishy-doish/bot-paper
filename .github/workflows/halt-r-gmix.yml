@@ -67,10 +67,10 @@ jobs:
           const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
           const base = JSON.parse(fs.readFileSync('halt-r/baseline.json', 'utf8'));
           fs.writeFileSync('/tmp/gmix.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'gmix-hop-plus-gpt', runs}, null, 1));
-          let md = '# gmix: hop + tiny-GPT (the paper\'s actual prescription)\nSame protocol, W32 = trainer block (full pos join). hop+bigram from lm-bench W32 rows; GPT-alone from baseline rev-2 q100.\n\n| corpus | hop+bigram acc/ppl | hop+GPT acc/ppl (lam*) | GPT-alone acc/ppl | cover |\n|---|---|---|---|---|\n';
+          let md = '# gmix: hop + tiny-GPT (the paper\'s actual prescription)\nSame protocol, W32 = trainer block (full pos join). hop+bigram from lm-bench W32 rows; GPT-alone from baseline rev-2 q100. Cost-class is first-class: hop is linear-O(P·D), GPT is parametric (fixed weights, cost in params).\n\n| corpus | hop+bigram acc/ppl | hop+GPT acc/ppl (lam*) | GPT-alone acc/ppl | GPT params | cover |\n|---|---|---|---|---|---|\n';
           for (const m of runs) {
             const g = base.runs.find(r => r.corpus === m.corpus);
-            md += '| ' + m.corpus + ' | ' + m.interpAcc.toFixed(3) + '/' + m.interpPpl.toFixed(2) + ' | ' + m.gptMixAcc.toFixed(3) + '/' + m.gptMixPpl.toFixed(2) + ' (' + m.gptMixLamSel + ') | ' + g.q100.acc.toFixed(3) + '/' + g.q100.ppl.toFixed(2) + ' | ' + m.gptCover + '/' + m.trials + ' |\n';
+            md += '| ' + m.corpus + ' | ' + m.interpAcc.toFixed(3) + '/' + m.interpPpl.toFixed(2) + ' | ' + m.gptMixAcc.toFixed(3) + '/' + m.gptMixPpl.toFixed(2) + ' (' + m.gptMixLamSel + ') | ' + g.q100.acc.toFixed(3) + '/' + g.q100.ppl.toFixed(2) + ' | ' + g.params + ' | ' + m.gptCover + '/' + m.trials + ' |\n';
             const win = m.gptMixPpl < m.interpPpl ? 'VERDICT: MIX WINS (hop+GPT beats hop+bigram).' : 'VERDICT: MIX FAILS (bigram mix stands).';
             md += '\n' + m.corpus + ' W32: ' + win + '\n';
           }

@@ -68,10 +68,11 @@ jobs:
           const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
           runs.sort((a, b) => (a.corpus < b.corpus ? -1 : 1) || a.W - b.W || (a.proj < b.proj ? -1 : 1));
           fs.writeFileSync('/tmp/sup2.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'sup2-poschar-scales', runs}, null, 1));
-          let md = '# sup2: per-(position,char) scales vs per-position scales\nSame protocol (P=8000, H=256, fixed lam, no-gen). sup2 = W*V predictive scales (strict generalization of sup). C5 split rides along (descriptive).\n\n| corpus | W | proj | hop acc/ppl | interp acc/ppl (lam*) | mem acc/n | nov acc/n |\n|---|---|---|---|---|---|\n';
+          let md = '# sup2: per-(position,char) scales vs per-position scales\nSame protocol (P=8000, H=256, fixed lam, no-gen). sup2 = W*V predictive scales (strict generalization of sup). C5 split rides along (descriptive). Cost-class is first-class: same equation, linear series until H9.\n\n| corpus | W | proj | cost | hop acc/ppl | interp acc/ppl (lam*) | mem acc/n | nov acc/n |\n|---|---|---|---|---|---|---|---|\n';
           for (const m of runs) {
             const sp = (m.memN === undefined) ? '-/-' : (m.memAcc.toFixed(2) + '/' + m.memN + ' vs ' + m.novAcc.toFixed(2) + '/' + m.novN);
-            md += '| ' + m.corpus + ' | ' + m.W + ' | ' + m.proj + ' | ' + m.acc.toFixed(3) + '/' + m.ppl.toFixed(2) + ' | ' + m.interpAcc.toFixed(3) + '/' + m.interpPpl.toFixed(2) + ' (' + m.interpLambda + ') | ' + sp + ' |\n';
+            const cc = m.costClass || (m.score === 'maxsim' ? 'linear-O(P·W²)' : 'linear-O(P·D)');
+            md += '| ' + m.corpus + ' | ' + m.W + ' | ' + m.proj + ' | ' + cc + ' | ' + m.acc.toFixed(3) + '/' + m.ppl.toFixed(2) + ' | ' + m.interpAcc.toFixed(3) + '/' + m.interpPpl.toFixed(2) + ' (' + m.interpLambda + ') | ' + sp + ' |\n';
           }
           for (const corpus of ['shakes', 'ts']) for (const W of [8, 16]) {
             const g = runs.filter(m => m.corpus === corpus && m.W === W);

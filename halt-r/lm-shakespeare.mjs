@@ -844,6 +844,10 @@ if (process.argv[2] === 'decrypt'){
   metrics.gptMixAcc = gptMixAcc; metrics.gptMixPpl = gptMixPpl;
   metrics.tok = TOK; metrics.bpeMerges = bpeMerges; metrics.bpeMeanLen = bpeMeanLen;
   metrics.encLossFirst = encLossFirst; metrics.encLossLast = encLossLast;
+  // PARADIGM LADDER (user, 2026-11-13): every verdict carries its cost-class. Same
+  // equation, different series: exact brute-force is linear-O(P·D) (whole) or
+  // linear-O(P·W²) (maxsim); H9 product-key/ANN will register 'sublinear' here.
+  metrics.costClass = SCORE === 'maxsim' ? 'linear-O(P·W²)' : 'linear-O(P·D)';
   metrics.hopAccRep = repStats[LAMBDAS.length - 1].acc; metrics.hopPplRep = repStats[LAMBDAS.length - 1].ppl;
   metrics.biAccRep = repStats[0].acc; metrics.biPplRep = repStats[0].ppl;
   metrics.gateTau = GATE; metrics.pruneKeep = KEEP; metrics.Peff = P; metrics.gatedFracRep = gatedFracRep;
