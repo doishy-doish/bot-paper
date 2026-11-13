@@ -7,38 +7,48 @@
    "corpus": "shakes",
    "V": 65,
    "params": 110464,
+   "arch": {
+    "n_embd": 64,
+    "n_head": 2,
+    "n_layer": 2
+   },
    "iters": 6000,
    "block": 32,
    "seed": 7,
    "chars": 1115394,
    "fullVal": {
     "acc": 0.43344392056104103,
-    "ppl": 6.8310033861235615
+    "ppl": 6.831003296386123
    },
    "q100": {
     "acc": 0.44,
-    "ppl": 7.11277985105801
+    "ppl": 7.112779228830686
    },
-   "trainSec": 262
+   "trainSec": 448
   },
   {
    "task": "tiny-transformer-baseline",
    "corpus": "ts",
    "V": 79,
    "params": 112256,
+   "arch": {
+    "n_embd": 64,
+    "n_head": 2,
+    "n_layer": 2
+   },
    "iters": 9000,
    "block": 32,
    "seed": 7,
    "chars": 2998738,
    "fullVal": {
-    "acc": 0.5960792553386628,
-    "ppl": 3.7312538120082115
+    "acc": 0.5960793595605671,
+    "ppl": 3.731253797197414
    },
    "q100": {
     "acc": 0.59,
-    "ppl": 4.192834511578387
+    "ppl": 4.192833543665659
    },
-   "trainSec": 1018
+   "trainSec": 1378
   }
  ]
 }

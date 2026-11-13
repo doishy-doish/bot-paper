@@ -3,5 +3,5 @@ Same data, same 90/10 split, same 100-query seed-2000 protocol as the HALT-R ben
 
 | corpus | params | iters | trainSec | full-val acc/ppl | q100 acc/ppl |
 |---|---|---|---|---|---|
-| shakes | 110464 | 6000 | 262 | 0.433/6.83 | 0.440/7.11 |
-| ts | 112256 | 9000 | 1018 | 0.596/3.73 | 0.590/4.19 |
+| shakes | 110464 | 6000 | 448 | 0.433/6.83 | 0.440/7.11 |
+| ts | 112256 | 9000 | 1378 | 0.596/3.73 | 0.590/4.19 |
