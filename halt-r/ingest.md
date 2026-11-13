@@ -5,8 +5,8 @@ Voters frozen: bigram (counts), HALT-R store (one-shot outer product), tiny-GPT 
 
 | corpus | hedgeAcc | hedgePpl | interpAcc | interpPpl | gptCover | gptMixAcc | gptMixPpl |
 |---|---|---|---|---|---|---|---|
-| shakes | 0.280 | 13.03 | 0.270 | 13.18 | 2 | 0.000 | 3438.19 |
-| ts | 0.530 | 7.47 | 0.540 | 7.56 | 1 | 1.000 | 1.00 |
+| shakes | 0.380 | 9.91 | 0.380 | 9.82 | 100 | 0.460 | 5.31 |
+| ts | 0.350 | 9.70 | 0.350 | 9.70 | 100 | 0.650 | 3.30 |
 
 ## Surgery (surgery jobs)
 
