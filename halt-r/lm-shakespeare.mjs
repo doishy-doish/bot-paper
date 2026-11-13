@@ -97,6 +97,7 @@ if (process.argv[2] === 'decrypt'){
   if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100]');
   const W = parseInt(gv('W', DEF.W)), P = parseInt(gv('P', DEF.P)), TR = parseInt(gv('trials', DEF.trials));
   const tag = gv('tag', 'shakes');
+  const PROJ = gv('proj', 'raw'), H = parseInt(gv('H', 256));
   const kei = a.indexOf('--key-env');
   const secret = process.env[kei >= 0 ? a[kei + 1] : 'SCRAMBLE'];
   if (!secret && !noEnc) fail('SCRAMBLE key missing (refuses plaintext save; --no-encrypt for smoke only)');
@@ -106,7 +107,7 @@ if (process.argv[2] === 'decrypt'){
   const train = raw.slice(0, cut), val = raw.slice(cut);
   const { chars, toI, V } = buildVocab(train);
   if (V > 200) fail('vocab blowup V=' + V);
-  console.log(`corpus chars=${raw.length} train=${train.length} val=${val.length} V=${V} W=${W} P=${P}`);
+  console.log(`corpus chars=${raw.length} train=${train.length} val=${val.length} V=${V} W=${W} P=${P} proj=${PROJ}${PROJ === 'sim' ? ' H=' + H : ''}`);
   const trainIds = new Uint16Array(train.length);
   for (let i = 0; i < train.length; i++) trainIds[i] = toI[train[i]];
   const valIds = new Uint16Array(val.length);
@@ -118,29 +119,50 @@ if (process.argv[2] === 'decrypt'){
   const uniPred = argmax(uni);
   const bi = new Float64Array(V * V);
   for (let i = 0; i + 1 < trainIds.length; i++) bi[trainIds[i] * V + trainIds[i + 1]]++;
-  // store: seeded sampled train contexts
+  // store: seeded sampled train contexts (raw one-hot or SimHash-projected bits)
   const t0 = Date.now();
-  const D = W * V;
+  const Din = W * V;
+  const D = PROJ === 'sim' ? H : Din;
+  let R = null;
+  if (PROJ === 'sim'){ // deterministic random projection (own rng stream); sign bits = SimHash
+    R = new Float32Array(Din * H);
+    const rr2 = rng(SEED + 1), inv = Math.sqrt(1 / Din);
+    for (let i = 0; i < R.length; i++){ let u = 0, v = 0; while (!u) u = rr2(); while (!v) v = rr2(); R[i] = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v) * inv; }
+  }
+  function featPM(ids, pos, out){ // ±1 features, length D
+    if (PROJ === 'sim'){
+      for (let h = 0; h < H; h++) out[h] = 0;
+      for (let k = 0; k < W; k++){
+        const base = (k * V + ids[pos + k]) * H;
+        for (let h = 0; h < H; h++) out[h] += R[base + h];
+      }
+      for (let h = 0; h < H; h++) out[h] = out[h] >= 0 ? 1 : -1;
+    } else {
+      out.fill(0);
+      for (let k = 0; k < W; k++) out[k * V + ids[pos + k]] = 1;
+      for (let j = 0; j < out.length; j++) out[j] = out[j] > 0.5 ? 1 : -1;
+    }
+    return out;
+  }
   const X = new Int8Array(P * D), next = new Uint8Array(P), spos = new Int32Array(P);
   const r = rng(SEED), q = new Float32Array(D);
   for (let s = 0; s < P; s++){
     const pos = Math.floor(r() * (trainIds.length - W));
     spos[s] = pos;
-    encodeCtx(trainIds, pos, W, V, q);
-    for (let j = 0; j < D; j++) X[s * D + j] = q[j] > 0.5 ? 1 : 0;
+    featPM(trainIds, pos, q);
+    for (let j = 0; j < D; j++) X[s * D + j] = q[j] > 0 ? 1 : 0;
     next[s] = trainIds[pos + W];
   }
   const buildMs = Date.now() - t0;
   console.log(`store P=${P} D=${D} bytes=${X.length + next.length} buildMs=${buildMs} rss=${rssMB()}MB`);
   const runQueries = (n, seed) => {
     const rr = rng(seed), dist_sum = { acc: 0, ce: 0, steps: 0 };
-    const qq = new Float32Array(D), qpm = new Float32Array(D);
+    const qq = new Float32Array(D);
     for (let t = 0; t < n; t++){
       const pos = Math.floor(rr() * (valIds.length - W - 1));
-      encodeCtx(valIds, pos, W, V, qq);
-      for (let j = 0; j < D; j++) qpm[j] = qq[j] > 0.5 ? 1 : -1; // ±1 queries: dot = 2*matches - W (zero-mean noise)
+      featPM(valIds, pos, qq);
       const trueNext = valIds[pos + W];
-      const { w, steps } = recallW(qpm, X, P, D, runQueries.beta, 12);
+      const { w, steps } = recallW(qq, X, P, D, runQueries.beta, 12);
       const dist = predictNext(w, next, V);
       let tot = 0; for (let i = 0; i < V; i++) tot += dist[i];
       if (argmax(dist) === trueNext) dist_sum.acc++;
@@ -196,8 +218,10 @@ if (process.argv[2] === 'decrypt'){
   for (let g = 0; g < GEN_N; g++) gPrompts.push(Math.floor(gSeed() * (valIds.length - W - 1)));
   function distOf(win){
     const qq = new Float32Array(D);
-    for (let k = 0; k < W; k++) qq[k * V + win[k]] = 1;
-    for (let j = 0; j < D; j++) qq[j] = qq[j] > 0.5 ? 1 : -1;
+    // win is an array of ids; materialize via a scratch ids buffer
+    const ids = distOf.ids || (distOf.ids = new Uint16Array(4096));
+    for (let k = 0; k < W; k++) ids[k] = win[k];
+    featPM(ids, 0, qq);
     const { w } = recallW(qq, X, P, D, best.beta, 12);
     const dist = predictNext(w, next, V);
     let tot = 0; for (let i = 0; i < V; i++) tot += dist[i];
@@ -243,13 +267,12 @@ if (process.argv[2] === 'decrypt'){
   // hard gate = machinery (the exact stored KEY must win, whatever its label);
   // labels are ambiguous under duplicate contexts, so patterns — not next-chars — are the check
   {
-    const qs = new Float32Array(D), qp = new Float32Array(D);
+    const qp = new Float32Array(D);
     const rs = rng(999);
     let self = 0; const NS = 20;
     for (let t = 0; t < NS; t++){
       const s = Math.floor(rs() * P), pos = spos[s]; // query an ACTUAL stored key
-      encodeCtx(trainIds, pos, W, V, qs);
-      for (let j = 0; j < D; j++) qp[j] = qs[j] > 0.5 ? 1 : -1;
+      featPM(trainIds, pos, qp);
       const { w } = recallW(qp, X, P, D, best.beta, 1); // single step: argmax must be the key itself
       let bi = 0; for (let i = 1; i < P; i++) if (w[i] > w[bi]) bi = i;
       let same = true;
@@ -262,7 +285,7 @@ if (process.argv[2] === 'decrypt'){
   // save wrapped store
   const plain = Buffer.concat([Buffer.from(X), Buffer.from(next)]);
   const sum = sha256hex(plain);
-  const meta = { task: 'nextchar-heldout', corpus: tag, W, P, V, D, seed: SEED, beta: best.beta, bytes: plain.length, sha256: sum, enc: noEnc ? 'none-smoke' : 'AES-256-GCM-v1', chars: raw.length };
+  const meta = { task: 'nextchar-heldout', corpus: tag, proj: PROJ, W, P, V, D, seed: SEED, beta: best.beta, bytes: plain.length, sha256: sum, enc: noEnc ? 'none-smoke' : 'AES-256-GCM-v1', chars: raw.length };
   writeFileSync(outDir + '/meta.json', JSON.stringify(meta));
   let encBytes = 0;
   if (!noEnc){ const wj = JSON.stringify(encryptWrap(plain, secret)); writeFileSync(outDir + '/model.bin.enc', wj); encBytes = wj.length; console.log(`enc bytes=${encBytes} sha256=${sum}`); }
@@ -271,7 +294,7 @@ if (process.argv[2] === 'decrypt'){
   writeFileSync(outDir + '/metrics.json', JSON.stringify(metrics));
   let stxt = '';
   for (const s of samples) stxt += 'PROMPT: ' + JSON.stringify(s.prompt) + '\nHOP: ' + JSON.stringify(s.hop) + '\nBI: ' + JSON.stringify(s.bi) + '\n---\n';
-  writeFileSync(outDir + '/samples-' + tag + '-W' + W + '.txt', stxt);
+  writeFileSync(outDir + '/samples-' + tag + '-W' + W + '-' + PROJ + '.txt', stxt);
   if (failN){ console.log('lm-shakespeare: ' + failN + ' FAILURES'); process.exit(1); }
   console.log('lm-shakespeare: benched');
 }
