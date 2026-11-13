@@ -23,14 +23,14 @@ jobs:
           pip install numpy
       - name: make reversed-balanced corpus (dataset bug fixed first)
         run: |
-          python3 halt-r/make-arith-revbal.py --out /tmp/arith --W 8
+          python3 halt-r/make-arith-revbal.py --out /tmp/arith --W 16
           wc -c /tmp/arith/arith-full.txt
       - name: train revbal donor (CPU, 1M-cell)
-        run: python3 halt-r/train-tiny-lm.py --data /tmp/arith/arith-train.txt --out out/donor --tag arith-revbal --block 8 --iters 20000 --n-embd 128 --n-head 4 --n-layer 4
+        run: python3 halt-r/train-tiny-lm.py --data /tmp/arith/arith-train.txt --out out/donor --tag arith-revbal --block 32 --iters 20000 --n-embd 128 --n-head 4 --n-layer 4
       - name: export donor GGUF (transplant key source)
         run: python3 halt-r/export-gguf.py --pt out/donor/tiny.pt --vocab out/donor/vocab.json --ref out/donor/ref-arith-revbal.json --out out/donor/tinygpt-arith-revbal.gguf
       - name: emit test-range donor dists (bench-joinable, W-matched)
-        run: python3 halt-r/emit-q100.py --pt out/donor/tiny.pt --vocab out/donor/vocab.json --data /tmp/arith/arith-full.txt --W 8 --trials 100 --tag arith-revbal-test --out out/donor
+        run: python3 halt-r/emit-q100.py --pt out/donor/tiny.pt --vocab out/donor/vocab.json --data /tmp/arith/arith-full.txt --W 16 --trials 100 --tag arith-revbal-test --out out/donor
       - name: stage corpus spec alongside donor
         run: cp /tmp/arith/arith-spec.json out/donor/arith-spec.json
       - uses: actions/upload-artifact@v4
@@ -39,7 +39,7 @@ jobs:
           path: out/donor/
           retention-days: 30
   bench:
-    name: arith-revbal bench ${{ matrix.arm }} (W8, hard-carry unseen)
+    name: arith-revbal bench ${{ matrix.arm }} (W16, hard-carry unseen)
     needs: train
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -61,13 +61,13 @@ jobs:
         run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
       - name: remake revbal corpus (deterministic, byte-identical)
         run: |
-          python3 halt-r/make-arith-revbal.py --out /tmp/arith --W 8
+          python3 halt-r/make-arith-revbal.py --out /tmp/arith --W 16
           wc -c /tmp/arith/arith-full.txt
       - name: bench revbal capability
         env:
           SCRAMBLE: ${{ secrets.SCRAMBLE }}
         run: |
-          FLAGS="--W 8 --P 8000 --trials 100 --H 256 --no-gen --split 1 --hedge 1"
+          FLAGS="--W 16 --P 8000 --trials 100 --H 256 --no-gen --split 1 --hedge 1"
           if [ "${{ matrix.arm }}" = interp ]; then
             FLAGS="$FLAGS --proj sup --mix none"
           elif [ "${{ matrix.arm }}" = gpt ]; then
@@ -137,7 +137,7 @@ jobs:
           const pmG5 = pair(gr5.repHitI, inter.repHitI);
           const d5 = inter.interpPpl - gr5.interpPpl;
           fs.writeFileSync('/tmp/arith-revbal.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'arith-revbal', spec: {matchFree: spec.matchFree, V: spec.V, reversed: spec.reversed, cites: spec.cites}, donorAlone2001: {acc: dA, ppl: dP}, interp: {acc: inter.interpAcc, ppl: inter.interpPpl, lam: inter.interpLambda}, blend: {acc: gpt.gptMixAcc, ppl: gpt.gptMixPpl, lam: gpt.gptMixLamSel, cover: gpt.gptCover, d, mcP: pmBG.p}, agreeBlendDonor: agBD, graft5: {acc: gr5.interpAcc, ppl: gr5.interpPpl, lam: gr5.interpLambda, d: d5, mcP: pmG5.p}}, null, 1));
-          let md = '# ARITH-REV BAL: reversed + balanced carry (measured, CI)\nTrain sums<=150 (crosses 100), reversed sum digits, balanced chains 0/1/2, test sums>=151 unseen pairs, match-free ' + spec.matchFree.toFixed(4) + '.\n\n| pole | acc/ppl | lam* |\n|---|---|---|\n| interp | ' + inter.interpAcc.toFixed(3) + '/' + inter.interpPpl.toFixed(2) + ' | ' + inter.interpLambda + ' |\n| donor | ' + dA.toFixed(3) + '/' + dP.toFixed(2) + ' | — |\n| blend | ' + gpt.gptMixAcc.toFixed(3) + '/' + gpt.gptMixPpl.toFixed(2) + ' | ' + gpt.gptMixLamSel + ' |\n| graft5 | ' + gr5.interpAcc.toFixed(3) + '/' + gr5.interpPpl.toFixed(2) + ' | ' + gr5.interpLambda + ' |\nblend-vs-interp b/c=' + pmBG.b + '/' + pmBG.c + ' p=' + pmBG.p.toFixed(3) + ' d=' + d.toFixed(2) + ' agree=' + agBD.toFixed(3) + '.\n';
+          let md = '# ARITH-REV BAL: reversed + balanced carry (measured, CI)\nTrain/test single sums<=150 pool, disjoint balanced chains 0/1/2 (1620/180 per chain), reversed sum digits, W16, match-free ' + spec.matchFree.toFixed(4) + '.\n\n| pole | acc/ppl | lam* |\n|---|---|---|\n| interp | ' + inter.interpAcc.toFixed(3) + '/' + inter.interpPpl.toFixed(2) + ' | ' + inter.interpLambda + ' |\n| donor | ' + dA.toFixed(3) + '/' + dP.toFixed(2) + ' | — |\n| blend | ' + gpt.gptMixAcc.toFixed(3) + '/' + gpt.gptMixPpl.toFixed(2) + ' | ' + gpt.gptMixLamSel + ' |\n| graft5 | ' + gr5.interpAcc.toFixed(3) + '/' + gr5.interpPpl.toFixed(2) + ' | ' + gr5.interpLambda + ' |\nblend-vs-interp b/c=' + pmBG.b + '/' + pmBG.c + ' p=' + pmBG.p.toFixed(3) + ' d=' + d.toFixed(2) + ' agree=' + agBD.toFixed(3) + '.\n';
           process.stdout.write(md);
           EOF
           cp /tmp/arith-revbal.json halt-r/arith-revbal.json
