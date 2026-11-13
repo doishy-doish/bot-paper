@@ -6,6 +6,7 @@ on:
       - '.github/workflows/twelve-sim.yml'
       - 'twelve/sim/incremental.sh'
       - 'twelve/sim/search.sh'
+      - 'twelve/submissions/rust-direct-challenger/**'
 permissions:
   contents: read
 jobs:
