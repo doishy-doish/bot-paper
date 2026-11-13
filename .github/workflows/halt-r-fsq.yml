@@ -1,0 +1,113 @@
+name: halt-r-fsq
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/lm-shakespeare.mjs'
+      - '.github/workflows/halt-r-fsq.yml'
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: fsq ${{ matrix.corpus }} W${{ matrix.W }} ${{ matrix.proj }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        corpus: [shakes, ts]
+        W: [8, 16]
+        proj: [sup, fsq]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fetch corpus (public domain / public research text)
+        run: |
+          if [ "${{ matrix.corpus }}" = ts ]; then
+            curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          else
+            curl -sSL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus.txt
+          fi
+          wc -c /tmp/corpus.txt
+      - name: bench fsq (discrete compositional keys vs sup control)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/fsq-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.proj }} --tag ${{ matrix.corpus }} --W ${{ matrix.W }} --P 8000 --trials 100 --proj ${{ matrix.proj }} --H 256 --no-gen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fsq-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.proj }}
+          path: out/fsq-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.proj }}/
+          retention-days: 30
+  collect:
+    name: collect fsq verdict
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fsq-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: fsq-vs-sup verdict
+        run: |
+          node - <<'EOF' | tee /tmp/fsq.md
+          const fs = require('node:fs'), path = require('node:path');
+          const mcP = (b, c) => { const n = b + c; if (!n) return 1; const lo = Math.min(b, c);
+            let pk = Math.pow(0.5, n), tail = pk;
+            for (let k = 1; k <= lo; k++){ pk = pk * (n - k + 1) / k; tail += pk; }
+            return Math.min(1, 2 * tail); };
+          const pair = (s1, s2) => { let b = 0, c = 0;
+            for (let i = 0; i < Math.min(s1.length, s2.length); i++){ const a = s1[i], d = s2[i];
+              if (a === 'x' || d === 'x') continue;
+              if (a === '1' && d === '0') b++; if (a === '0' && d === '1') c++; }
+            return {b, c, p: mcP(b, c)}; };
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          walk('models');
+          const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+          runs.sort((a, b) => (a.corpus < b.corpus ? -1 : 1) || a.W - b.W || (a.proj < b.proj ? -1 : 1));
+          fs.writeFileSync('/tmp/fsq.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'fsq-keys', preReg: 'fsq wins iff lam*>0 AND d>0.2ppl vs sup AND McNemar p<0.05. Primary shakes W16 (sup lam*>0 but weak). Secondary ts W16. W8 context. Prior-art checked 2026-11-13; math note scratch/papers/f1-math.md.', runs}, null, 1));
+          let md = '# FSQ: discrete compositional keys vs sup (measured, CI)\nSame protocol (P=8000, char, no-gen, H=256). fsq: supervised probe THROUGH FSQ L=8 straight-through (300 steps, same streams as enc2), sign via sim path + quantize-before-sign. sup = same-workflow strongest-fixed-key control.\n\n| corpus | W | proj | cost | interp acc/ppl (lam*) | fsqReuse |\n|---|---|---|---|---|---|\n';
+          for (const r of runs) md += '| ' + r.corpus + ' | ' + r.W + ' | ' + r.proj + ' | ' + (r.costClass || 'linear-O(P·D)') + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + ' (' + r.interpLambda + ') | ' + ((r.fsqReuse != null) ? r.fsqReuse.toFixed(3) : '-') + ' |\n';
+          for (const corpus of ['shakes', 'ts']) for (const W of [8, 16]) {
+            const o = runs.find(r => r.corpus === corpus && r.W === W && r.proj === 'sup');
+            const contenders = [['fsq', runs.find(r => r.corpus === corpus && r.W === W && r.proj === 'fsq')]];
+            if (!o) continue;
+            for (const [pname, g] of contenders) {
+              if (!g) continue;
+              const d = o.interpPpl - g.interpPpl;
+              const pm = pair(g.repHitI || '', o.repHitI || '');
+              const wins = g.interpLambda > 0 && d > 0.2 && pm.p < 0.05;
+              const holds = g.interpLambda === 0;
+              md += '\n' + corpus + ' W' + W + ' ' + pname + ': sup ' + o.interpPpl.toFixed(2) + ' (lam*=' + o.interpLambda + ') vs ' + pname + ' ' + g.interpPpl.toFixed(2) + ' (lam*=' + g.interpLambda + ') d=' + d.toFixed(2) + '. McNemar ' + pname + '-vs-sup b/c=' + pm.b + '/' + pm.c + ' p=' + pm.p.toFixed(3) + (pm.p < 0.05 ? ' SIGNIFICANT.' : '.') + ' ' + (wins ? 'VERDICT: FSQ WINS (' + pname + ' beats sup).' : holds ? 'VERDICT: WALL STANDS (' + pname + ' adds nothing over sup).' : 'VERDICT: leans ' + pname + ', not significant.') + '\n';
+            }
+          }
+          process.stdout.write(md);
+          EOF
+          cp /tmp/fsq.json halt-r/fsq.json
+          cp /tmp/fsq.md halt-r/fsq.md
+          cat halt-r/fsq.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit fsq back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/fsq.json halt-r/fsq.json
+            cp /tmp/fsq.md halt-r/fsq.md
+            git add halt-r/fsq.json halt-r/fsq.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: fsq verdict $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
