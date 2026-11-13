@@ -27,7 +27,7 @@ jobs:
           python3 halt-r/make-arith.py --out /tmp/arith --W 8
           wc -c /tmp/arith/arith-train.txt /tmp/arith/arith-full.txt
       - name: train tiny arithmetic donor (CPU)
-        run: python3 halt-r/train-tiny-lm.py --data /tmp/arith/arith-train.txt --out out/donor --tag arith --block 8 --iters 5000
+        run: python3 halt-r/train-tiny-lm.py --data /tmp/arith/arith-train.txt --out out/donor --tag arith --block 8 --iters 20000
       - name: export donor GGUF (transplant key source)
         run: python3 halt-r/export-gguf.py --pt out/donor/tiny.pt --vocab out/donor/vocab.json --ref out/donor/ref-arith.json --out out/donor/tinygpt-arith.gguf
       - name: emit test-range donor dists (bench-joinable, W-matched)
