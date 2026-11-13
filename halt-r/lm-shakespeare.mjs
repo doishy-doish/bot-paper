@@ -91,6 +91,7 @@ function predictNext(w, next, V){
   for (let i = 0; i < w.length; i++) dist[next[i]] += w[i];
   return dist;
 }
+function normDist(d, V){ let t = 0; for (let i = 0; i < V; i++) t += d[i]; for (let i = 0; i < V; i++) d[i] /= (t + 1e-12 * V); return d; }
 // ---- io ----
 if (process.argv[2] === 'decrypt'){
   const a = process.argv.slice(3), file = a[0];
@@ -156,6 +157,10 @@ if (process.argv[2] === 'decrypt'){
   if (ORF !== '0' && ORF !== '1') fail('usage: --orf 0|1');
   const C2D = gv('c2d', '0'); // C2 per-implant detail: 0=off (default, bit-identical), 1=emit per-implant remember/edit bit strings
   if (C2D !== '0' && C2D !== '1') fail('usage: --c2d 0|1');
+  const DTW = gv('dtw', '0'); // DTW rerank: 0=off (default, bit-identical), 1=top-50 weights reranked by DTW dist (0/1 frame cost, tau=W fixed; screen 2026-11-13: shift 0.74, rev 0.00)
+  if (DTW !== '0' && DTW !== '1') fail('usage: --dtw 0|1');
+  const SMP = parseFloat(gv('smp', '0')); // E1 energy sampling: 0=off (default, bit-identical argmax/pen path), else sampling temperature on the hop dist
+  if (![0, 0.7, 1.0, 1.3].includes(SMP)) fail('usage: --smp 0|0.7|1|1.3');
   const kei = a.indexOf('--key-env');
   const secret = process.env[kei >= 0 ? a[kei + 1] : 'SCRAMBLE'];
   if (!secret && !noEnc) fail('SCRAMBLE key missing (refuses plaintext save; --no-encrypt for smoke only)');
@@ -785,6 +790,16 @@ if (process.argv[2] === 'decrypt'){
     for (let i = 0; i < V; i++) dist[i] /= (tot + 1e-12 * V);
     return dist;
   }
+  const sRng = rng(3002); // E1 sampling stream: reproducible draws, same prompts across jobs
+  function smpPick(dist){ // E1: sample with temperature SMP on the hop dist (SMP=0 never calls this)
+    const T = SMP;
+    const p = new Float64Array(V);
+    let tot = 0;
+    for (let c = 0; c < V; c++){ p[c] = Math.exp(Math.log(dist[c] + 1e-18) / T); tot += p[c]; }
+    let u = sRng() * tot;
+    for (let c = 0; c < V; c++){ u -= p[c]; if (u <= 0) return c; }
+    return V - 1;
+  }
   function penPick(dist, win){ // H10: degeneration penalty over top-8 (PEN=0 -> plain argmax)
     if (PEN === 0) return argmax(dist);
     const K = Math.min(8, V);
@@ -805,7 +820,7 @@ if (process.argv[2] === 'decrypt'){
     for (let k = 0; k < W; k++) text += chars[win[k]];
     for (let t = 0; t < GEN_LEN; t++){
       let ni;
-      if (kind === 'hop'){ const dd = distOf(win); ni = penPick(dd, win); }
+      if (kind === 'hop'){ const dd = distOf(win); ni = SMP > 0 ? smpPick(dd) : penPick(dd, win); }
       else { const row = win[W - 1] * V; let b = -1; ni = 0; for (let c = 0; c < V; c++){ if (bi[row + c] > b){ b = bi[row + c]; ni = c; } } }
       text += chars[ni];
       for (let k = 0; k < W - 1; k++) win[k] = win[k + 1];
@@ -904,6 +919,69 @@ if (process.argv[2] === 'decrypt'){
   for (const s of selStats) if (s.ppl < bestLam.ppl || (s.ppl === bestLam.ppl && s.acc > bestLam.acc)) bestLam = s;
   const repRows = hopBiDists(TR, 2001), repStats = lamStats(repRows);
   const repLocked = repStats[LAMBDAS.indexOf(bestLam.lam)];
+  // DTW rerank (screen verdict 2026-11-13: shift 0.74, rev 0.00 — rerank-only behind
+  // the sup prefilter, K=50, tau=W fixed; costs one extra recall pass per query, disclosed)
+  let dtwLamSel = -1, dtwAccSel = 0, dtwPplSel = 0, dtwAcc = 0, dtwPpl = 0, repHitD = '';
+  function dtwDist(a, b, n){ // token-id windows length n, 0/1 frame cost, full band
+    const C = new Float64Array((n + 1) * (n + 1)).fill(1e18); C[0] = 0;
+    for (let i = 1; i <= n; i++) for (let j = 1; j <= n; j++){
+      const c = (a[i - 1] === b[j - 1]) ? 0 : 1;
+      let m = C[(i - 1) * (n + 1) + j];
+      const m2 = C[i * (n + 1) + j - 1]; if (m2 < m) m = m2;
+      const m3 = C[(i - 1) * (n + 1) + j - 1]; if (m3 < m) m = m3;
+      C[i * (n + 1) + j] = c + m;
+    }
+    return C[n * (n + 1) + n];
+  }
+  function dtwMix(qr){
+    const K = 50, TAU = W;
+    const qq2 = new Float32Array(D);
+    featPM(valIds, qr.pos, qq2);
+    const r2 = scoreW(qq2, valIds, qr.pos, best.beta, 12);
+    flopSteps += r2.steps;
+    const w = r2.w;
+    const idx = [...Array(w.length).keys()];
+    idx.sort((x, y) => w[y] - w[x]);
+    const w2 = Float32Array.from(w);
+    const qw = new Array(W), sw = new Array(W);
+    for (let k = 0; k < W; k++) qw[k] = valIds[qr.pos + k];
+    for (let k = 0; k < Math.min(K, idx.length); k++){
+      const sp = spos[idx[k]];
+      for (let j = 0; j < W; j++) sw[j] = trainIds[sp + j];
+      w2[idx[k]] = w[idx[k]] * Math.exp(-dtwDist(qw, sw, W) / TAU);
+    }
+    return predictNext(w2, next, V);
+  }
+  function dtwStats(rows){
+    return LAMBDAS.map(lam => {
+      let acc = 0, ce = 0;
+      for (const qr of rows){
+        const dd = qr.dd;
+        let bp = -1, bci = 0;
+        for (let c = 0; c < V; c++){ const p = lam * dd[c] + (1 - lam) * qr.bd[c]; if (p > bp){ bp = p; bci = c; } }
+        if (bci === qr.trueNext) acc++;
+        ce += -Math.log(Math.max(lam * dd[qr.trueNext] + (1 - lam) * qr.bd[qr.trueNext], 1e-12));
+      }
+      return { lam, acc: acc / rows.length, ppl: Math.exp(ce / rows.length) };
+    });
+  }
+  if (DTW === '1'){
+    for (const qr of selRows) qr.dd = normDist(dtwMix(qr), V);
+    const dSelStats = dtwStats(selRows);
+    let bestD = dSelStats[0];
+    for (const s of dSelStats) if (s.ppl < bestD.ppl || (s.ppl === bestD.ppl && s.acc > bestD.acc)) bestD = s;
+    dtwLamSel = bestD.lam; dtwAccSel = bestD.acc; dtwPplSel = bestD.ppl;
+    for (const qr of repRows) qr.dd = normDist(dtwMix(qr), V);
+    const dRepStats = dtwStats(repRows);
+    const dLocked = dRepStats[LAMBDAS.indexOf(dtwLamSel)];
+    dtwAcc = dLocked.acc; dtwPpl = dLocked.ppl;
+    for (const qr of repRows){
+      let dp = -1, dci = 0;
+      for (let c = 0; c < V; c++){ const p = dtwLamSel * qr.dd[c] + (1 - dtwLamSel) * qr.bd[c]; if (p > dp){ dp = p; dci = c; } }
+      repHitD += dci === qr.trueNext ? '1' : '0';
+    }
+    console.log(`dtw lam*=${dtwLamSel} acc=${dtwAcc.toFixed(3)} ppl=${dtwPpl.toFixed(2)}`);
+  }
   // H8 hybrid arm: alpha grid on select (same beta probe as dense arm; probe ran with hybAlpha=0.25 default), locked report
   let hybA = 0.25, hybLamSel = -1, hybAccSel = 0, hybPplSel = 0, hybAcc = 0, hybPpl = 0, repHitH = '';
   if (HYB === '1'){
@@ -1167,7 +1245,7 @@ if (process.argv[2] === 'decrypt'){
   // PARADIGM LADDER (user, 2026-11-13): every verdict carries its cost-class. Same
   // equation, different series: exact brute-force is linear-O(P·D) (whole) or
   // linear-O(P·W²) (maxsim); H9 product-key/ANN will register 'sublinear' here.
-  metrics.costClass = PK === '1' ? 'sublinear-O(sqrt(P)·D)' : (SCORE === 'maxsim' ? 'linear-O(P·W²)' : 'linear-O(P·D)');
+  metrics.costClass = DTW === '1' ? 'linear-O(P·D+K·W^2)' : (PK === '1' ? 'sublinear-O(sqrt(P)·D)' : (SCORE === 'maxsim' ? 'linear-O(P·W²)' : 'linear-O(P·D)'));
   metrics.sparse = parseInt(SPARSE) || 0; metrics.hedge = parseInt(HEDGE) || 0;
   metrics.hyb = parseInt(HYB) || 0; metrics.hybA = hybA; metrics.hybLamSel = hybLamSel;
   metrics.hybAccSel = hybAccSel; metrics.hybPplSel = hybPplSel; metrics.hybAcc = hybAcc; metrics.hybPpl = hybPpl;
@@ -1184,6 +1262,8 @@ if (process.argv[2] === 'decrypt'){
   metrics.gateTau = GATE; metrics.pruneKeep = KEEP; metrics.Peff = P; metrics.gatedFracRep = gatedFracRep;
   metrics.canRemember = canRemember; metrics.canEditFlip = canEditFlip; metrics.canForgetLeak = canForgetLeak; metrics.collatBase = collatBase; metrics.collatAfter = collatAfter; metrics.canaryN = CAPAB === 'canary' ? 20 : 0;
   metrics.pen = PEN; metrics.prov = parseInt(PROV) || 0;
+  metrics.dtw = parseInt(DTW) || 0; metrics.dtwLamSel = dtwLamSel; metrics.dtwAccSel = dtwAccSel; metrics.dtwPplSel = dtwPplSel; metrics.dtwAcc = dtwAcc; metrics.dtwPpl = dtwPpl; metrics.repHitD = repHitD;
+  metrics.smp = SMP;
   if (split){ metrics.memAcc = split.memAcc; metrics.memBiAcc = split.memBi; metrics.memN = split.memN; metrics.novAcc = split.novAcc; metrics.novBiAcc = split.novBi; metrics.novN = split.novN; }
   metrics.h6 = parseInt(H6) || 0; metrics.h6LamSel = h6LamSel; metrics.h6AccSel = h6AccSel; metrics.h6PplSel = h6PplSel; metrics.h6Acc = h6Acc; metrics.h6Ppl = h6Ppl; metrics.h6AUC = h6AUC;
   writeFileSync(outDir + '/metrics.json', JSON.stringify(metrics));
