@@ -90,6 +90,8 @@ jobs:
           # do not fail the job here: kensac may refuse io_uring on hosted runners; summary reports it
           exit 0
       - name: max-hold search (official-style probes + bisect + hold, short-hold CI edition)
+        env:
+          START: "10"
         run: |
           set -u
           export PATH="/usr/local/bin:$HOME/.cargo/bin:$PATH"
