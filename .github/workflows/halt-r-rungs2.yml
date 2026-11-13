@@ -1,0 +1,122 @@
+name: halt-r-rungs2
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/lm-shakespeare.mjs'
+      - '.github/workflows/halt-r-rungs2.yml'
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: ${{ matrix.rung }} ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include:
+          - {rung: b1-gate, label: 'tau0', gate: 0, keep: 1.0, P: 8000, proj: raw}
+          - {rung: b1-gate, label: 'tau0.1', gate: 0.1, keep: 1.0, P: 8000, proj: raw}
+          - {rung: b1-gate, label: 'tau0.25', gate: 0.25, keep: 1.0, P: 8000, proj: raw}
+          - {rung: b1-gate, label: 'tau0.5', gate: 0.5, keep: 1.0, P: 8000, proj: raw}
+          - {rung: b2-prune, label: 'keep1', gate: 0, keep: 1.0, P: 8000, proj: raw}
+          - {rung: b2-prune, label: 'keep0.5', gate: 0, keep: 0.5, P: 8000, proj: raw}
+          - {rung: b2-prune, label: 'keep0.25', gate: 0, keep: 0.25, P: 8000, proj: raw}
+          - {rung: h3-slope, label: 'P32K-raw', gate: 0, keep: 1.0, P: 32000, proj: raw}
+          - {rung: h3-slope, label: 'P32K-sim', gate: 0, keep: 1.0, P: 32000, proj: sim}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fetch text8 (public research text, 100MB)
+        run: |
+          curl -sSL http://mattmahoney.net/dc/text8.zip -o /tmp/text8.zip
+          python3 -c "import zipfile; zipfile.ZipFile('/tmp/text8.zip').extractall('/tmp')"
+          wc -c /tmp/text8
+      - name: bench
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/text8 --out out/r2-${{ matrix.rung }}-${{ matrix.label }} --tag text8 --W 4 --P ${{ matrix.P }} --trials 100 --proj ${{ matrix.proj }} --H 256 --gate ${{ matrix.gate }} --pruneKeep ${{ matrix.keep }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lm-r2-${{ matrix.rung }}-${{ matrix.label }}
+          path: out/r2-${{ matrix.rung }}-${{ matrix.label }}/
+          retention-days: 30
+  collect:
+    name: collect rungs2
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: lm-r2-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: merge table with verdicts
+        run: |
+          node - <<'EOF'
+          const fs = require('node:fs'), path = require('node:path');
+          const bpc = p => Math.log2(p);
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          walk('models');
+          const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+          const b1 = runs.filter(r => (r.gateTau ?? 0) > -1 && r.pruneKeep === 1 && r.P === 8000).sort((a, b) => a.gateTau - b.gateTau);
+          const b2 = runs.filter(r => (r.gateTau ?? 0) === 0 && r.P === 8000).sort((a, b) => b.pruneKeep - a.pruneKeep);
+          const h3 = runs.filter(r => r.P === 32000);
+          let md = '# HALT-R rungs2: gate + prune + slope (measured, CI, concurrent)\nBPC = log2(char-ppl). text8 W4. Pilot anchor (P=8000, no gate): interp 3.21 BPC vs bigram 3.31.\n\n## B1 confidence gate (tau sweep, P=8000 raw)\n| tau | gatedFrac | interp acc/ppl/BPC | vs bigram ppl |\n|---|---|---|---|\n';
+          for (const r of b1) md += '| ' + r.gateTau + ' | ' + (r.gatedFracRep ?? 0).toFixed(3) + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + '/' + bpc(r.interpPpl).toFixed(2) + ' | ' + (r.bigramPpl - r.interpPpl >= 0 ? 'at/below bigram' : 'ABOVE bigram by ' + (r.interpPpl - r.bigramPpl).toFixed(2)) + ' |\n';
+          md += '\n## B2 store prune (nested random subsets, P=8000 raw, no gate)\n| keep | Peff | interp acc/ppl/BPC | retention vs keep=1 | evalMflops |\n|---|---|---|---|---|\n';
+          const full = b2.find(r => r.pruneKeep === 1);
+          for (const r of b2) md += '| ' + r.pruneKeep + ' | ' + r.Peff + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + '/' + bpc(r.interpPpl).toFixed(2) + ' | ' + (full ? (r.interpAcc / full.interpAcc * 100).toFixed(1) + '%' : '?') + ' | ' + r.evalMflops + ' |\n';
+          md += '\n## H3 text8 slope 8K->32K (2 doublings, W4)\n| proj | P=8000 BPC (pilot) | P=32000 BPC | slope/dbl | vs -0.11 family |\n|---|---|---|---|---|\n';
+          const pilot = {raw: 3.21, sim: 3.29};
+          for (const r of h3) { const s = (bpc(r.interpPpl) - pilot[r.proj]) / 2; md += '| ' + r.proj + ' | ' + pilot[r.proj] + ' | ' + bpc(r.interpPpl).toFixed(2) + ' | ' + s.toFixed(3) + ' | ' + (s < -0.08 ? 'in family' : 'SHALLOWER') + ' |\n'; }
+          fs.writeFileSync('halt-r/rungs2.md', md);
+          console.log(md);
+          EOF
+          cat halt-r/rungs2.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit rungs back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            node - <<'EOF'
+          const fs = require('node:fs'), path = require('node:path');
+          const bpc = p => Math.log2(p);
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          walk('models');
+          const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+          const b1 = runs.filter(r => (r.gateTau ?? 0) > -1 && r.pruneKeep === 1 && r.P === 8000).sort((a, b) => a.gateTau - b.gateTau);
+          const b2 = runs.filter(r => (r.gateTau ?? 0) === 0 && r.P === 8000).sort((a, b) => b.pruneKeep - a.pruneKeep);
+          const h3 = runs.filter(r => r.P === 32000);
+          let md = '# HALT-R rungs2: gate + prune + slope (measured, CI, concurrent)\nBPC = log2(char-ppl). text8 W4. Pilot anchor (P=8000, no gate): interp 3.21 BPC vs bigram 3.31.\n\n## B1 confidence gate (tau sweep, P=8000 raw)\n| tau | gatedFrac | interp acc/ppl/BPC | vs bigram ppl |\n|---|---|---|---|\n';
+          for (const r of b1) md += '| ' + r.gateTau + ' | ' + (r.gatedFracRep ?? 0).toFixed(3) + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + '/' + bpc(r.interpPpl).toFixed(2) + ' | ' + (r.bigramPpl - r.interpPpl >= 0 ? 'at/below bigram' : 'ABOVE bigram by ' + (r.interpPpl - r.bigramPpl).toFixed(2)) + ' |\n';
+          md += '\n## B2 store prune (nested random subsets, P=8000 raw, no gate)\n| keep | Peff | interp acc/ppl/BPC | retention vs keep=1 | evalMflops |\n|---|---|---|---|---|\n';
+          const full = b2.find(r => r.pruneKeep === 1);
+          for (const r of b2) md += '| ' + r.pruneKeep + ' | ' + r.Peff + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + '/' + bpc(r.interpPpl).toFixed(2) + ' | ' + (full ? (r.interpAcc / full.interpAcc * 100).toFixed(1) + '%' : '?') + ' | ' + r.evalMflops + ' |\n';
+          md += '\n## H3 text8 slope 8K->32K (2 doublings, W4)\n| proj | P=8000 BPC (pilot) | P=32000 BPC | slope/dbl | vs -0.11 family |\n|---|---|---|---|---|\n';
+          const pilot = {raw: 3.21, sim: 3.29};
+          for (const r of h3) { const s = (bpc(r.interpPpl) - pilot[r.proj]) / 2; md += '| ' + r.proj + ' | ' + pilot[r.proj] + ' | ' + bpc(r.interpPpl).toFixed(2) + ' | ' + s.toFixed(3) + ' | ' + (s < -0.08 ? 'in family' : 'SHALLOWER') + ' |\n'; }
+          fs.writeFileSync('halt-r/rungs2.md', md);
+          console.log(md);
+          EOF
+            git add halt-r/rungs2.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: rungs2 gate+prune+slope $(date -u +%F)"
+            git push origin main && exit 0
+            sleep 10
+          done
+          exit 1
