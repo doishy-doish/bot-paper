@@ -10,7 +10,7 @@ permissions:
   contents: write
 jobs:
   bench:
-    name: lm ${{ matrix.corpus }} W${{ matrix.W }}
+    name: lm ${{ matrix.corpus }} W${{ matrix.W }} ${{ matrix.proj }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -19,6 +19,7 @@ jobs:
       matrix:
         corpus: [shakes, ts]
         W: [2, 4, 8, 16, 32]
+        proj: [raw, sim]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,11 +39,11 @@ jobs:
       - name: bench
         env:
           SCRAMBLE: ${{ secrets.SCRAMBLE }}
-        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/${{ matrix.corpus }}-W${{ matrix.W }} --tag ${{ matrix.corpus }} --W ${{ matrix.W }} --P 8000 --trials 100
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.proj }} --tag ${{ matrix.corpus }} --W ${{ matrix.W }} --P 8000 --trials 100 --proj ${{ matrix.proj }} --H 256
       - uses: actions/upload-artifact@v4
         with:
-          name: lm-${{ matrix.corpus }}-W${{ matrix.W }}
-          path: out/${{ matrix.corpus }}-W${{ matrix.W }}/
+          name: lm-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.proj }}
+          path: out/${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.proj }}/
           retention-days: 30
   collect:
     name: collect lm bench
