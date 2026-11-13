@@ -1,0 +1,12 @@
+PROMPT: " they all marche"
+HOP: " e                                                                                                  "
+BI: " the the the the the the the the the the the the the the the the the the the the the the the the the"
+---
+PROMPT: "rom the history!"
+HOP: "e                                                                                                   "
+BI: "\" the the the the the the the the the the the the the the the the the the the the the the the the th"
+---
+PROMPT: "re became known "
+HOP: "r                                                                                                   "
+BI: "the the the the the the the the the the the the the the the the the the the the the the the the the "
+---

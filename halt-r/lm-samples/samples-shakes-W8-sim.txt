@@ -1,0 +1,12 @@
+PROMPT: "For I ha"
+HOP: "v  oth  o   h  m     me eou   ay t w                                                                "
+BI: "nd the the the the the the the the the the the the the the the the the the the the the the the the t"
+---
+PROMPT: "he be cr"
+HOP: "n     g  e                                                                                          "
+BI: " the the the the the the the the the the the the the the the the the the the the the the the the the"
+---
+PROMPT: "od Lord,"
+HOP: "\n\n hI                                                                                               "
+BI: " the the the the the the the the the the the the the the the the the the the the the the the the the"
+---
