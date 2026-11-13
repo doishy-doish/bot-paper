@@ -37,8 +37,8 @@
     "wordValid": 1
    },
    "buildMs": 22,
-   "evalMs": 1857,
-   "maxRssMB": 98,
+   "evalMs": 1873,
+   "maxRssMB": 99.5,
    "encBytes": 1397542,
    "evalScope": "heldout-val",
    "evalMflops": 1872,
@@ -137,7 +137,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -173,9 +176,9 @@
     "rep4": 0.9450171821305843,
     "wordValid": 1
    },
-   "buildMs": 45,
-   "evalMs": 2553,
-   "maxRssMB": 122.4,
+   "buildMs": 43,
+   "evalMs": 3424,
+   "maxRssMB": 110.2,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 2830.3,
@@ -274,7 +277,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -310,9 +316,9 @@
     "rep4": 0.8178694158075602,
     "wordValid": 0.6538461538461539
    },
-   "buildMs": 19,
-   "evalMs": 4115,
-   "maxRssMB": 108.7,
+   "buildMs": 16,
+   "evalMs": 2503,
+   "maxRssMB": 109.1,
    "encBytes": 2784206,
    "evalScope": "heldout-val",
    "evalMflops": 7621.1,
@@ -411,7 +417,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -447,9 +456,9 @@
     "rep4": 0.7285223367697595,
     "wordValid": 0.7450738916256158
    },
-   "buildMs": 79,
-   "evalMs": 6664,
-   "maxRssMB": 88.8,
+   "buildMs": 47,
+   "evalMs": 4302,
+   "maxRssMB": 99.8,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 4341.8,
@@ -548,7 +557,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -584,9 +596,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 28,
-   "evalMs": 14357,
-   "maxRssMB": 117,
+   "buildMs": 35,
+   "evalMs": 17944,
+   "maxRssMB": 118.6,
    "encBytes": 5557542,
    "evalScope": "heldout-val",
    "evalMflops": 33895.7,
@@ -685,7 +697,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -721,9 +736,9 @@
     "rep4": 0.8281786941580757,
     "wordValid": 0.4666666666666666
    },
-   "buildMs": 103,
-   "evalMs": 21935,
-   "maxRssMB": 120.5,
+   "buildMs": 102,
+   "evalMs": 21917,
+   "maxRssMB": 121.4,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 22863.9,
@@ -822,7 +837,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -858,9 +876,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 40,
-   "evalMs": 18750,
-   "maxRssMB": 156.8,
+   "buildMs": 50,
+   "evalMs": 24550,
+   "maxRssMB": 151.7,
    "encBytes": 11104206,
    "evalScope": "heldout-val",
    "evalMflops": 45244.2,
@@ -959,7 +977,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -995,9 +1016,9 @@
     "rep4": 0.9621993127147767,
     "wordValid": 0.3333333333333333
    },
-   "buildMs": 117,
-   "evalMs": 22112,
-   "maxRssMB": 114.3,
+   "buildMs": 154,
+   "evalMs": 25157,
+   "maxRssMB": 115.5,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 18640.9,
@@ -1096,7 +1117,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -1132,9 +1156,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 52,
-   "evalMs": 22124,
-   "maxRssMB": 217,
+   "buildMs": 94,
+   "evalMs": 48733,
+   "maxRssMB": 214.8,
    "encBytes": 22197543,
    "evalScope": "heldout-val",
    "evalMflops": 93982.7,
@@ -1233,7 +1257,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -1269,9 +1296,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 241,
-   "evalMs": 21387,
-   "maxRssMB": 96.2,
+   "buildMs": 203,
+   "evalMs": 18915,
+   "maxRssMB": 107.3,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 15532,
@@ -1370,7 +1397,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -1406,9 +1436,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 24,
-   "evalMs": 3873,
-   "maxRssMB": 140.1,
+   "buildMs": 22,
+   "evalMs": 3929,
+   "maxRssMB": 138.5,
    "encBytes": 1696206,
    "evalScope": "heldout-val",
    "evalMflops": 6600.6,
@@ -1507,7 +1537,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -1543,9 +1576,9 @@
     "rep4": 0.872852233676976,
     "wordValid": 0.9871794871794872
    },
-   "buildMs": 64,
-   "evalMs": 3744,
-   "maxRssMB": 151.5,
+   "buildMs": 36,
+   "evalMs": 2057,
+   "maxRssMB": 150.3,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 2764.8,
@@ -1644,7 +1677,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -1680,9 +1716,9 @@
     "rep4": 0.7628865979381443,
     "wordValid": 0.9696969696969697
    },
-   "buildMs": 18,
-   "evalMs": 2867,
-   "maxRssMB": 155.1,
+   "buildMs": 28,
+   "evalMs": 4821,
+   "maxRssMB": 155.6,
    "encBytes": 3381542,
    "evalScope": "heldout-val",
    "evalMflops": 6461.6,
@@ -1781,7 +1817,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -1817,9 +1856,9 @@
     "rep4": 0.7628865979381443,
     "wordValid": 0.9696969696969697
    },
-   "buildMs": 56,
-   "evalMs": 7011,
-   "maxRssMB": 150.9,
+   "buildMs": 84,
+   "evalMs": 8123,
+   "maxRssMB": 146.4,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 4456.4,
@@ -1918,7 +1957,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -1954,9 +1996,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 31,
-   "evalMs": 19787,
-   "maxRssMB": 189.1,
+   "buildMs": 34,
+   "evalMs": 21142,
+   "maxRssMB": 169.7,
    "encBytes": 6752206,
    "evalScope": "heldout-val",
    "evalMflops": 47324.2,
@@ -2055,7 +2097,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -2091,9 +2136,9 @@
     "rep4": 0.9450171821305843,
     "wordValid": 0.6666666666666666
    },
-   "buildMs": 82,
-   "evalMs": 14660,
-   "maxRssMB": 122.7,
+   "buildMs": 90,
+   "evalMs": 15351,
+   "maxRssMB": 117.4,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 20897.8,
@@ -2192,7 +2237,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -2228,9 +2276,9 @@
     "rep4": 0.9759450171821307,
     "wordValid": 0
    },
-   "buildMs": 73,
-   "evalMs": 50184,
-   "maxRssMB": 188.3,
+   "buildMs": 63,
+   "evalMs": 49243,
+   "maxRssMB": 185,
    "encBytes": 13493543,
    "evalScope": "heldout-val",
    "evalMflops": 93879.8,
@@ -2329,7 +2377,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -2365,9 +2416,9 @@
     "rep4": 0.9759450171821306,
     "wordValid": 0
    },
-   "buildMs": 170,
-   "evalMs": 25346,
-   "maxRssMB": 131.2,
+   "buildMs": 131,
+   "evalMs": 22285,
+   "maxRssMB": 140.4,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 22290.4,
@@ -2466,7 +2517,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -2502,9 +2556,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 103,
-   "evalMs": 51732,
-   "maxRssMB": 272.9,
+   "buildMs": 70,
+   "evalMs": 31751,
+   "maxRssMB": 273.6,
    "encBytes": 26976207,
    "evalScope": "heldout-val",
    "evalMflops": 121586.7,
@@ -2603,7 +2657,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   },
   {
    "task": "nextchar-heldout",
@@ -2639,9 +2696,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 259,
-   "evalMs": 23374,
-   "maxRssMB": 132.3,
+   "buildMs": 257,
+   "evalMs": 23316,
+   "maxRssMB": 147.3,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 16670.7,
@@ -2740,7 +2797,10 @@
    "h6PplSel": 0,
    "h6Acc": 0,
    "h6Ppl": 0,
-   "h6AUC": 0
+   "h6AUC": 0,
+   "fsq": 0,
+   "fsqCodes": 0,
+   "fsqReuse": 0
   }
  ]
 }
