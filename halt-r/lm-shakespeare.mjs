@@ -105,7 +105,7 @@ if (process.argv[2] === 'decrypt'){
   const PROJ = gv('proj', 'raw'), H = parseInt(gv('H', 256));
   const BSEL = gv('betaSel', 'acc');
   if (BSEL !== 'acc' && BSEL !== 'ppl') fail('usage: --betaSel acc|ppl');
-  const ADA = gv('ada', '0') === '1'; // H4 adaptive-lambda: per-query L=lam*confidence; default 0 = legacy fixed-lam only
+  const ADA = gv('ada', '0'); // H4/H5 adaptive-lambda: 0=off(fixed lam), 1=L=lam*top1frac(g), 2=L=lam*negentropy(1-h); default 0
   const kei = a.indexOf('--key-env');
   const secret = process.env[kei >= 0 ? a[kei + 1] : 'SCRAMBLE'];
   if (!secret && !noEnc) fail('SCRAMBLE key missing (refuses plaintext save; --no-encrypt for smoke only)');
@@ -346,6 +346,8 @@ if (process.argv[2] === 'decrypt'){
       flopSteps += stI;
       let wmax = 0, wsum = 0; // B1: top-1 weight fraction = match confidence
       for (let i = 0; i < w.length; i++){ wsum += w[i]; if (w[i] > wmax) wmax = w[i]; }
+      let ent = 1; // H5: normalized entropy of store weights (1=uniform/diffuse, 0=one-hot); same loop, no extra pass
+      if (wsum > 0){ ent = 0; for (let i = 0; i < w.length; i++){ const p = w[i] / wsum; if (p > 0) ent -= p * Math.log(p); } ent /= Math.log(w.length); }
       const hd = predictNext(w, next, V);
       let tot = 0; for (let i = 0; i < V; i++) tot += hd[i];
       for (let i = 0; i < V; i++) hd[i] /= (tot + 1e-12 * V);
@@ -353,7 +355,7 @@ if (process.argv[2] === 'decrypt'){
       let rtot = V; for (let c = 0; c < V; c++) rtot += bi[off + c];
       const bd = new Float64Array(V);
       for (let c = 0; c < V; c++) bd[c] = (bi[off + c] + 1) / rtot;
-      rows.push({ hd, bd, trueNext, g: wmax / (wsum || 1) });
+      rows.push({ hd, bd, trueNext, g: wmax / (wsum || 1), h: ent });
     }
     return rows;
   }
@@ -385,7 +387,8 @@ if (process.argv[2] === 'decrypt'){
     return LAMBDAS.map(lam => {
       let acc = 0, ce = 0;
       for (const qr of rows){
-        const L = (GATE > 0 && qr.g < GATE) ? 0 : lam * qr.g;
+        const conf = ADA === '2' ? (1 - qr.h) : qr.g; // H5 entropy mode: sharp store->lam, diffuse store->bigram
+        const L = (GATE > 0 && qr.g < GATE) ? 0 : lam * conf;
         let bp = -1, bci = 0;
         for (let c = 0; c < V; c++){ const p = L * qr.hd[c] + (1 - L) * qr.bd[c]; if (p > bp){ bp = p; bci = c; } }
         if (bci === qr.trueNext) acc++;
@@ -395,7 +398,7 @@ if (process.argv[2] === 'decrypt'){
     });
   }
   let adaLamSel = -1, adaAccSel = 0, adaPplSel = 0, adaAcc = 0, adaPpl = 0;
-  if (ADA){
+  if (ADA !== '0'){
     const selAda = adaStats(selRows);
     let bestAda = selAda[0];
     for (const s of selAda) if (s.ppl < bestAda.ppl || (s.ppl === bestAda.ppl && s.acc > bestAda.acc)) bestAda = s;
@@ -440,7 +443,7 @@ if (process.argv[2] === 'decrypt'){
   let encBytes = 0;
   if (!noEnc){ const wj = JSON.stringify(encryptWrap(plain, secret)); writeFileSync(outDir + '/model.bin.enc', wj); encBytes = wj.length; console.log(`enc bytes=${encBytes} sha256=${sum}`); }
   else { writeFileSync(outDir + '/model.bin', plain); console.log(`plain-smoke bytes=${plain.length} sha256=${sum}`); }
-  const metrics = { ...meta, trials: TR, flips: 'n/a-nextchar', acc: e.acc, ppl: e.ppl, avgSteps: e.avgSteps, bigramAcc: biE.acc, bigramPpl: biE.ppl, unigramAcc: uniE.acc, unigramPpl: uniE.ppl, beatUni: e.acc > uniE.acc, quality, buildMs, evalMs, maxRssMB: rssMB(), encBytes, evalScope: 'heldout-val', evalMflops, buildMflops, flopSteps, betaSel: BSEL, betaAcc: best.beta, betaPpl: bestPpl.beta, ada: ADA ? 1 : 0, adaLamSel, adaAccSel, adaPplSel, adaAcc, adaPpl };
+  const metrics = { ...meta, trials: TR, flips: 'n/a-nextchar', acc: e.acc, ppl: e.ppl, avgSteps: e.avgSteps, bigramAcc: biE.acc, bigramPpl: biE.ppl, unigramAcc: uniE.acc, unigramPpl: uniE.ppl, beatUni: e.acc > uniE.acc, quality, buildMs, evalMs, maxRssMB: rssMB(), encBytes, evalScope: 'heldout-val', evalMflops, buildMflops, flopSteps, betaSel: BSEL, betaAcc: best.beta, betaPpl: bestPpl.beta, ada: parseInt(ADA) || 0, adaLamSel, adaAccSel, adaPplSel, adaAcc, adaPpl };
   // kNN-LM interpolation results (locked-lam report on fresh seed-2001 queries)
   metrics.interpLambda = bestLam.lam;
   metrics.interpAccSel = bestLam.acc; metrics.interpPplSel = bestLam.ppl;
