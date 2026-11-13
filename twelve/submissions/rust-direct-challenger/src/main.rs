@@ -31,6 +31,7 @@ const INSERT_LIKE_SQL: &str =
 
 struct App {
     reads: Mutex<VecDeque<Connection>>,
+    read_sem: Arc<tokio::sync::Semaphore>,
     write: Mutex<Connection>,
     secret: Vec<u8>,
     start: Instant,
@@ -167,14 +168,24 @@ fn valid_id(s: &str) -> Option<i64> {
 }
 
 // ---- DB work (runs on the blocking pool) ----
+// Never panic on a poisoned/empty pool: a panic while holding one of these locks
+// poisons the mutex and collapses the whole server under load (found at 40 VUs:
+// 5th concurrent read hit expect("pool") on the 4-conn pool -> cascade -> 99.5% err).
+fn unpoison<T>(m: std::sync::LockResult<T>) -> T {
+    m.unwrap_or_else(|e| e.into_inner())
+}
 fn with_read<F>(app: &Arc<App>, f: F) -> Response<Full<Bytes>>
 where
     F: FnOnce(&Connection) -> Result<Response<Full<Bytes>>, String>,
 {
-    let c = app.reads.lock().unwrap().pop_front().expect("pool");
+    let mut pool = unpoison(app.reads.lock());
+    let c = match pool.pop_front() {
+        Some(c) => c,
+        None => return err(StatusCode::INTERNAL_SERVER_ERROR, "internal server error"),
+    };
     let r =
         f(&c).unwrap_or_else(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "internal server error"));
-    app.reads.lock().unwrap().push_back(c);
+    pool.push_back(c);
     r
 }
 
@@ -182,15 +193,18 @@ fn with_write<F>(app: &Arc<App>, f: F) -> Response<Full<Bytes>>
 where
     F: FnOnce(&Connection) -> Result<Response<Full<Bytes>>, String>,
 {
-    let c = app.write.lock().unwrap();
+    let c = unpoison(app.write.lock());
     f(&c).unwrap_or_else(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "internal server error"))
 }
 
 fn health(app: &App) -> Response<Full<Bytes>> {
     let up = app.start.elapsed().as_secs();
     let ok = (|| -> rusqlite::Result<()> {
-        let mut pool = app.reads.lock().unwrap();
-        let c = pool.pop_front().expect("pool");
+        let mut pool = unpoison(app.reads.lock());
+        let c = match pool.pop_front() {
+            Some(c) => c,
+            None => return Err(rusqlite::Error::InvalidQuery),
+        };
         let r = c.query_row("SELECT 1", [], |_| Ok(()));
         pool.push_back(c);
         r
@@ -309,9 +323,20 @@ async fn spawn_read<F>(app: Arc<App>, f: F) -> Response<Full<Bytes>>
 where
     F: FnOnce(&Connection) -> Result<Response<Full<Bytes>>, String> + Send + 'static,
 {
-    tokio::task::spawn_blocking(move || with_read(&app, f))
-        .await
-        .unwrap_or_else(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "internal server error"))
+    // Gate read concurrency on the pool size: without this, the (N+1)th concurrent
+    // read finds an empty pool and used to panic -> poison -> total collapse.
+    // The permit is held across the blocking work, so at most POOL reads run at once.
+    let app2 = app.clone();
+    let permit = match app.read_sem.clone().acquire_owned().await {
+        Ok(p) => p,
+        Err(_) => return err(StatusCode::INTERNAL_SERVER_ERROR, "internal server error"),
+    };
+    tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        with_read(&app2, f)
+    })
+    .await
+    .unwrap_or_else(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "internal server error"))
 }
 
 async fn spawn_write<F>(app: Arc<App>, f: F) -> Response<Full<Bytes>>
@@ -377,6 +402,7 @@ async fn main() {
         reads.push_back(open_db(&path));
     }
     let app = Arc::new(App {
+        read_sem: Arc::new(tokio::sync::Semaphore::new(reads.len())),
         reads: Mutex::new(reads),
         write: Mutex::new(write),
         secret,
