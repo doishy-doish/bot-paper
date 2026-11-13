@@ -15,10 +15,10 @@
 //        node halt-r/demo-ingest.mjs --model both --pull --out out/demo
 // Exit non-zero on any failed check (honest demo: red means red).
 
-const fs = require('node:fs');
-const path = require('node:path');
-const crypto = require('node:crypto');
-const https = require('node:https');
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import https from 'node:https';
 
 const BASE_DEFAULT = 'https://raw.githubusercontent.com/doishy-doish/bot-paper/main/halt-r';
 
