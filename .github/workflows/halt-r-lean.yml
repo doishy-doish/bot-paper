@@ -1,0 +1,30 @@
+name: halt-r-lean
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/halt-r-lean.yml'
+      - 'halt-r/proofs/**'
+permissions:
+  contents: write
+jobs:
+  check:
+    name: lean verdict proofs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: install elan + lean4 stable (no mathlib, core only)
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:stable
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: check proofs (kernel elaborates every file, placeholder-free)
+        run: |
+          lean --version
+          for f in halt-r/proofs/*.lean; do
+            echo "checking $f"
+            lean "$f" || exit 1
+            if grep -qE '^[[:space:]]*sorry([[:space:]]|$)' "$f"; then echo "PROOF GAP in $f"; exit 1; fi
+            if grep -qE '^[[:space:]]*axiom[[:space:]]' "$f"; then echo "AXIOM in $f"; exit 1; fi
+          done
+          echo "lean proofs green"
