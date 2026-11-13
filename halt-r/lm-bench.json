@@ -32,9 +32,9 @@
     "rep4": 0.9450171821305843,
     "wordValid": 1
    },
-   "buildMs": 12,
-   "evalMs": 1905,
-   "maxRssMB": 96.6,
+   "buildMs": 11,
+   "evalMs": 1919,
+   "maxRssMB": 88.8,
    "encBytes": 1397542,
    "evalScope": "heldout-val",
    "evalMflops": 1872,
@@ -48,7 +48,11 @@
    "hopAccRep": 0.46,
    "hopPplRep": 27.29500681246836,
    "biAccRep": 0.32,
-   "biPplRep": 11.006389660346303
+   "biPplRep": 11.006389660346303,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -80,9 +84,9 @@
     "rep4": 0.9450171821305843,
     "wordValid": 1
    },
-   "buildMs": 40,
-   "evalMs": 2652,
-   "maxRssMB": 105.8,
+   "buildMs": 56,
+   "evalMs": 4727,
+   "maxRssMB": 91.9,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 2830.3,
@@ -96,7 +100,11 @@
    "hopAccRep": 0.47,
    "hopPplRep": 58.598648826682954,
    "biAccRep": 0.32,
-   "biPplRep": 11.006389660346303
+   "biPplRep": 11.006389660346303,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -128,9 +136,9 @@
     "rep4": 0.8178694158075602,
     "wordValid": 0.6538461538461539
    },
-   "buildMs": 14,
-   "evalMs": 4071,
-   "maxRssMB": 97.3,
+   "buildMs": 10,
+   "evalMs": 2500,
+   "maxRssMB": 100.2,
    "encBytes": 2784206,
    "evalScope": "heldout-val",
    "evalMflops": 7621.1,
@@ -144,7 +152,11 @@
    "hopAccRep": 0.38,
    "hopPplRep": 16837.952990864713,
    "biAccRep": 0.29,
-   "biPplRep": 11.848986027482697
+   "biPplRep": 11.848986027482697,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -176,9 +188,9 @@
     "rep4": 0.7285223367697595,
     "wordValid": 0.7450738916256158
    },
-   "buildMs": 54,
-   "evalMs": 5597,
-   "maxRssMB": 88.4,
+   "buildMs": 55,
+   "evalMs": 5582,
+   "maxRssMB": 86.9,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 4341.8,
@@ -192,7 +204,11 @@
    "hopAccRep": 0.33,
    "hopPplRep": 19098035.83511245,
    "biAccRep": 0.29,
-   "biPplRep": 11.848986027482697
+   "biPplRep": 11.848986027482697,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -224,9 +240,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 26,
-   "evalMs": 14352,
-   "maxRssMB": 105.3,
+   "buildMs": 24,
+   "evalMs": 14264,
+   "maxRssMB": 103.9,
    "encBytes": 5557542,
    "evalScope": "heldout-val",
    "evalMflops": 33895.7,
@@ -240,7 +256,11 @@
    "hopAccRep": 0.2,
    "hopPplRep": 28.880781484644103,
    "biAccRep": 0.3,
-   "biPplRep": 13.487851327097836
+   "biPplRep": 13.487851327097836,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -272,9 +292,9 @@
     "rep4": 0.8281786941580757,
     "wordValid": 0.4666666666666666
    },
-   "buildMs": 120,
-   "evalMs": 21766,
-   "maxRssMB": 83.7,
+   "buildMs": 80,
+   "evalMs": 18850,
+   "maxRssMB": 89.1,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 22863.9,
@@ -288,7 +308,11 @@
    "hopAccRep": 0.28,
    "hopPplRep": 4529.245217679415,
    "biAccRep": 0.3,
-   "biPplRep": 13.487851327097836
+   "biPplRep": 13.487851327097836,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -320,9 +344,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 51,
-   "evalMs": 25424,
-   "maxRssMB": 134.5,
+   "buildMs": 50,
+   "evalMs": 25360,
+   "maxRssMB": 137.1,
    "encBytes": 11104206,
    "evalScope": "heldout-val",
    "evalMflops": 45244.2,
@@ -336,7 +360,11 @@
    "hopAccRep": 0.16,
    "hopPplRep": 29.809016599185043,
    "biAccRep": 0.26,
-   "biPplRep": 13.680846299338056
+   "biPplRep": 13.680846299338056,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -368,9 +396,9 @@
     "rep4": 0.9621993127147767,
     "wordValid": 0.3333333333333333
    },
-   "buildMs": 131,
-   "evalMs": 28106,
-   "maxRssMB": 84.6,
+   "buildMs": 78,
+   "evalMs": 16978,
+   "maxRssMB": 85.9,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 18640.9,
@@ -384,7 +412,11 @@
    "hopAccRep": 0.15,
    "hopPplRep": 163.51233300534258,
    "biAccRep": 0.26,
-   "biPplRep": 13.680846299338056
+   "biPplRep": 13.680846299338056,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -416,9 +448,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 83,
-   "evalMs": 49687,
-   "maxRssMB": 203.6,
+   "buildMs": 89,
+   "evalMs": 52516,
+   "maxRssMB": 200.7,
    "encBytes": 22197543,
    "evalScope": "heldout-val",
    "evalMflops": 93982.7,
@@ -432,7 +464,11 @@
    "hopAccRep": 0.22,
    "hopPplRep": 26.042304925981554,
    "biAccRep": 0.38,
-   "biPplRep": 9.823870092140574
+   "biPplRep": 9.823870092140574,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -464,9 +500,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 176,
-   "evalMs": 18469,
-   "maxRssMB": 88.9,
+   "buildMs": 215,
+   "evalMs": 21189,
+   "maxRssMB": 86,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 15532,
@@ -480,7 +516,11 @@
    "hopAccRep": 0.22,
    "hopPplRep": 26.070246992393407,
    "biAccRep": 0.38,
-   "biPplRep": 9.823870092140574
+   "biPplRep": 9.823870092140574,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -512,9 +552,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 12,
-   "evalMs": 3035,
-   "maxRssMB": 122.9,
+   "buildMs": 14,
+   "evalMs": 3666,
+   "maxRssMB": 153.5,
    "encBytes": 1696206,
    "evalScope": "heldout-val",
    "evalMflops": 6600.6,
@@ -528,7 +568,11 @@
    "hopAccRep": 0.3,
    "hopPplRep": 19.844161975253662,
    "biAccRep": 0.38,
-   "biPplRep": 9.004125680213708
+   "biPplRep": 9.004125680213708,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -560,9 +604,9 @@
     "rep4": 0.872852233676976,
     "wordValid": 0.9871794871794872
    },
-   "buildMs": 56,
-   "evalMs": 3733,
-   "maxRssMB": 139.9,
+   "buildMs": 33,
+   "evalMs": 2153,
+   "maxRssMB": 143.5,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 2764.8,
@@ -576,7 +620,11 @@
    "hopAccRep": 0.48,
    "hopPplRep": 20.322915815850955,
    "biAccRep": 0.38,
-   "biPplRep": 9.004125680213708
+   "biPplRep": 9.004125680213708,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -608,9 +656,9 @@
     "rep4": 0.7628865979381443,
     "wordValid": 0.9696969696969697
    },
-   "buildMs": 25,
-   "evalMs": 6114,
-   "maxRssMB": 139.8,
+   "buildMs": 16,
+   "evalMs": 3017,
+   "maxRssMB": 150.6,
    "encBytes": 3381542,
    "evalScope": "heldout-val",
    "evalMflops": 6461.6,
@@ -624,7 +672,11 @@
    "hopAccRep": 0.47,
    "hopPplRep": 1101.4597439711167,
    "biAccRep": 0.29,
-   "biPplRep": 9.986729069370352
+   "biPplRep": 9.986729069370352,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -656,9 +708,9 @@
     "rep4": 0.7628865979381443,
     "wordValid": 0.9696969696969697
    },
-   "buildMs": 68,
-   "evalMs": 8049,
-   "maxRssMB": 96.3,
+   "buildMs": 71,
+   "evalMs": 8041,
+   "maxRssMB": 133.2,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 4456.4,
@@ -672,7 +724,11 @@
    "hopAccRep": 0.45,
    "hopPplRep": 336.75583713478443,
    "biAccRep": 0.29,
-   "biPplRep": 9.986729069370352
+   "biPplRep": 9.986729069370352,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -704,9 +760,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 25,
-   "evalMs": 20168,
-   "maxRssMB": 125.2,
+   "buildMs": 38,
+   "evalMs": 26688,
+   "maxRssMB": 128.7,
    "encBytes": 6752206,
    "evalScope": "heldout-val",
    "evalMflops": 47324.2,
@@ -720,7 +776,11 @@
    "hopAccRep": 0.26,
    "hopPplRep": 25.587031418798066,
    "biAccRep": 0.26,
-   "biPplRep": 11.028279505331088
+   "biPplRep": 11.028279505331088,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -752,9 +812,9 @@
     "rep4": 0.9450171821305843,
     "wordValid": 0.6666666666666666
    },
-   "buildMs": 94,
-   "evalMs": 16594,
-   "maxRssMB": 157.7,
+   "buildMs": 99,
+   "evalMs": 18054,
+   "maxRssMB": 158.6,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 20897.8,
@@ -768,7 +828,11 @@
    "hopAccRep": 0.4,
    "hopPplRep": 1224.5315184136275,
    "biAccRep": 0.26,
-   "biPplRep": 11.028279505331088
+   "biPplRep": 11.028279505331088,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -800,9 +864,9 @@
     "rep4": 0.9759450171821307,
     "wordValid": 0
    },
-   "buildMs": 64,
-   "evalMs": 50089,
-   "maxRssMB": 176.6,
+   "buildMs": 34,
+   "evalMs": 22743,
+   "maxRssMB": 175.3,
    "encBytes": 13493543,
    "evalScope": "heldout-val",
    "evalMflops": 93879.8,
@@ -816,7 +880,11 @@
    "hopAccRep": 0.28,
    "hopPplRep": 55.81892661300718,
    "biAccRep": 0.27,
-   "biPplRep": 11.946129354433861
+   "biPplRep": 11.946129354433861,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -848,9 +916,9 @@
     "rep4": 0.9759450171821306,
     "wordValid": 0
    },
-   "buildMs": 137,
-   "evalMs": 25125,
-   "maxRssMB": 101.1,
+   "buildMs": 135,
+   "evalMs": 25352,
+   "maxRssMB": 97.2,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 22290.4,
@@ -864,7 +932,11 @@
    "hopAccRep": 0.3,
    "hopPplRep": 307.743992477285,
    "biAccRep": 0.27,
-   "biPplRep": 11.946129354433861
+   "biPplRep": 11.946129354433861,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -896,9 +968,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 115,
-   "evalMs": 65536,
-   "maxRssMB": 242.9,
+   "buildMs": 89,
+   "evalMs": 51650,
+   "maxRssMB": 244.8,
    "encBytes": 26976207,
    "evalScope": "heldout-val",
    "evalMflops": 121586.7,
@@ -912,7 +984,11 @@
    "hopAccRep": 0.17,
    "hopPplRep": 20.526442871396128,
    "biAccRep": 0.33,
-   "biPplRep": 9.857847542887097
+   "biPplRep": 9.857847542887097,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   },
   {
    "task": "nextchar-heldout",
@@ -944,9 +1020,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 226,
-   "evalMs": 23182,
-   "maxRssMB": 102.3,
+   "buildMs": 187,
+   "evalMs": 21745,
+   "maxRssMB": 138.6,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 16670.7,
@@ -960,7 +1036,11 @@
    "hopAccRep": 0.17,
    "hopPplRep": 30.89792451074274,
    "biAccRep": 0.33,
-   "biPplRep": 9.857847542887097
+   "biPplRep": 9.857847542887097,
+   "gateTau": 0,
+   "pruneKeep": 1,
+   "Peff": 8000,
+   "gatedFracRep": 0
   }
  ]
 }
