@@ -38,8 +38,8 @@
     "wordValid": 1
    },
    "buildMs": 13,
-   "evalMs": 895,
-   "maxRssMB": 1125.5,
+   "evalMs": 893,
+   "maxRssMB": 1129.5,
    "encBytes": 586873,
    "evalScope": "heldout-val",
    "evalMflops": 745.6,
@@ -72,7 +72,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -108,9 +115,9 @@
     "rep4": 0.9484536082474225,
     "wordValid": 1
    },
-   "buildMs": 54,
-   "evalMs": 3572,
-   "maxRssMB": 1135,
+   "buildMs": 52,
+   "evalMs": 3570,
+   "maxRssMB": 1107.6,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 2687,
@@ -143,7 +150,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -179,9 +193,9 @@
     "rep4": 0.9243986254295532,
     "wordValid": 1
    },
-   "buildMs": 12,
-   "evalMs": 1742,
-   "maxRssMB": 1120.5,
+   "buildMs": 17,
+   "evalMs": 2239,
+   "maxRssMB": 1129.8,
    "encBytes": 1162873,
    "evalScope": "heldout-val",
    "evalMflops": 2676.7,
@@ -214,7 +228,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -250,9 +271,9 @@
     "rep4": 0.872852233676976,
     "wordValid": 0.9649122807017543
    },
-   "buildMs": 63,
-   "evalMs": 10836,
-   "maxRssMB": 1113.2,
+   "buildMs": 53,
+   "evalMs": 9399,
+   "maxRssMB": 1148,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 4898.8,
@@ -285,7 +306,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -321,9 +349,9 @@
     "rep4": 0.23367697594501716,
     "wordValid": 0.35792094615624026
    },
-   "buildMs": 10,
-   "evalMs": 3320,
-   "maxRssMB": 1025.8,
+   "buildMs": 12,
+   "evalMs": 3423,
+   "maxRssMB": 1007.8,
    "encBytes": 2314874,
    "evalScope": "heldout-val",
    "evalMflops": 13544.1,
@@ -356,7 +384,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   },
   {
    "task": "nextchar-heldout",
@@ -392,9 +427,9 @@
     "rep4": 0.8384879725085911,
     "wordValid": 0.5357142857142857
    },
-   "buildMs": 69,
-   "evalMs": 19040,
-   "maxRssMB": 1097.4,
+   "buildMs": 68,
+   "evalMs": 19059,
+   "maxRssMB": 1109.3,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 22757.4,
@@ -427,7 +462,14 @@
    "canForgetLeak": -1,
    "collatBase": -1,
    "collatAfter": -1,
-   "canaryN": 0
+   "canaryN": 0,
+   "h6": 0,
+   "h6LamSel": -1,
+   "h6AccSel": 0,
+   "h6PplSel": 0,
+   "h6Acc": 0,
+   "h6Ppl": 0,
+   "h6AUC": 0
   }
  ]
 }
