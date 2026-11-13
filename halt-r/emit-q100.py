@@ -73,7 +73,7 @@ class TinyGPT(nn.Module):
         self.tok = nn.Embedding(V, n_embd)
         self.layers = nn.ModuleList([Block(n_embd, n_head, n_mlp) for _ in range(n_layer)])
         self.ln = RMSNorm(n_embd)
-        self.head = nn.Linear(V, n_embd, bias=False)
+        self.head = nn.Linear(n_embd, V, bias=False)
     def forward(self, idx):
         B, T = idx.shape
         x = self.tok(idx)
