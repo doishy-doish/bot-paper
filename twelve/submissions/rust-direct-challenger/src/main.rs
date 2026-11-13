@@ -319,6 +319,29 @@ fn db_like(c: &Connection, auth: Authed, pid: i64) -> Result<Response<Full<Bytes
 }
 
 // ---- async dispatch: route sync, collect POST bodies, DB work off-loop ----
+use std::sync::atomic::{AtomicU64, Ordering};
+struct Agg { n: AtomicU64, us: AtomicU64 }
+static FEED_T: Agg = Agg { n: AtomicU64::new(0), us: AtomicU64::new(0) };
+static POST_T: Agg = Agg { n: AtomicU64::new(0), us: AtomicU64::new(0) };
+static CREATE_T: Agg = Agg { n: AtomicU64::new(0), us: AtomicU64::new(0) };
+static LIKE_T: Agg = Agg { n: AtomicU64::new(0), us: AtomicU64::new(0) };
+fn agg_avg(a: &Agg) -> f64 { let n = a.n.load(Ordering::Relaxed); if (n == 0) { 0.0 } else { a.us.load(Ordering::Relaxed) as f64 / n as f64 / 1000.0 } }
+fn agg_for(ep: &str) -> &'static Agg { match ep { "feed" => &FEED_T, "post" => &POST_T, "create" => &CREATE_T, _ => &LIKE_T } }
+fn rec(ep: &'static str, dt: std::time::Duration) {
+    let a = agg_for(ep);
+    a.n.fetch_add(1, Ordering::Relaxed);
+    a.us.fetch_add(dt.as_micros() as u64, Ordering::Relaxed);
+    let total = FEED_T.n.load(Ordering::Relaxed) + POST_T.n.load(Ordering::Relaxed) + CREATE_T.n.load(Ordering::Relaxed) + LIKE_T.n.load(Ordering::Relaxed);
+    if (total % 200) == 0 {
+        eprintln!("timing n={} feed_avg_ms={:.1} post_avg_ms={:.1} create_avg_ms={:.1} like_avg_ms={:.1}", total, agg_avg(&FEED_T), agg_avg(&POST_T), agg_avg(&CREATE_T), agg_avg(&LIKE_T));
+    }
+}
+async fn timed(ep: &'static str, fut: impl std::future::Future<Output = Response<Full<Bytes>>>) -> Response<Full<Bytes>> {
+    let t0 = std::time::Instant::now();
+    let r = fut.await;
+    rec(ep, t0.elapsed());
+    r
+}
 async fn spawn_read<F>(app: Arc<App>, f: F) -> Response<Full<Bytes>>
 where
     F: FnOnce(&Connection) -> Result<Response<Full<Bytes>>, String> + Send + 'static,
@@ -359,9 +382,9 @@ async fn dispatch(app: Arc<App>, req: Request<Incoming>) -> Result<Response<Full
         .map(|s| s.to_string());
     match (method, segs.as_slice()) {
         (Method::GET, ["", "health"]) => Ok(health(&app)),
-        (Method::GET, ["", "feed"]) => Ok(spawn_read(app, db_feed).await),
+        (Method::GET, ["", "feed"]) => Ok(timed("feed", spawn_read(app, db_feed)).await),
         (Method::GET, ["", "posts", id]) => match valid_id(id) {
-            Some(pid) => Ok(spawn_read(app, move |c| db_post(c, pid)).await),
+            Some(pid) => Ok(timed("post", spawn_read(app, move |c| db_post(c, pid))).await),
             None => Ok(err(StatusCode::BAD_REQUEST, "invalid post id")),
         },
         (Method::POST, ["", "posts"]) => {
@@ -373,7 +396,7 @@ async fn dispatch(app: Arc<App>, req: Request<Incoming>) -> Result<Response<Full
                 Ok(b) => b.to_bytes(),
                 Err(_) => return Ok(err(StatusCode::INTERNAL_SERVER_ERROR, "internal server error")),
             };
-            Ok(spawn_write(app, move |c| db_create(c, auth, &bytes)).await)
+            Ok(timed("create", spawn_write(app, move |c| db_create(c, auth, &bytes))).await)
         }
         (Method::POST, ["", "posts", id, "like"]) => {
             let auth = match check_auth(&app.secret, auth_h.as_deref()) {
@@ -381,7 +404,7 @@ async fn dispatch(app: Arc<App>, req: Request<Incoming>) -> Result<Response<Full
                 Err(r) => return Ok(r),
             };
             match valid_id(id) {
-                Some(pid) => Ok(spawn_write(app, move |c| db_like(c, auth, pid)).await),
+                Some(pid) => Ok(timed("like", spawn_write(app, move |c| db_like(c, auth, pid))).await),
                 None => Ok(err(StatusCode::BAD_REQUEST, "invalid post id")),
             }
         }
