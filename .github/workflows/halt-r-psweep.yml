@@ -1,0 +1,80 @@
+name: halt-r-psweep
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/lm-shakespeare.mjs'
+      - 'halt-r/lm-psweep-collect.mjs'
+      - '.github/workflows/halt-r-psweep.yml'
+permissions:
+  contents: write
+jobs:
+  sweep:
+    name: psweep ${{ matrix.corpus }} W${{ matrix.W }} P${{ matrix.P }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        corpus: [shakes, ts]
+        W: [2, 4, 8, 16, 32]
+        P: [2000, 8000, 32000, 128000]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fetch corpus (public domain / public research text)
+        run: |
+          if [ "${{ matrix.corpus }}" = ts ]; then
+            curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          else
+            curl -sSL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus.txt
+          fi
+          wc -c /tmp/corpus.txt
+          head -c 200 /tmp/corpus.txt
+      - name: sweep bench (sim only: D=H=256 fixed, cost linear in P; --no-gen skips per-P samples)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/psweep-${{ matrix.corpus }}-W${{ matrix.W }}-P${{ matrix.P }} --tag ${{ matrix.corpus }} --W ${{ matrix.W }} --P ${{ matrix.P }} --trials 100 --proj sim --H 256 --no-gen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lm-psweep-${{ matrix.corpus }}-W${{ matrix.W }}-P${{ matrix.P }}
+          path: out/psweep-${{ matrix.corpus }}-W${{ matrix.W }}-P${{ matrix.P }}/
+          retention-days: 30
+  collect:
+    name: collect P-sweep + plot curves
+    needs: sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: lm-psweep-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: merge + plot
+        run: |
+          node halt-r/lm-psweep-collect.mjs $(find models -name metrics.json) --out halt-r/psweep.json --md halt-r/psweep.md --svg halt-r/psweep
+          cat halt-r/psweep.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit sweep back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            node halt-r/lm-psweep-collect.mjs $(find models -name metrics.json) --out halt-r/psweep.json --md halt-r/psweep.md --svg halt-r/psweep
+            git add halt-r/psweep.json halt-r/psweep.md halt-r/psweep-*.svg
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: psweep P-vs-ppl $(date -u +%F)"
+            git push origin main && exit 0
+            sleep 10
+          done
+          exit 1
