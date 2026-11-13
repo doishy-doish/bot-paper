@@ -1,6 +1,9 @@
 name: twelve-sim
 on:
   workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/twelve-sim.yml'
 permissions:
   contents: read
 jobs:
@@ -122,7 +125,7 @@ jobs:
           pkill -f twelve-direct || true; pkill -f feed-server || true
           echo "smoke done"
           exit 0
-      - name: summarize (honest: runner is relative, never the official score)
+      - name: "summarize (honest: runner is relative, never the official score)"
         run: |
           node - <<'EOF' | tee /tmp/twelve-summary.md
           const fs = require('node:fs');
