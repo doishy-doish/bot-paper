@@ -82,7 +82,7 @@ jobs:
           echo "K_RC=$K_RC O_RC=$O_RC" | tee /tmp/test-rc.env
           # do not fail the job here: kensac may refuse io_uring on hosted runners; summary reports it
           exit 0
-      - name: k6 smoke (VUS=50, 30s hold each, fresh DB per server)
+      - name: incremental ramp (10-25-50-100 users, same user model, same bars)
         run: |
           set -u
           export PATH="/usr/local/bin:$HOME/.cargo/bin:$PATH"
@@ -94,37 +94,30 @@ jobs:
             for _ in $(seq 1 60); do curl -sf "http://127.0.0.1:$port/health" >/dev/null 2>&1 && break; sleep 1; done
             curl -sf "http://127.0.0.1:$port/health" || { echo "server on $port failed to start; log:"; tail -40 "$log"; return 1; }
           }
+          restart_fresh() { # <submission-dir> <port> <db> <log>
+            kill "$(cat /tmp/srv-$2.pid)" 2>/dev/null || true; sleep 2
+            start_server "$1" "$2" "$3" "$4"
+          }
           K_OK=0; O_OK=0
           start_server "upstream/submissions/rust-iouring-kensac" 3001 /tmp/kensac.db /tmp/srv-kensac.log || K_OK=$?
-          # fresh DB for golden checks inside k6? No: k6 writes, so copy fresh again before each k6 run per official bench (restart on fresh DB)
-          if [ "$K_OK" = 0 ]; then
-            cp upstream/seed/feed.db /tmp/kensac.db
-            # restart kensac on the fresh copy (kill + start) so k6 measures a clean DB like the official bench
-            kill "$(cat /tmp/srv-3001.pid)" 2>/dev/null || true; sleep 2
-            start_server "upstream/submissions/rust-iouring-kensac" 3001 /tmp/kensac.db /tmp/srv-kensac.log || K_OK=$?
-          fi
           start_server "self/twelve/submissions/rust-direct-challenger" 3002 /tmp/ours.db /tmp/srv-ours.log || O_OK=$?
-          if [ "$O_OK" = 0 ]; then
-            kill "$(cat /tmp/srv-3002.pid)" 2>/dev/null || true; sleep 2
-            start_server "self/twelve/submissions/rust-direct-challenger" 3002 /tmp/ours.db /tmp/srv-ours.log || O_OK=$?
-          fi
           echo "K_OK=$K_OK O_OK=$O_OK" | tee /tmp/srv-status.env
           if [ "$K_OK" = 0 ]; then
-            echo "--- k6 kensac VUS=50 30s ---"
-            BASE_URL=http://127.0.0.1:3001 VUS=50 DURATION=30s RAMP_UP=10s TOKENS=upstream/seed/tokens.json k6 run --summary-export /tmp/k6-kensac.json upstream/bench/load.js 2>&1 | tee /tmp/k6-kensac.log | tail -25
+            restart_fresh "upstream/submissions/rust-iouring-kensac" 3001 /tmp/kensac.db /tmp/srv-kensac.log || K_OK=$?
+            [ "$K_OK" = 0 ] && bash self/twelve/sim/incremental.sh http://127.0.0.1:3001 upstream/seed/tokens.json upstream/bench/load.js /tmp/ramp-kensac "10 25 50 100" || K_OK=$?
           else
-            echo "SKIP k6 kensac (server did not start; likely io_uring blocked on hosted runner)"
+            echo "SKIP kensac ramp (server did not start; likely io_uring blocked on hosted runner)"
           fi
           if [ "$O_OK" = 0 ]; then
-            echo "--- k6 ours VUS=50 30s ---"
-            BASE_URL=http://127.0.0.1:3002 VUS=50 DURATION=30s RAMP_UP=10s TOKENS=upstream/seed/tokens.json k6 run --summary-export /tmp/k6-ours.json upstream/bench/load.js 2>&1 | tee /tmp/k6-ours.log | tail -25
+            restart_fresh "self/twelve/submissions/rust-direct-challenger" 3002 /tmp/ours.db /tmp/srv-ours.log || O_OK=$?
+            [ "$O_OK" = 0 ] && bash self/twelve/sim/incremental.sh http://127.0.0.1:3002 upstream/seed/tokens.json upstream/bench/load.js /tmp/ramp-ours "10 25 50 100" || O_OK=$?
           else
             echo "ours failed to start (unexpected: epoll/tokio should run anywhere)"
           fi
           kill "$(cat /tmp/srv-3001.pid 2>/dev/null)" 2>/dev/null || true
           kill "$(cat /tmp/srv-3002.pid 2>/dev/null)" 2>/dev/null || true
           pkill -f twelve-direct || true; pkill -f feed-server || true
-          echo "smoke done"
+          echo "ramp done"
           exit 0
       - name: "summarize (honest: runner is relative, never the official score)"
         run: |
@@ -132,17 +125,18 @@ jobs:
           const fs = require('node:fs');
           const read = p => { try { return fs.readFileSync(p, 'utf8'); } catch { return null; } };
           const testK = read('/tmp/test-kensac.log') || '', testO = read('/tmp/test-ours.log') || '';
-          const k6K = read('/tmp/k6-kensac.log') || '', k6O = read('/tmp/k6-ours.log') || '';
-          const last = (s, pat) => (s.split('\n').filter(l => pat.test(l)).slice(-3).join('\n'));
+          const tableK = read('/tmp/ramp-kensac/TABLE.md'), tableO = read('/tmp/ramp-ours/TABLE.md');
+          const resK = (() => { try { return JSON.parse(read('/tmp/ramp-kensac/result.json')); } catch { return null; } })();
+          const resO = (() => { try { return JSON.parse(read('/tmp/ramp-ours/result.json')); } catch { return null; } })();
           const passed = s => { const m = s.match(/passed=(\d+) failed=(\d+)/); return m ? m[0] : 'no passed/failed line'; };
           let md = '# twelve-sim (GitHub runner: relative signal, NOT the official score)\n\n';
-          md += 'Hosted runner is a shared 2-4 vCPU VM with noisy neighbors; the official box is a dedicated 1 vCPU Synteq VPS with a 16-core load rig and 5-min holds. Same-machine + same k6 smoke here measures _relative_ health only.\n\n';
+          md += 'Hosted runner is a shared VM with noisy neighbors; the official box is a dedicated 1 vCPU Synteq VPS with a 16-core load rig and 5-min holds. Same-machine + same incremental ramp here measures _relative_ behavior only.\n\n';
           md += '## test.sh (42 checks, fresh DB)\n';
           md += '- kensac: ' + passed(testK) + '\n- ours (rust-direct): ' + passed(testO) + '\n';
-          md += '\n## k6 smoke (VUS=50, 30s hold + 10s ramp, same runner, same script)\n';
-          const grab = s => last(s, /http_req|checks|failed|p\(95\)|data_received|vus/i) || '(no k6 output: server did not start or k6 skipped)';
-          md += '### kensac k6 tail\n```\n' + grab(k6K) + '\n```\n### ours k6 tail\n```\n' + grab(k6O) + '\n```\n';
-          md += '\n## how to read this\n- If both pass test.sh and both complete k6 with 0 failed checks, the entries are functionally equivalent at smoke scale; the req/s gap here is scheduling noise + shared-CPU, not rank.\n- If kensac fails to start (io_uring blocked) while ours starts, that is a portability signal in our favor for constrained hosts, not a performance claim.\n- Real verdict needs the official bench (16-core rig, 2-min probes + 5-min holds). This job is pre-benchmark signal only.\n';
+          md += '\n## incremental ramp (levels 10/25/50/100, 30s hold + 10s ramp each, same user model + pass bars as the official bench)\n';
+          md += '### kensac' + (resK ? ` (max pass: ${resK.max_pass}, failed at: ${resK.failed_at || 'none — cleared all levels'})` : ' (no ramp output: server did not start or ramp skipped)') + '\n' + (tableK ? tableK + '\n' : '');
+          md += '### ours (rust-direct)' + (resO ? ` (max pass: ${resO.max_pass}, failed at: ${resO.failed_at || 'none — cleared all levels'})` : ' (no ramp output)') + '\n' + (tableO ? tableO + '\n' : '');
+          md += '\n## how to read this\n- If both pass test.sh and clear the same ramp levels, the entries are functionally equivalent at this scale; the req/s gap here is scheduling noise + shared-CPU, not rank.\n- If kensac fails to start (io_uring blocked) while ours starts, that is a portability signal in our favor for constrained hosts, not a performance claim.\n- Real verdict needs the official bench (16-core rig, 2-min probes + 5-min holds). This job is pre-benchmark signal only.\n';
           process.stdout.write(md);
           EOF
           cat /tmp/twelve-summary.md >> "$GITHUB_STEP_SUMMARY"
@@ -153,10 +147,8 @@ jobs:
           path: |
             /tmp/test-kensac.log
             /tmp/test-ours.log
-            /tmp/k6-kensac.log
-            /tmp/k6-ours.log
-            /tmp/k6-kensac.json
-            /tmp/k6-ours.json
+            /tmp/ramp-kensac/
+            /tmp/ramp-ours/
             /tmp/srv-kensac.log
             /tmp/srv-ours.log
             /tmp/twelve-summary.md
