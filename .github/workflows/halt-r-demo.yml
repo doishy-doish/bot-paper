@@ -37,8 +37,8 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             cp out/demo/demo-log.txt halt-r/demo-log.md
-            test -f out/demo/demo-ingest-model.json && cp out/demo/demo-ingest-model.json halt-r/demo-ingest-model.json
-            test -f out/demo/demo-ingest.md && cp out/demo/demo-ingest.md halt-r/demo-ingest.md
+            if test -f out/demo/demo-ingest-model.json; then cp out/demo/demo-ingest-model.json halt-r/demo-ingest-model.json; fi
+            if test -f out/demo/demo-ingest.md; then cp out/demo/demo-ingest.md halt-r/demo-ingest.md; fi
             git add halt-r/demo-log.md halt-r/demo-ingest-model.json halt-r/demo-ingest.md
             git diff --cached --quiet && exit 0
             git commit -m "halt-r: ingest demo pull-check-save $(date -u +%F)" && git push origin main && exit 0
