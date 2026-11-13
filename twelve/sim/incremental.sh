@@ -15,6 +15,9 @@ TOKENS="$2"; LOADJS="$3"; OUT="$4"
 LEVELS="${5:-${LEVELS:-10 25 50 100}}"
 DURATION="${DURATION:-30s}"; RAMP_UP="${RAMP_UP:-10s}"
 mkdir -p "$OUT"
+# warmup: fault in page cache / pools so the ramp measures steady state, not cold start
+WARMUP="${WARMUP:-30}"
+for _ in $(seq "$WARMUP"); do curl -sf "$BASE_URL/feed" >/dev/null 2>&1 || true; done
 
 pass=0; fail_at=""
 echo "| users | req/s | p95 ms | p99 ms | err % | verdict |" | tee "$OUT/TABLE.md"
@@ -25,11 +28,15 @@ for n in $LEVELS; do
   row="$(python3 - "$OUT/level-$n.json" "$n" <<'EOF'
 import json,sys
 p, n = sys.argv[1], sys.argv[2]
+def flat(d):
+  # k6 >=0.50 summary-export is flat; older nests under .values — accept both
+  if isinstance(d, dict) and 'values' in d: return d['values']
+  return d if isinstance(d, dict) else {}
 try:
   s = json.load(open(p)); m = s.get('metrics', {})
-  d = m.get('http_req_duration', {}).get('values', {})
-  f = m.get('http_req_failed', {}).get('values', {})
-  r = m.get('http_reqs', {}).get('values', {})
+  d = flat(m.get('http_req_duration', {}))
+  f = flat(m.get('http_req_failed', {}))
+  r = flat(m.get('http_reqs', {}))
   p95, p99 = d.get('p(95)', float('nan')), d.get('p(99)', float('nan'))
   err = 100.0 * f.get('rate', 1.0)
   rps = r.get('rate', float('nan'))
