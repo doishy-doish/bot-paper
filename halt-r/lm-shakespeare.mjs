@@ -97,7 +97,9 @@ if (process.argv[2] === 'decrypt'){
   const noGen = a.includes('--no-gen'); // P-sweep: skip generation (costly, unneeded per-P)
   const dataPath = gv('data', null), outDir = gv('out', null);
   if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100] [--proj raw|sim] [--no-gen]');
-  const W = parseInt(gv('W', DEF.W)), P = parseInt(gv('P', DEF.P)), TR = parseInt(gv('trials', DEF.trials));
+  const W = parseInt(gv('W', DEF.W)), TR = parseInt(gv('trials', DEF.trials));
+  let P = parseInt(gv('P', DEF.P));
+  const GATE = parseFloat(gv('gate', 0)), KEEP = parseFloat(gv('pruneKeep', 1)); // B1 confidence gate, B2 store prune
   const tag = gv('tag', 'shakes');
   const PROJ = gv('proj', 'raw'), H = parseInt(gv('H', 256));
   const kei = a.indexOf('--key-env');
@@ -146,7 +148,7 @@ if (process.argv[2] === 'decrypt'){
     }
     return out;
   }
-  const X = new Int8Array(P * D), next = new Uint8Array(P), spos = new Int32Array(P);
+  let X = new Int8Array(P * D), next = new Uint8Array(P), spos = new Int32Array(P);
   let flopSteps = 0; // recall iterations actually executed (all phases) -> evalMflops
   const r = rng(SEED), q = new Float32Array(D);
   for (let s = 0; s < P; s++){
@@ -155,6 +157,14 @@ if (process.argv[2] === 'decrypt'){
     featPM(trainIds, pos, q);
     for (let j = 0; j < D; j++) X[s * D + j] = q[j] > 0 ? 1 : 0;
     next[s] = trainIds[pos + W];
+  }
+  if (KEEP < 1){ // B2: seeded nested random prune (keep=0.25 subset of 0.5 subset of full)
+    const pr = rng(SEED + 2), keep = [];
+    for (let s = 0; s < P; s++) if (pr() < KEEP) keep.push(s);
+    const nX = new Int8Array(keep.length * D), nN = new Uint8Array(keep.length), nS = new Int32Array(keep.length);
+    keep.forEach((s, i) => { nX.set(X.subarray(s * D, s * D + D), i * D); nN[i] = next[s]; nS[i] = spos[s]; });
+    X = nX; next = nN; spos = nS; P = keep.length;
+    console.log(`prune keep=${KEEP} Peff=${P}`);
   }
   const buildMs = Date.now() - t0;
   console.log(`store P=${P} D=${D} bytes=${X.length + next.length} buildMs=${buildMs} rss=${rssMB()}MB`);
@@ -283,6 +293,8 @@ if (process.argv[2] === 'decrypt'){
       const trueNext = valIds[pos + W];
       const { w, steps: stI } = recallW(qq, X, P, D, best.beta, 12);
       flopSteps += stI;
+      let wmax = 0, wsum = 0; // B1: top-1 weight fraction = match confidence
+      for (let i = 0; i < w.length; i++){ wsum += w[i]; if (w[i] > wmax) wmax = w[i]; }
       const hd = predictNext(w, next, V);
       let tot = 0; for (let i = 0; i < V; i++) tot += hd[i];
       for (let i = 0; i < V; i++) hd[i] /= (tot + 1e-12 * V);
@@ -290,7 +302,7 @@ if (process.argv[2] === 'decrypt'){
       let rtot = V; for (let c = 0; c < V; c++) rtot += bi[off + c];
       const bd = new Float64Array(V);
       for (let c = 0; c < V; c++) bd[c] = (bi[off + c] + 1) / rtot;
-      rows.push({ hd, bd, trueNext });
+      rows.push({ hd, bd, trueNext, g: wmax / (wsum || 1) });
     }
     return rows;
   }
@@ -298,10 +310,11 @@ if (process.argv[2] === 'decrypt'){
     return LAMBDAS.map(lam => {
       let acc = 0, ce = 0;
       for (const qr of rows){
+        const L = (GATE > 0 && qr.g < GATE) ? 0 : lam; // B1: no-match -> bigram only
         let bp = -1, bci = 0;
-        for (let c = 0; c < V; c++){ const p = lam * qr.hd[c] + (1 - lam) * qr.bd[c]; if (p > bp){ bp = p; bci = c; } }
+        for (let c = 0; c < V; c++){ const p = L * qr.hd[c] + (1 - L) * qr.bd[c]; if (p > bp){ bp = p; bci = c; } }
         if (bci === qr.trueNext) acc++;
-        ce += -Math.log(Math.max(lam * qr.hd[qr.trueNext] + (1 - lam) * qr.bd[qr.trueNext], 1e-12));
+        ce += -Math.log(Math.max(L * qr.hd[qr.trueNext] + (1 - L) * qr.bd[qr.trueNext], 1e-12));
       }
       return { lam, acc: acc / rows.length, ppl: Math.exp(ce / rows.length) };
     });
@@ -313,6 +326,8 @@ if (process.argv[2] === 'decrypt'){
   for (const s of selStats) if (s.ppl < bestLam.ppl || (s.ppl === bestLam.ppl && s.acc > bestLam.acc)) bestLam = s;
   const repRows = hopBiDists(TR, 2001), repStats = lamStats(repRows);
   const repLocked = repStats[LAMBDAS.indexOf(bestLam.lam)];
+  const gatedFracRep = repRows.length ? repRows.filter(qr => qr.g < GATE).length / repRows.length : 0;
+  console.log(`gate tau=${GATE} pruneKeep=${KEEP} Peff=${P} gatedFrac=${gatedFracRep.toFixed(3)}`);
   console.log('interp select: ' + selStats.map(s => `lam=${s.lam} acc=${s.acc.toFixed(3)} ppl=${s.ppl.toFixed(2)}`).join(' | '));
   console.log(`interp locked lam=${bestLam.lam} report acc=${repLocked.acc.toFixed(3)} ppl=${repLocked.ppl.toFixed(2)}`);
   // pairing self-check: lam=0 must reproduce the bigram eval exactly (same queries, same Laplace)
@@ -354,6 +369,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.interpAcc = repLocked.acc; metrics.interpPpl = repLocked.ppl;
   metrics.hopAccRep = repStats[LAMBDAS.length - 1].acc; metrics.hopPplRep = repStats[LAMBDAS.length - 1].ppl;
   metrics.biAccRep = repStats[0].acc; metrics.biPplRep = repStats[0].ppl;
+  metrics.gateTau = GATE; metrics.pruneKeep = KEEP; metrics.Peff = P; metrics.gatedFracRep = gatedFracRep;
   writeFileSync(outDir + '/metrics.json', JSON.stringify(metrics));
   let stxt = '';
   for (const s of samples) stxt += 'PROMPT: ' + JSON.stringify(s.prompt) + '\nHOP: ' + JSON.stringify(s.hop) + '\nBI: ' + JSON.stringify(s.bi) + '\n---\n';
