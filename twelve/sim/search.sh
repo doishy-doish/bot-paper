@@ -33,15 +33,17 @@ try:
   d=flat(m.get('http_req_duration',{})); f=flat(m.get('http_req_failed',{})); r=flat(m.get('http_reqs',{}))
   p95=d.get('p(95)',float('nan')); p99=d.get('p(99)',float('nan'))
   err=100.0*f.get('rate',f.get('value',1.0)); rps=r.get('rate',float('nan'))
+  c=flat(m.get('checks',{})); cp=c.get('passes',0); cf=c.get('fails',0)
+  chk=100.0*cp/(cp+cf) if (cp+cf)>0 else 0.0
   ok=(p95<500 and p99<1000 and err<1.0)
-  print(f"VERDICT={'PASS' if ok else 'FAIL'} RPS={rps:.1f} P95={p95:.0f} P99={p99:.0f} ERR={err:.2f}")
+  print(f"VERDICT={'PASS' if ok else 'FAIL'} RPS={rps:.1f} P95={p95:.0f} P99={p99:.0f} ERR={err:.2f} CHK={chk:.1f}")
 except Exception as e:
   print(f"VERDICT=ERROR RPS=nan P95=nan P99=nan ERR=nan ({e})")
 EOF
 }
 
-echo "| users | req/s | p95 ms | p99 ms | err % | verdict |" | tee "$OUT/TABLE.md"
-echo "|---|---|---|---|---|---|" | tee -a "$OUT/TABLE.md"
+echo "| users | req/s | p95 ms | p99 ms | err % | checks % | verdict |" | tee "$OUT/TABLE.md"
+echo "|---|---|---|---|---|---|---|" | tee -a "$OUT/TABLE.md"
 probed=""
 doprobe() { # <vus> <dur> <ramp> <tag> <label> -> sets PROBE_V; appends table row
   local out line v rps p95 p99 err
@@ -51,7 +53,8 @@ doprobe() { # <vus> <dur> <ramp> <tag> <label> -> sets PROBE_V; appends table ro
   p95="$(echo "$out" | grep -o 'P95=[^ ]*' | cut -d= -f2)"
   p99="$(echo "$out" | grep -o 'P99=[^ ]*' | cut -d= -f2)"
   err="$(echo "$out" | grep -o 'ERR=[^ ]*' | cut -d= -f2)"
-  echo "| $5 | $rps | $p95 | $p99 | $err | $v |" | tee -a "$OUT/TABLE.md"
+  chk="$(echo "$out" | grep -o 'CHK=[^ ]*' | cut -d= -f2)"
+  echo "| $5 | $rps | $p95 | $p99 | $err | $chk | $v |" | tee -a "$OUT/TABLE.md"
   probed="$probed $1"
   PROBE_V="$v"
 }
