@@ -37,8 +37,13 @@ jobs:
           path: models/
       - name: stage post-ingestion model
         run: |
-          cp models/demo-ingest/demo-ingest-model.json halt-r/demo-ingest-model.json
-          cp models/demo-ingest/demo-ingest.md halt-r/demo-ingest.md
+          MODEL=$(find models -name demo-ingest-model.json | head -1)
+          MDOC=$(find models -name demo-ingest.md | head -1)
+          test -n "$MODEL" && test -n "$MDOC"
+          cp "$MODEL" /tmp/demo-ingest-model.json
+          cp "$MDOC" /tmp/demo-ingest.md
+          cp /tmp/demo-ingest-model.json halt-r/demo-ingest-model.json
+          cp /tmp/demo-ingest.md halt-r/demo-ingest.md
           cat halt-r/demo-ingest.md >> "$GITHUB_STEP_SUMMARY"
       - name: commit demo back
         run: |
@@ -47,8 +52,8 @@ jobs:
           for i in 1 2 3; do
             git fetch origin main
             git reset --hard origin/main
-            cp models/demo-ingest/demo-ingest-model.json halt-r/demo-ingest-model.json
-            cp models/demo-ingest/demo-ingest.md halt-r/demo-ingest.md
+            cp /tmp/demo-ingest-model.json halt-r/demo-ingest-model.json
+            cp /tmp/demo-ingest.md halt-r/demo-ingest.md
             git add halt-r/demo-ingest-model.json halt-r/demo-ingest.md
             git diff --cached --quiet && exit 0
             git commit -m "halt-r: ingest demo pull-check-save $(date -u +%F)" && git push origin main && exit 0
