@@ -94,8 +94,9 @@ if (process.argv[2] === 'decrypt'){
   const a = process.argv.slice(2);
   const gv = (k, d) => { const i = a.indexOf('--' + k); return i >= 0 ? a[i + 1] : d; };
   const noEnc = a.includes('--no-encrypt');
+  const noGen = a.includes('--no-gen'); // P-sweep: skip generation (costly, unneeded per-P)
   const dataPath = gv('data', null), outDir = gv('out', null);
-  if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100]');
+  if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100] [--proj raw|sim] [--no-gen]');
   const W = parseInt(gv('W', DEF.W)), P = parseInt(gv('P', DEF.P)), TR = parseInt(gv('trials', DEF.trials));
   const tag = gv('tag', 'shakes');
   const PROJ = gv('proj', 'raw'), H = parseInt(gv('H', 256));
@@ -146,6 +147,7 @@ if (process.argv[2] === 'decrypt'){
     return out;
   }
   const X = new Int8Array(P * D), next = new Uint8Array(P), spos = new Int32Array(P);
+  let flopSteps = 0; // recall iterations actually executed (all phases) -> evalMflops
   const r = rng(SEED), q = new Float32Array(D);
   for (let s = 0; s < P; s++){
     const pos = Math.floor(r() * (trainIds.length - W));
@@ -170,6 +172,7 @@ if (process.argv[2] === 'decrypt'){
       dist_sum.ce += -Math.log((dist[trueNext] + 1e-12) / (tot + 1e-12 * V));
       dist_sum.steps += steps;
     }
+    flopSteps += dist_sum.steps;
     return { acc: dist_sum.acc / n, ppl: Math.exp(dist_sum.ce / n), avgSteps: dist_sum.steps / n };
   };
   // bigram eval on same query streams happens implicitly below via shared seeds (positions only depend on seed)
@@ -213,7 +216,7 @@ if (process.argv[2] === 'decrypt'){
   console.log(`eval beta=${best.beta} hopfield acc=${e.acc.toFixed(3)} ppl=${e.ppl.toFixed(2)} steps=${e.avgSteps.toFixed(2)} ms=${evalMs} rss=${rssMB()}MB`);
   console.log(`base bigram acc=${biE.acc.toFixed(3)} ppl=${biE.ppl.toFixed(2)} | unigram acc=${uniE.acc.toFixed(3)} ppl=${uniE.ppl.toFixed(2)}`);
   // generation quality: argmax continuations from fixed held-out prompts, both systems
-  const GEN_N = 3, GEN_LEN = 100;
+  const GEN_N = noGen ? 0 : 3, GEN_LEN = 100;
   const wordSet = new Set((train.toLowerCase().match(/[a-z]+/g) || []));
   const gSeed = rng(3000), gPrompts = [];
   for (let g = 0; g < GEN_N; g++) gPrompts.push(Math.floor(gSeed() * (valIds.length - W - 1)));
@@ -223,7 +226,8 @@ if (process.argv[2] === 'decrypt'){
     const ids = distOf.ids || (distOf.ids = new Uint16Array(4096));
     for (let k = 0; k < W; k++) ids[k] = win[k];
     featPM(ids, 0, qq);
-    const { w } = recallW(qq, X, P, D, best.beta, 12);
+    const { w, steps: stG } = recallW(qq, X, P, D, best.beta, 12);
+    flopSteps += stG;
     const dist = predictNext(w, next, V);
     let tot = 0; for (let i = 0; i < V; i++) tot += dist[i];
     for (let i = 0; i < V; i++) dist[i] /= (tot + 1e-12 * V);
@@ -261,7 +265,7 @@ if (process.argv[2] === 'decrypt'){
     qRep += qh.rep4; qWord += qh.wordValid;
     samples.push({ prompt: h.slice(0, W), hop: h.slice(W), bi: b.slice(W) });
   }
-  const quality = { n: GEN_N, genLen: GEN_LEN, rep4: qRep / GEN_N, wordValid: qWord / GEN_N };
+  const quality = { n: GEN_N, genLen: GEN_LEN, rep4: GEN_N ? qRep / GEN_N : 0, wordValid: GEN_N ? qWord / GEN_N : 0 };
   console.log(`gen rep4=${quality.rep4.toFixed(3)} wordValid=${quality.wordValid.toFixed(3)}`);
   let failN = 0;
   const check = (n, c, d) => { console.log(((c ? 'PASS' : 'FAIL') + ' ' + n + ' ' + (d || ''))); if (!c) failN++; };
@@ -277,7 +281,8 @@ if (process.argv[2] === 'decrypt'){
       const pos = Math.floor(rr() * (valIds.length - W - 1));
       featPM(valIds, pos, qq);
       const trueNext = valIds[pos + W];
-      const { w } = recallW(qq, X, P, D, best.beta, 12);
+      const { w, steps: stI } = recallW(qq, X, P, D, best.beta, 12);
+      flopSteps += stI;
       const hd = predictNext(w, next, V);
       let tot = 0; for (let i = 0; i < V; i++) tot += hd[i];
       for (let i = 0; i < V; i++) hd[i] /= (tot + 1e-12 * V);
@@ -329,6 +334,9 @@ if (process.argv[2] === 'decrypt'){
     check('self-key-retrieval', self === NS, self + '/' + NS);
   }
   console.log(`compare hopfield acc=${e.acc.toFixed(3)} ppl=${e.ppl.toFixed(2)} vs bigram ${biE.acc.toFixed(3)}/${biE.ppl.toFixed(2)} vs unigram ${uniE.acc.toFixed(3)}/${uniE.ppl.toFixed(2)} beatUni=${e.acc > uniE.acc}`);
+  const evalMflops = Math.round(flopSteps * P * D * 2 / 1e6 * 10) / 10; // 2 FLOP per MAC (dot+mix), measured steps
+  const buildMflops = PROJ === 'sim' ? Math.round(P * W * H * 2 / 1e6 * 10) / 10 : 0; // feature-projection estimate (W*H adds per pattern)
+  console.log(`flops steps=${flopSteps} evalMflops=${evalMflops} buildMflops=${buildMflops}`);
   // save wrapped store
   const plain = Buffer.concat([Buffer.from(X), Buffer.from(next)]);
   const sum = sha256hex(plain);
@@ -337,7 +345,7 @@ if (process.argv[2] === 'decrypt'){
   let encBytes = 0;
   if (!noEnc){ const wj = JSON.stringify(encryptWrap(plain, secret)); writeFileSync(outDir + '/model.bin.enc', wj); encBytes = wj.length; console.log(`enc bytes=${encBytes} sha256=${sum}`); }
   else { writeFileSync(outDir + '/model.bin', plain); console.log(`plain-smoke bytes=${plain.length} sha256=${sum}`); }
-  const metrics = { ...meta, trials: TR, flips: 'n/a-nextchar', acc: e.acc, ppl: e.ppl, avgSteps: e.avgSteps, bigramAcc: biE.acc, bigramPpl: biE.ppl, unigramAcc: uniE.acc, unigramPpl: uniE.ppl, beatUni: e.acc > uniE.acc, quality, buildMs, evalMs, maxRssMB: rssMB(), encBytes, evalScope: 'heldout-val' };
+  const metrics = { ...meta, trials: TR, flips: 'n/a-nextchar', acc: e.acc, ppl: e.ppl, avgSteps: e.avgSteps, bigramAcc: biE.acc, bigramPpl: biE.ppl, unigramAcc: uniE.acc, unigramPpl: uniE.ppl, beatUni: e.acc > uniE.acc, quality, buildMs, evalMs, maxRssMB: rssMB(), encBytes, evalScope: 'heldout-val', evalMflops, buildMflops, flopSteps };
   // kNN-LM interpolation results (locked-lam report on fresh seed-2001 queries)
   metrics.interpLambda = bestLam.lam;
   metrics.interpAccSel = bestLam.acc; metrics.interpPplSel = bestLam.ppl;
