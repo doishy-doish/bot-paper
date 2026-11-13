@@ -36,7 +36,7 @@ jobs:
       - name: bench canary edit plus exact forget
         env:
           SCRAMBLE: ${{ secrets.SCRAMBLE }}
-        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/c2-${{ matrix.corpus }}-W${{ matrix.W }} --tag ${{ matrix.corpus }} --W ${{ matrix.W }} --P 8000 --trials 100 --proj sup --H 256 --ada 0 --score whole --capab canary --no-gen
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/c2-${{ matrix.corpus }}-W${{ matrix.W }} --tag ${{ matrix.corpus }} --W ${{ matrix.W }} --P 8000 --trials 100 --proj sup --H 256 --ada 0 --score whole --capab canary --c2d 1 --no-gen
       - uses: actions/upload-artifact@v4
         with:
           name: c2-${{ matrix.corpus }}-W${{ matrix.W }}
@@ -69,6 +69,9 @@ jobs:
           let md = '# C2: implanted facts, edit flips, exact forget\nSame protocol as H1 (P=8000, sup, fixed lam, no-gen) + canary phases in one job. remember/edit/forget on 20 implanted facts; collateral = standard q100 acc before/after deletion.\n\n| corpus | W | remember | editFlip | forgetLeak | collateral base -> after |\n|---|---|---|---|---|---|\n';
           for (const m of runs) {
             md += '| ' + m.corpus + ' | ' + m.W + ' | ' + m.canRemember.toFixed(2) + ' | ' + m.canEditFlip.toFixed(2) + ' | ' + m.canForgetLeak.toFixed(3) + ' | ' + m.collatBase.toFixed(3) + ' -> ' + m.collatAfter.toFixed(3) + ' |\n';
+          }
+          for (const m of runs) {
+            if (m.canRemDetail) md += '\n' + m.corpus + ' W' + m.W + ' remember bits: ' + m.canRemDetail + ' edit bits: ' + m.canEditDetail;
           }
           let proven = 0;
           for (const m of runs) {
