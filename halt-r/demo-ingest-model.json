@@ -1,0 +1,100 @@
+{
+ "version": "demo-ingest/1",
+ "date": "2026-11-13",
+ "task": "ingest-demo",
+ "preReg": "frozen voters ingested with zero training (store+bigram+tinyGPT); cover 100/100; replay in band; donor sha pinned",
+ "donors": [
+  {
+   "donor": {
+    "gguf": "tinygpt-ts.gguf",
+    "bytes": 436064,
+    "sha256": "26402e2d9eac0c7a2d26c8e876e7c17c3c2be52b5a13fcacad2e7327df2fba70",
+    "arch": "halt-tinygpt",
+    "params": 108480,
+    "V": 79,
+    "n_embd": 64,
+    "n_head": 2,
+    "n_layer": 2,
+    "block": 32,
+    "rev": 2,
+    "vocab": "vocab-ts.json",
+    "ref": "ref-ts.json",
+    "refN": 5
+   },
+   "voter": {
+    "q100": "q100-gpt-ts.json",
+    "streams": {
+     "model": "ts",
+     "V": 79,
+     "s2000": {
+      "acc": 0.57,
+      "ppl": 4.36,
+      "cover": 100
+     },
+     "s2001": {
+      "acc": 0.65,
+      "ppl": 3.3,
+      "cover": 100
+     }
+    }
+   }
+  },
+  {
+   "donor": {
+    "gguf": "tinygpt-shakes.gguf",
+    "bytes": 428768,
+    "sha256": "fcd797be68c5d0948f3a836fc689773d7a6cf921da79b53f88b0dec376201af9",
+    "arch": "halt-tinygpt",
+    "params": 106688,
+    "V": 65,
+    "n_embd": 64,
+    "n_head": 2,
+    "n_layer": 2,
+    "block": 32,
+    "rev": 2,
+    "vocab": "vocab-shakes.json",
+    "ref": "ref-shakes.json",
+    "refN": 5
+   },
+   "voter": {
+    "q100": "q100-gpt-shakes.json",
+    "streams": {
+     "model": "shakes",
+     "V": 65,
+     "s2000": {
+      "acc": 0.49,
+      "ppl": 6.12,
+      "cover": 100
+     },
+     "s2001": {
+      "acc": 0.46,
+      "ppl": 5.31,
+      "cover": 100
+     }
+    }
+   }
+  }
+ ],
+ "router": {
+  "recipe": "mix gpt over W32 join; Hedge online over LAMBDAS frozen on select stream, locked report",
+  "expected": {
+   "ts": {
+    "gptMixAcc": 0.65,
+    "gptMixPpl": 3.3
+   },
+   "shakes": {
+    "gptMixAcc": 0.46,
+    "gptMixPpl": 5.31
+   }
+  }
+ },
+ "surgery": {
+  "ref": "halt-r/c2.json",
+  "remember": "1.00/0.95",
+  "editFlip": "0.90-1.00",
+  "forgetLeak": 0,
+  "collateral": 0
+ },
+ "boot": "load this file, verify donor sha256, route frozen voters. No rebuild, no training.",
+ "verdict": "DEMO GREEN: finished small model(s) pulled, checked, ingested as frozen voter(s); post-ingestion artifact saved; zero gradients."
+}
