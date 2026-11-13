@@ -48,31 +48,27 @@ def main():
     import os
     os.makedirs(a.out, exist_ok=True)
     rr = lcg(1234)
-    train_pool = {0: [], 1: [], 2: []}
-    test_pool = {0: [], 1: [], 2: []}
+    pools = {0: [], 1: [], 2: []}
     for x in range(100):
         for y in range(100):
-            s = x + y
-            L = chain(x, y)
-            if s <= 150:
-                train_pool[L].append((x, y))
-            else:
-                test_pool[L].append((x, y))
+            if x + y > 150:
+                continue
+            pools[chain(x, y)].append((x, y))
     for L in (0, 1, 2):
-        assert len(train_pool[L]) >= 1800, 'train pool L%d=%d <1800' % (L, len(train_pool[L]))
-        assert len(test_pool[L]) >= 200, 'test pool L%d=%d <200' % (L, len(test_pool[L]))
+        assert len(pools[L]) >= 1800, 'pool L%d=%d <1800' % (L, len(pools[L]))
     fmt = lambda p: '%02d+%02d=%s\n' % (p[0], p[1], ('%03d' % (p[0] + p[1]))[::-1])
     train_lines, test_lines = [], []
     for L in (0, 1, 2):
-        train_lines += [fmt(p) for p in shuffled(train_pool[L], rr)[:1800]]
-        test_lines += [fmt(p) for p in shuffled(test_pool[L], rr)[:200]]
+        q = shuffled(pools[L], rr)
+        train_lines += [fmt(p) for p in q[:1620]]
+        test_lines += [fmt(p) for p in q[1620:1800]]
     train_lines = shuffled(train_lines, rr)
     test_lines = shuffled(test_lines, rr)
-    assert len(train_lines) == 5400 and len(test_lines) == 600
+    assert len(train_lines) == 4860 and len(test_lines) == 540
     assert all(len(l) == 10 for l in train_lines + test_lines)
     train_txt = ''.join(train_lines)
     full_txt = train_txt + ''.join(test_lines)
-    assert len(full_txt) == 60000
+    assert len(full_txt) == 54000
     cut = (len(full_txt) * 9) // 10
     if cut != len(train_txt):
         raise SystemExit('FAIL boundary cut=%d train_len=%d' % (cut, len(train_txt)))
@@ -96,10 +92,10 @@ def main():
         raise SystemExit('FAIL match_free=%.4f < 0.99' % match_free)
     open(a.out + '/arith-train.txt', 'w').write(train_txt)
     open(a.out + '/arith-full.txt', 'w').write(full_txt)
-    spec = {'task': 'arith-revbal-corpus', 'trainSumMax': 150, 'testSumMin': 151,
-            'reversed': True, 'balanced': [1800, 1800, 1800], 'testBalanced': [200, 200, 200],
-            'lineFmt': '%02d+%02d=REV(%03d)\\n', 'lineLen': 10, 'trainLines': 5400,
-            'testLines': 600, 'totalChars': 60000, 'cut': cut,
+    spec = {'task': 'arith-revbal-corpus', 'trainSums': '0-150', 'testSums': '0-150 disjoint unseen pairs',
+            'reversed': True, 'balanced': [1620, 1620, 1620], 'testBalanced': [180, 180, 180],
+            'lineFmt': '%02d+%02d=REV(%03d)\\n', 'lineLen': 10, 'trainLines': 4860,
+            'testLines': 540, 'totalChars': 54000, 'cut': cut,
             'boundaryExact': True, 'vocab': vocab, 'V': len(vocab),
             'W': a.W, 'testWindows': tot, 'matchFree': match_free,
             'cites': ['2310.16028', '2307.03381'],
