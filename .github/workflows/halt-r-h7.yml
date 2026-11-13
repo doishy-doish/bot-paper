@@ -1,0 +1,103 @@
+name: halt-r-h7
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/halt-r-h7.yml'
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: h7 ${{ matrix.corpus }} W${{ matrix.W }} ${{ matrix.score }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        corpus: [shakes, ts]
+        W: [8, 16]
+        score: [whole, maxsim]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fetch corpus
+        run: |
+          if [ "${{ matrix.corpus }}" = ts ]; then
+            curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          else
+            curl -sSL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus.txt
+          fi
+          wc -c /tmp/corpus.txt
+          head -c 200 /tmp/corpus.txt
+      - name: bench whole-window vs maxsim scoring
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/h7-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.score }} --tag ${{ matrix.corpus }} --W ${{ matrix.W }} --P 8000 --trials 100 --proj sup --H 256 --ada 0 --score ${{ matrix.score }} --no-gen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: h7-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.score }}
+          path: out/h7-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.score }}/
+          retention-days: 30
+  collect:
+    name: collect maxsim ablation
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: h7-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: maxsim table plus verdict
+        run: |
+          node - <<'EOF' | tee /tmp/h7.md
+          const fs = require('node:fs'), path = require('node:path');
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          try { walk('models'); } catch (e) { console.log('no metrics found'); process.exit(0); }
+          const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+          runs.sort((a, b) => (a.corpus < b.corpus ? -1 : 1) || a.W - b.W || (a.score < b.score ? -1 : 1));
+          fs.writeFileSync('/tmp/h7.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'h7-maxsim-scoring', runs}, null, 1));
+          let md = '# H7: late-interaction MaxSim scoring vs whole-window dot\nSame protocol as H1/H4 (P=8000, H=256, no-gen, sup only, fixed lam). maxsim = unweighted char-level MaxSim (sum_j max_k match); position scales NOT applied.\n\n| corpus | W | score | hop acc/ppl | interp acc/ppl (lam*) | msMflops |\n|---|---|---|---|---|---|\n';
+          for (const m of runs) {
+            md += '| ' + m.corpus + ' | ' + m.W + ' | ' + m.score + ' | ' + m.acc.toFixed(3) + '/' + m.ppl.toFixed(2) + ' | ' + m.interpAcc.toFixed(3) + '/' + m.interpPpl.toFixed(2) + ' (' + m.interpLambda + ') | ' + (m.msMflops || 0) + ' |\n';
+          }
+          for (const corpus of ['shakes', 'ts']) for (const W of [8, 16]) {
+            const g = runs.filter(m => m.corpus === corpus && m.W === W);
+            if (g.length < 2) continue;
+            const f = g.find(m => m.score === 'whole'), m = g.find(m => m.score === 'maxsim');
+            if (!f || !m) continue;
+            const d = f.interpPpl - m.interpPpl;
+            md += '\n' + corpus + ' W' + W + ': whole interpPpl=' + f.interpPpl.toFixed(2) + ' (lam*=' + f.interpLambda + ') vs maxsim interpPpl=' + m.interpPpl.toFixed(2) + ' (lam*=' + m.interpLambda + ') d=' + d.toFixed(2) + '. ';
+            md += (d >= 0.2 && m.interpLambda > 0) ? 'VERDICT: WALL CRACKED BY SCORING.' : (d > 0 ? 'VERDICT: MOVES PARTIALLY.' : 'VERDICT: WHOLE HOLDS (uniqueness total or MaxSim adds nothing).');
+            md += '\n';
+          }
+          process.stdout.write(md);
+          EOF
+          cp /tmp/h7.json halt-r/h7.json
+          cp /tmp/h7.md halt-r/h7.md
+          cat halt-r/h7.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit h7 back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/h7.json halt-r/h7.json
+            cp /tmp/h7.md halt-r/h7.md
+            git add halt-r/h7.json halt-r/h7.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: h7 maxsim-scoring $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
