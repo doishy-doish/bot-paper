@@ -1,0 +1,52 @@
+{
+ "date": "2026-11-13",
+ "task": "arith-gluttony",
+ "preReg": "store~=chance (lam*=0, acc~1/13, novFrac>=0.95); donor strong (acc>0.4, ppl<bigram); blend~=donor (|dAcc|<=0.08, d>0.2, McNemar p<0.05); graft5 survival bar same transplant bar",
+ "spec": {
+  "matchFree": 1,
+  "V": 13
+ },
+ "donorAlone2001": {
+  "acc": 0.33,
+  "ppl": 24.99483554014322
+ },
+ "interp": {
+  "acc": 0.36,
+  "ppl": 65.16240801160633,
+  "lam": 0.25,
+  "novFrac": 1
+ },
+ "blend": {
+  "acc": 0.4,
+  "ppl": 21.80672906666356,
+  "lam": 0.1,
+  "cover": 100,
+  "d": 43.35567894494277,
+  "mcB": 6,
+  "mcC": 2,
+  "mcP": 0.2890625
+ },
+ "donorVsInterp": {
+  "mcB": 8,
+  "mcC": 11,
+  "mcP": 0.6476058959960938
+ },
+ "agree": {
+  "blendDonor": 0.89,
+  "blendInterp": 0.92,
+  "donorInterp": 0.81
+ },
+ "graft5": {
+  "acc": 0.39,
+  "ppl": 68.19279936338569,
+  "lam": 0.25,
+  "d": -3.0303913517793575,
+  "mcP": 0.6476058959960938
+ },
+ "verdicts": {
+  "storeChance": false,
+  "donorStrong": false,
+  "blendDonor": false,
+  "surv": false
+ }
+}

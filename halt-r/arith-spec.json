@@ -1,0 +1,39 @@
+{
+ "task": "arith-gluttony-corpus",
+ "trainRange": [
+  0,
+  49
+ ],
+ "testRange": [
+  50,
+  99
+ ],
+ "lineFmt": "%02d+%02d=%03d\\n",
+ "lineLen": 10,
+ "trainLines": 22500,
+ "testLines": 2500,
+ "totalChars": 250000,
+ "cut": 225000,
+ "boundaryExact": true,
+ "vocab": [
+  "\n",
+  "+",
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "="
+ ],
+ "V": 13,
+ "W": 8,
+ "testWindows": 24993,
+ "matchFree": 1.0,
+ "shaFull": "a460e5534cc5a47732fa7f107d20a4b61a7c118bbe033a717f89a15aae9f9ede",
+ "shaTrain": "b83d2a89ec41cb27d5222c075624949fe19e9ea4508f0f7d8bc3f89da4559cdb"
+}
