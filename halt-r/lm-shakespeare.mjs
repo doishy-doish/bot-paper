@@ -307,8 +307,10 @@ if (process.argv[2] === 'decrypt'){
     });
   }
   const selRows = hopBiDists(TR, 2000), selStats = lamStats(selRows);
+  // ppl-guarded: minimize select-set ppl first (kNN-LM tunes for ppl), tie-break higher acc.
+  // acc-first selection picked lam=1 overconfident stores whose ppl exploded on fresh queries.
   let bestLam = selStats[0];
-  for (const s of selStats) if (s.acc > bestLam.acc || (s.acc === bestLam.acc && s.ppl < bestLam.ppl)) bestLam = s;
+  for (const s of selStats) if (s.ppl < bestLam.ppl || (s.ppl === bestLam.ppl && s.acc > bestLam.acc)) bestLam = s;
   const repRows = hopBiDists(TR, 2001), repStats = lamStats(repRows);
   const repLocked = repStats[LAMBDAS.indexOf(bestLam.lam)];
   console.log('interp select: ' + selStats.map(s => `lam=${s.lam} acc=${s.acc.toFixed(3)} ppl=${s.ppl.toFixed(2)}`).join(' | '));
