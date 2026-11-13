@@ -39,7 +39,7 @@ jobs:
         env:
           SCRAMBLE: ${{ secrets.SCRAMBLE }}
         run: |
-          FLAGS="--proj graft5 --anchors 256"
+          FLAGS="--proj graft5 --anchors 256 --graftgguf halt-r/tinygpt-${{ matrix.corpus }}.gguf"
           if [ "${{ matrix.arm }}" = gpt ]; then
             FLAGS="$FLAGS --mix gpt --gptq halt-r/q100-gpt-${{ matrix.corpus }}.json"
           fi
