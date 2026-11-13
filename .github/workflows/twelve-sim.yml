@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/twelve-sim.yml'
+      - 'twelve/sim/incremental.sh'
 permissions:
   contents: read
 jobs:
