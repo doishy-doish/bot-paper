@@ -70,8 +70,11 @@ jobs:
           const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
           walk('models');
           const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
-          const b1 = runs.filter(r => (r.gateTau ?? 0) > -1 && r.pruneKeep === 1 && r.P === 8000).sort((a, b) => a.gateTau - b.gateTau);
-          const b2 = runs.filter(r => (r.gateTau ?? 0) === 0 && r.P === 8000).sort((a, b) => b.pruneKeep - a.pruneKeep);
+          const P0of = r => (r.P0 ?? r.P);
+          const b1all = runs.filter(r => (r.gateTau ?? 0) > -1 && r.pruneKeep === 1 && P0of(r) === 8000).sort((a, b) => a.gateTau - b.gateTau);
+          const b1 = [...new Map(b1all.map(r => [r.gateTau, r])).values()].sort((a, b) => a.gateTau - b.gateTau);
+          const b2all = runs.filter(r => (r.gateTau ?? 0) === 0 && P0of(r) === 8000).sort((a, b) => b.pruneKeep - a.pruneKeep);
+          const b2 = [...new Map(b2all.map(r => [r.pruneKeep, r])).values()].sort((a, b) => b.pruneKeep - a.pruneKeep);
           const h3 = runs.filter(r => r.P === 32000);
           let md = '# HALT-R rungs2: gate + prune + slope (measured, CI, concurrent)\nBPC = log2(char-ppl). text8 W4. Pilot anchor (P=8000, no gate): interp 3.21 BPC vs bigram 3.31.\n\n## B1 confidence gate (tau sweep, P=8000 raw)\n| tau | gatedFrac | interp acc/ppl/BPC | vs bigram ppl |\n|---|---|---|---|\n';
           for (const r of b1) md += '| ' + r.gateTau + ' | ' + (r.gatedFracRep ?? 0).toFixed(3) + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + '/' + bpc(r.interpPpl).toFixed(2) + ' | ' + (r.bigramPpl - r.interpPpl >= 0 ? 'at/below bigram' : 'ABOVE bigram by ' + (r.interpPpl - r.bigramPpl).toFixed(2)) + ' |\n';
@@ -99,8 +102,11 @@ jobs:
           const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
           walk('models');
           const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
-          const b1 = runs.filter(r => (r.gateTau ?? 0) > -1 && r.pruneKeep === 1 && r.P === 8000).sort((a, b) => a.gateTau - b.gateTau);
-          const b2 = runs.filter(r => (r.gateTau ?? 0) === 0 && r.P === 8000).sort((a, b) => b.pruneKeep - a.pruneKeep);
+          const P0of = r => (r.P0 ?? r.P);
+          const b1all = runs.filter(r => (r.gateTau ?? 0) > -1 && r.pruneKeep === 1 && P0of(r) === 8000).sort((a, b) => a.gateTau - b.gateTau);
+          const b1 = [...new Map(b1all.map(r => [r.gateTau, r])).values()].sort((a, b) => a.gateTau - b.gateTau);
+          const b2all = runs.filter(r => (r.gateTau ?? 0) === 0 && P0of(r) === 8000).sort((a, b) => b.pruneKeep - a.pruneKeep);
+          const b2 = [...new Map(b2all.map(r => [r.pruneKeep, r])).values()].sort((a, b) => b.pruneKeep - a.pruneKeep);
           const h3 = runs.filter(r => r.P === 32000);
           let md = '# HALT-R rungs2: gate + prune + slope (measured, CI, concurrent)\nBPC = log2(char-ppl). text8 W4. Pilot anchor (P=8000, no gate): interp 3.21 BPC vs bigram 3.31.\n\n## B1 confidence gate (tau sweep, P=8000 raw)\n| tau | gatedFrac | interp acc/ppl/BPC | vs bigram ppl |\n|---|---|---|---|\n';
           for (const r of b1) md += '| ' + r.gateTau + ' | ' + (r.gatedFracRep ?? 0).toFixed(3) + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + '/' + bpc(r.interpPpl).toFixed(2) + ' | ' + (r.bigramPpl - r.interpPpl >= 0 ? 'at/below bigram' : 'ABOVE bigram by ' + (r.interpPpl - r.bigramPpl).toFixed(2)) + ' |\n';

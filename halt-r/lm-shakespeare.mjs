@@ -99,6 +99,7 @@ if (process.argv[2] === 'decrypt'){
   if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100] [--proj raw|sim] [--no-gen]');
   const W = parseInt(gv('W', DEF.W)), TR = parseInt(gv('trials', DEF.trials));
   let P = parseInt(gv('P', DEF.P));
+  const P0 = P; // requested store size; P becomes Peff after B2 prune
   const GATE = parseFloat(gv('gate', 0)), KEEP = parseFloat(gv('pruneKeep', 1)); // B1 confidence gate, B2 store prune
   const tag = gv('tag', 'shakes');
   const PROJ = gv('proj', 'raw'), H = parseInt(gv('H', 256));
@@ -357,7 +358,7 @@ if (process.argv[2] === 'decrypt'){
   // save wrapped store
   const plain = Buffer.concat([Buffer.from(X), Buffer.from(next)]);
   const sum = sha256hex(plain);
-  const meta = { task: 'nextchar-heldout', corpus: tag, proj: PROJ, W, P, V, D, seed: SEED, beta: best.beta, bytes: plain.length, sha256: sum, enc: noEnc ? 'none-smoke' : 'AES-256-GCM-v1', chars: raw.length };
+  const meta = { task: 'nextchar-heldout', corpus: tag, proj: PROJ, W, P: P0, P0, Peff: P, V, D, seed: SEED, beta: best.beta, bytes: plain.length, sha256: sum, enc: noEnc ? 'none-smoke' : 'AES-256-GCM-v1', chars: raw.length };
   writeFileSync(outDir + '/meta.json', JSON.stringify(meta));
   let encBytes = 0;
   if (!noEnc){ const wj = JSON.stringify(encryptWrap(plain, secret)); writeFileSync(outDir + '/model.bin.enc', wj); encBytes = wj.length; console.log(`enc bytes=${encBytes} sha256=${sum}`); }
