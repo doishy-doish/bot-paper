@@ -1,10 +1,11 @@
 {
- "date": "2026-11-12",
+ "date": "2026-11-13",
  "task": "nextchar-heldout",
  "runs": [
   {
    "task": "nextchar-heldout",
    "corpus": "shakes",
+   "proj": "raw",
    "W": 2,
    "P": 8000,
    "V": 65,
@@ -31,15 +32,16 @@
     "rep4": 0.9450171821305843,
     "wordValid": 1
    },
-   "buildMs": 9,
-   "evalMs": 1903,
-   "maxRssMB": 83.9,
+   "buildMs": 7,
+   "evalMs": 893,
+   "maxRssMB": 84.6,
    "encBytes": 1397542,
    "evalScope": "heldout-val"
   },
   {
    "task": "nextchar-heldout",
    "corpus": "shakes",
+   "proj": "raw",
    "W": 4,
    "P": 8000,
    "V": 65,
@@ -66,15 +68,16 @@
     "rep4": 0.8178694158075602,
     "wordValid": 0.6538461538461539
    },
-   "buildMs": 12,
-   "evalMs": 5066,
-   "maxRssMB": 91.6,
+   "buildMs": 13,
+   "evalMs": 4079,
+   "maxRssMB": 94.3,
    "encBytes": 2784206,
    "evalScope": "heldout-val"
   },
   {
    "task": "nextchar-heldout",
    "corpus": "shakes",
+   "proj": "raw",
    "W": 8,
    "P": 8000,
    "V": 65,
@@ -101,15 +104,16 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 19,
-   "evalMs": 14488,
-   "maxRssMB": 101.9,
+   "buildMs": 21,
+   "evalMs": 14282,
+   "maxRssMB": 100.5,
    "encBytes": 5557542,
    "evalScope": "heldout-val"
   },
   {
    "task": "nextchar-heldout",
    "corpus": "shakes",
+   "proj": "raw",
    "W": 16,
    "P": 8000,
    "V": 65,
@@ -136,15 +140,16 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 33,
-   "evalMs": 20511,
-   "maxRssMB": 133.8,
+   "buildMs": 24,
+   "evalMs": 11027,
+   "maxRssMB": 137.6,
    "encBytes": 11104206,
    "evalScope": "heldout-val"
   },
   {
    "task": "nextchar-heldout",
    "corpus": "shakes",
+   "proj": "raw",
    "W": 32,
    "P": 8000,
    "V": 65,
@@ -171,15 +176,16 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 62,
-   "evalMs": 38570,
-   "maxRssMB": 198.3,
+   "buildMs": 94,
+   "evalMs": 50370,
+   "maxRssMB": 201,
    "encBytes": 22197543,
    "evalScope": "heldout-val"
   },
   {
    "task": "nextchar-heldout",
    "corpus": "ts",
+   "proj": "raw",
    "W": 2,
    "P": 8000,
    "V": 79,
@@ -206,15 +212,16 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 8,
-   "evalMs": 3017,
-   "maxRssMB": 135.2,
+   "buildMs": 15,
+   "evalMs": 3863,
+   "maxRssMB": 124.7,
    "encBytes": 1696206,
    "evalScope": "heldout-val"
   },
   {
    "task": "nextchar-heldout",
    "corpus": "ts",
+   "proj": "raw",
    "W": 4,
    "P": 8000,
    "V": 79,
@@ -241,15 +248,16 @@
     "rep4": 0.7628865979381443,
     "wordValid": 0.9696969696969697
    },
-   "buildMs": 8,
-   "evalMs": 2691,
-   "maxRssMB": 138.1,
+   "buildMs": 14,
+   "evalMs": 2910,
+   "maxRssMB": 137.6,
    "encBytes": 3381542,
    "evalScope": "heldout-val"
   },
   {
    "task": "nextchar-heldout",
    "corpus": "ts",
+   "proj": "raw",
    "W": 8,
    "P": 8000,
    "V": 79,
@@ -276,15 +284,16 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 27,
-   "evalMs": 25478,
-   "maxRssMB": 128.6,
+   "buildMs": 32,
+   "evalMs": 27364,
+   "maxRssMB": 117,
    "encBytes": 6752206,
    "evalScope": "heldout-val"
   },
   {
    "task": "nextchar-heldout",
    "corpus": "ts",
+   "proj": "raw",
    "W": 16,
    "P": 8000,
    "V": 79,
@@ -311,15 +320,16 @@
     "rep4": 0.9759450171821307,
     "wordValid": 0
    },
-   "buildMs": 24,
-   "evalMs": 21041,
-   "maxRssMB": 158.3,
+   "buildMs": 62,
+   "evalMs": 50023,
+   "maxRssMB": 159.3,
    "encBytes": 13493543,
    "evalScope": "heldout-val"
   },
   {
    "task": "nextchar-heldout",
    "corpus": "ts",
+   "proj": "raw",
    "W": 32,
    "P": 8000,
    "V": 79,
@@ -346,9 +356,9 @@
     "rep4": 0.9896907216494846,
     "wordValid": 0
    },
-   "buildMs": 77,
-   "evalMs": 60818,
-   "maxRssMB": 249.7,
+   "buildMs": 89,
+   "evalMs": 55896,
+   "maxRssMB": 247.9,
    "encBytes": 26976207,
    "evalScope": "heldout-val"
   }

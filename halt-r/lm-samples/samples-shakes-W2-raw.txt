@@ -1,0 +1,12 @@
+PROMPT: "r "
+HOP: "the the the the the the the the the the the the the the the the the the the the the the the the the "
+BI: "the the the the the the the the the the the the the the the the the the the the the the the the the "
+---
+PROMPT: "be"
+HOP: " the the the the the the the the the the the the the the the the the the the the the the the the the"
+BI: " the the the the the the the the the the the the the the the the the the the the the the the the the"
+---
+PROMPT: "d,"
+HOP: " and the the the the the the the the the the the the the the the the the the the the the the the the"
+BI: " the the the the the the the the the the the the the the the the the the the the the the the the the"
+---
