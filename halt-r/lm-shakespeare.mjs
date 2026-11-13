@@ -59,7 +59,24 @@ function recallW(q, X, P, D, beta, maxS){
       d *= beta; w[i] = d; if (d > m) m = d;
     }
     let t = 0;
-    for (let i = 0; i < P; i++){ w[i] = Math.exp(w[i] - m); t += w[i]; }
+    if (SPARSE === '1'){
+      // entmax-1.5 (Correia et al. 2019): p_i = [(s_i - tau)]_+^2 / Z, tau via bisection.
+      // Same argmax as softmax (monotone), compact support: dilutes nothing, sharpens votes.
+      let mx = -1e30;
+      for (let i = 0; i < P; i++) if (w[i] > mx) mx = w[i];
+      let lo = mx - 4, hi = mx;
+      for (let it = 0; it < 40; it++){
+        const mid = (lo + hi) / 2;
+        let s = 0;
+        for (let i = 0; i < P; i++){ const v = w[i] - mid; if (v > 0) s += v * v; }
+        if (s > 1) lo = mid; else hi = mid;
+      }
+      const tau = (lo + hi) / 2;
+      for (let i = 0; i < P; i++){ const v = w[i] - tau; w[i] = v > 0 ? v * v : 0; t += w[i]; }
+      if (!(t > 0)){ t = P; for (let i = 0; i < P; i++) w[i] = 1; } // unreachable safety (tau <= max always)
+    } else {
+      for (let i = 0; i < P; i++){ w[i] = Math.exp(w[i] - m); t += w[i]; }
+    }
     const nx = new Float32Array(D);
     for (let i = 0; i < P; i++){ const c = w[i] / t; const off = i * D; for (let j = 0; j < D; j++) nx[j] += c * (X[off + j] ? 1 : -1); }
     let maxd = 0;
@@ -123,6 +140,10 @@ if (process.argv[2] === 'decrypt'){
   const MIX = gv('mix', 'none'); // gmix: none (default, bit-identical), gpt (mix hop + tiny-GPT dists from q100-gpt file, joined on pos)
   if (MIX !== 'none' && MIX !== 'gpt') fail('usage: --mix none|gpt');
   const GPTQ = gv('gptq', null);
+  const SPARSE = gv('sparse', '0'); // S-rung: 0=softmax (default, bit-identical), 1=entmax-1.5 sparse assignment (same argmax, 100x sparser support; prototype: identical convergence/acc, support 253->2)
+  if (SPARSE !== '0' && SPARSE !== '1') fail('usage: --sparse 0|1');
+  const HEDGE = gv('hedge', '0'); // Hedge/experts adaptive lambda: 0=off (default, bit-identical), 1=online Hedge over the LAMBDAS grid (frozen on select stream, evaluated on report stream; regret-bounded mixing)
+  if (HEDGE !== '0' && HEDGE !== '1') fail('usage: --hedge 0|1');
   const kei = a.indexOf('--key-env');
   const secret = process.env[kei >= 0 ? a[kei + 1] : 'SCRAMBLE'];
   if (!secret && !noEnc) fail('SCRAMBLE key missing (refuses plaintext save; --no-encrypt for smoke only)');
@@ -711,22 +732,76 @@ if (process.argv[2] === 'decrypt'){
     });
     return { cov: cov.length, stats };
   }
-  let gptCover = 0, gptMixLamSel = -1, gptMixAccSel = 0, gptMixPplSel = 0, gptMixAcc = 0, gptMixPpl = 0;
+  let gptCover = 0, gptMixLamSel = -1, gptMixAccSel = 0, gptMixPplSel = 0, gptMixAcc = 0, gptMixPpl = 0, bestGlam = 0;
   if (MIX === 'gpt') {
     const gSel = gmixStats(selRows, '2000');
     let bestG = gSel.stats[0];
     for (const s of gSel.stats) if (s.ppl < bestG.ppl || (s.ppl === bestG.ppl && s.acc > bestG.acc)) bestG = s;
     const gRep = gmixStats(repRows, '2001');
     const gr = gRep.stats[LAMBDAS.indexOf(bestG.lam)];
-    gptCover = gRep.cov; gptMixLamSel = bestG.lam; gptMixAccSel = bestG.acc; gptMixPplSel = bestG.ppl; gptMixAcc = gr.acc; gptMixPpl = gr.ppl;
+    gptCover = gRep.cov; bestGlam = bestG.lam; gptMixLamSel = bestG.lam; gptMixAccSel = bestG.acc; gptMixPplSel = bestG.ppl; gptMixAcc = gr.acc; gptMixPpl = gr.ppl;
     console.log(`gmix select lam=${bestG.lam} acc=${bestG.acc.toFixed(3)} ppl=${bestG.ppl.toFixed(2)} cover=${gSel.cov}/${selRows.length} report acc=${gr.acc.toFixed(3)} ppl=${gr.ppl.toFixed(2)} cover=${gRep.cov}/${repRows.length}`);
   }
   // H4 adaptive-lambda: per-query L_i = lam * retrieval confidence (top-1 weight fraction g).
   // Known kNN-LM pathology (TO-VERIFY cites): fixed lam lets noisy retrieval hurt the tokens
   // it cannot help; adaptive lam collapses toward bigram where retrieval is diffuse.
   // Cheap: reuses hopBiDists rows, no extra recall passes.
-  function adaStats(rows){
-    return LAMBDAS.map(lam => {
+  // Hedge/experts (Freund & Schapire): weights over the LAMBDAS grid fit ONLINE on the
+  // select stream (loss = -log p(trueNext), eta=1), FROZEN, then the mixture predicts the
+  // report stream — same select/report discipline as lam. Regret-bounded by construction.
+  let hedgeAcc = 0, hedgePpl = 0, hedgeNeff = 0;
+  if (HEDGE === '1'){
+    const NE = LAMBDAS.length;
+    const hw = new Array(NE).fill(1 / NE);
+    for (const qr of selRows){
+      let tot = 0;
+      for (let e = 0; e < NE; e++){
+        const lam = LAMBDAS[e];
+        hw[e] *= Math.max(lam * qr.hd[qr.trueNext] + (1 - lam) * qr.bd[qr.trueNext], 1e-12);
+        tot += hw[e];
+      }
+      for (let e = 0; e < NE; e++) hw[e] /= tot;
+    }
+    let ent = 0;
+    for (let e = 0; e < NE; e++) if (hw[e] > 0) ent -= hw[e] * Math.log(hw[e]);
+    hedgeNeff = Math.exp(ent);
+    let acc = 0, ce = 0;
+    for (const qr of repRows){
+      const mix = new Float64Array(V);
+      for (let e = 0; e < NE; e++){ const lam = LAMBDAS[e]; for (let c = 0; c < V; c++) mix[c] += hw[e] * (lam * qr.hd[c] + (1 - lam) * qr.bd[c]); }
+      let bp = -1, bci = 0;
+      for (let c = 0; c < V; c++) if (mix[c] > bp){ bp = mix[c]; bci = c; }
+      if (bci === qr.trueNext) acc++;
+      ce += -Math.log(Math.max(mix[qr.trueNext], 1e-12));
+    }
+    hedgeAcc = acc / repRows.length; hedgePpl = Math.exp(ce / repRows.length);
+    console.log(`hedge frozen-w acc=${hedgeAcc.toFixed(3)} ppl=${hedgePpl.toFixed(2)} neff=${hedgeNeff.toFixed(2)}`);
+  }
+  // Paired-testing machinery (faster verdicts without quality loss): per-query hit
+  // strings on the REPORT stream. Same seeds => same queries across jobs, so collects
+  // can run exact McNemar tests (higher power per query than eyeballing aggregates).
+  let repHitI = '', repHitB = '', repHitG = '';
+  {
+    for (const qr of repRows){
+      let bp = -1, bci = 0;
+      for (let c = 0; c < V; c++) if (qr.bd[c] > bp){ bp = qr.bd[c]; bci = c; }
+      repHitB += bci === qr.trueNext ? '1' : '0';
+      const lam = bestLam.lam;
+      let ip = -1, ici = 0;
+      for (let c = 0; c < V; c++){ const p = lam * qr.hd[c] + (1 - lam) * qr.bd[c]; if (p > ip){ ip = p; ici = c; } }
+      repHitI += ici === qr.trueNext ? '1' : '0';
+      if (MIX === 'gpt'){
+        const g = gptMap.get(qr.pos);
+        if (g && g['2001']){
+          const gd = g['2001'], gl = bestGlam;
+          let gp = -1, gci = 0;
+          for (let c = 0; c < V; c++){ const p = gl * qr.hd[c] + (1 - gl) * gd[c]; if (p > gp){ gp = p; gci = c; } }
+          repHitG += gci === qr.trueNext ? '1' : '0';
+        } else repHitG += 'x';
+      }
+    }
+  }
+  function adaStats(rows){    return LAMBDAS.map(lam => {
       let acc = 0, ce = 0;
       for (const qr of rows){
         const conf = ADA === '2' ? (1 - qr.h) : qr.g; // H5 entropy mode: sharp store->lam, diffuse store->bigram
@@ -848,6 +923,9 @@ if (process.argv[2] === 'decrypt'){
   // equation, different series: exact brute-force is linear-O(P·D) (whole) or
   // linear-O(P·W²) (maxsim); H9 product-key/ANN will register 'sublinear' here.
   metrics.costClass = SCORE === 'maxsim' ? 'linear-O(P·W²)' : 'linear-O(P·D)';
+  metrics.sparse = parseInt(SPARSE) || 0; metrics.hedge = parseInt(HEDGE) || 0;
+  metrics.hedgeAcc = hedgeAcc; metrics.hedgePpl = hedgePpl; metrics.hedgeNeff = hedgeNeff;
+  metrics.repHitI = repHitI; metrics.repHitB = repHitB; metrics.repHitG = repHitG;
   metrics.hopAccRep = repStats[LAMBDAS.length - 1].acc; metrics.hopPplRep = repStats[LAMBDAS.length - 1].ppl;
   metrics.biAccRep = repStats[0].acc; metrics.biPplRep = repStats[0].ppl;
   metrics.gateTau = GATE; metrics.pruneKeep = KEEP; metrics.Peff = P; metrics.gatedFracRep = gatedFracRep;

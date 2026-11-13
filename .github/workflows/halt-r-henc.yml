@@ -61,6 +61,15 @@ jobs:
         run: |
           node - <<'EOF' | tee /tmp/henc.md
           const fs = require('node:fs'), path = require('node:path');
+          const mcP = (b, c) => { const n = b + c; if (!n) return 1; const lo = Math.min(b, c);
+            let pk = Math.pow(0.5, n), tail = pk;
+            for (let k = 1; k <= lo; k++){ pk = pk * (n - k + 1) / k; tail += pk; }
+            return Math.min(1, 2 * tail); };
+          const pair = (s1, s2) => { let b = 0, c = 0;
+            for (let i = 0; i < Math.min(s1.length, s2.length); i++){ const a = s1[i], d = s2[i];
+              if (a === 'x' || d === 'x') continue;
+              if (a === '1' && d === '0') b++; if (a === '0' && d === '1') c++; }
+            return {b, c, p: mcP(b, c)}; };
           const files = [];
           const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
           walk('models');
@@ -74,7 +83,8 @@ jobs:
             const e = runs.find(r => r.corpus === corpus && r.W === W && r.proj === 'enc');
             if (!s || !e) continue;
             const wins = e.interpLambda > 0 && e.interpPpl < s.interpPpl;
-            md += '\n' + corpus + ' W' + W + ': sup ' + s.interpPpl.toFixed(2) + ' vs enc ' + e.interpPpl.toFixed(2) + ' (lam*=' + e.interpLambda + '). ' + (wins ? 'VERDICT: LEARNING CRACKS IT (encoder beats scales).' : 'VERDICT: SCALES STAND (learning adds nothing).') + '\n';
+            const pm = pair(e.repHitI || '', s.repHitI || '');
+            md += '\n' + corpus + ' W' + W + ': sup ' + s.interpPpl.toFixed(2) + ' vs enc ' + e.interpPpl.toFixed(2) + ' (lam*=' + e.interpLambda + '). McNemar enc-vs-sup b/c=' + pm.b + '/' + pm.c + ' p=' + pm.p.toFixed(3) + (pm.p < 0.05 ? ' SIGNIFICANT.' : '.') + ' ' + (wins && pm.p < 0.05 ? 'VERDICT: LEARNING CRACKS IT (encoder beats scales).' : wins ? 'VERDICT: leans encoder, not significant.' : 'VERDICT: SCALES STAND (learning adds nothing).') + '\n';
           }
           process.stdout.write(md);
           EOF

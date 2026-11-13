@@ -62,6 +62,15 @@ jobs:
         run: |
           node - <<'EOF' | tee /tmp/sup2.md
           const fs = require('node:fs'), path = require('node:path');
+          const mcP = (b, c) => { const n = b + c; if (!n) return 1; const lo = Math.min(b, c);
+            let pk = Math.pow(0.5, n), tail = pk;
+            for (let k = 1; k <= lo; k++){ pk = pk * (n - k + 1) / k; tail += pk; }
+            return Math.min(1, 2 * tail); };
+          const pair = (s1, s2) => { let b = 0, c = 0;
+            for (let i = 0; i < Math.min(s1.length, s2.length); i++){ const a = s1[i], d = s2[i];
+              if (a === 'x' || d === 'x') continue;
+              if (a === '1' && d === '0') b++; if (a === '0' && d === '1') c++; }
+            return {b, c, p: mcP(b, c)}; };
           const files = [];
           const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
           try { walk('models'); } catch (e) { console.log('no metrics found'); process.exit(0); }
@@ -80,8 +89,9 @@ jobs:
             const f = g.find(m => m.proj === 'sup'), b = g.find(m => m.proj === 'sup2');
             if (!f || !b) continue;
             const d = f.interpPpl - b.interpPpl;
-            md += '\n' + corpus + ' W' + W + ': sup interpPpl=' + f.interpPpl.toFixed(2) + ' vs sup2 interpPpl=' + b.interpPpl.toFixed(2) + ' d=' + d.toFixed(2) + '. ';
-            md += (d > 0 ? 'VERDICT: SCALES-REFINE WINS.' : 'VERDICT: sup HOLDS (finer scales add nothing).');
+            const pm = pair(b.repHitI || '', f.repHitI || '');
+            md += '\n' + corpus + ' W' + W + ': sup interpPpl=' + f.interpPpl.toFixed(2) + ' vs sup2 interpPpl=' + b.interpPpl.toFixed(2) + ' d=' + d.toFixed(2) + ' McNemar b/c=' + pm.b + '/' + pm.c + ' p=' + pm.p.toFixed(3) + (pm.p < 0.05 ? ' SIGNIFICANT.' : '.') + ' ';
+            md += (d > 0 && pm.p < 0.05 ? 'VERDICT: SCALES-REFINE WINS.' : d > 0 ? 'VERDICT: leans sup2, not significant.' : 'VERDICT: sup HOLDS (finer scales add nothing).');
             if (b.memN !== undefined) md += ' Memorized ' + b.memAcc.toFixed(2) + ' (n=' + b.memN + ') vs novel ' + b.novAcc.toFixed(2) + ' (n=' + b.novN + ').';
             md += '\n';
           }

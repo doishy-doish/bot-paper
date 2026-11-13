@@ -61,6 +61,15 @@ jobs:
         run: |
           node - <<'EOF' | tee /tmp/gmix.md
           const fs = require('node:fs'), path = require('node:path');
+          const mcP = (b, c) => { const n = b + c; if (!n) return 1; const lo = Math.min(b, c);
+            let pk = Math.pow(0.5, n), tail = pk;
+            for (let k = 1; k <= lo; k++){ pk = pk * (n - k + 1) / k; tail += pk; }
+            return Math.min(1, 2 * tail); };
+          const pair = (s1, s2) => { let b = 0, c = 0;
+            for (let i = 0; i < Math.min(s1.length, s2.length); i++){ const a = s1[i], d = s2[i];
+              if (a === 'x' || d === 'x') continue;
+              if (a === '1' && d === '0') b++; if (a === '0' && d === '1') c++; }
+            return {b, c, p: mcP(b, c)}; };
           const files = [];
           const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
           walk('models');
@@ -71,8 +80,9 @@ jobs:
           for (const m of runs) {
             const g = base.runs.find(r => r.corpus === m.corpus);
             md += '| ' + m.corpus + ' | ' + m.interpAcc.toFixed(3) + '/' + m.interpPpl.toFixed(2) + ' | ' + m.gptMixAcc.toFixed(3) + '/' + m.gptMixPpl.toFixed(2) + ' (' + m.gptMixLamSel + ') | ' + g.q100.acc.toFixed(3) + '/' + g.q100.ppl.toFixed(2) + ' | ' + g.params + ' | ' + m.gptCover + '/' + m.trials + ' |\n';
-            const win = m.gptMixPpl < m.interpPpl ? 'VERDICT: MIX WINS (hop+GPT beats hop+bigram).' : 'VERDICT: MIX FAILS (bigram mix stands).';
-            md += '\n' + m.corpus + ' W32: ' + win + '\n';
+            const win = m.gptMixPpl < m.interpPpl;
+            const pm = (m.repHitG || '').includes('x') || !(m.repHitG || '').length ? null : pair(m.repHitG, m.repHitI || '');
+            md += '\n' + m.corpus + ' W32: ' + (pm ? ('McNemar gmix-vs-bigrammix b/c=' + pm.b + '/' + pm.c + ' p=' + pm.p.toFixed(3) + (pm.p < 0.05 ? ' SIGNIFICANT. ' : '. ')) : 'McNemar skipped (partial cover). ') + (win && (!pm || pm.p < 0.05) ? 'VERDICT: MIX WINS (hop+GPT beats hop+bigram).' : win ? 'VERDICT: leans mix, not significant.' : 'VERDICT: MIX FAILS (bigram mix stands).') + '\n';
           }
           process.stdout.write(md);
           EOF
