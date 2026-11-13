@@ -72,6 +72,20 @@ def main():
     n_params = sum(p.numel() for p in model.parameters())
     opt = torch.optim.AdamW(model.parameters(), lr=3e-4 if a.n_embd <= 64 else 2e-4)
     rng = lcg(a.seed)
+    # FRONTIER SCALE-DOWN (2022-2023 standard practice, written down 2026-11-13):
+    # never full-val inside the loop. Fixed 2048-window subset for checkpoints, full val once at end.
+    # Old code ran full-val (~19M tokens for ts block-64) every 250 iters = ~97% of wall time in eval.
+    eval_rng = lcg(999)
+    n_eval_sub = 2048
+    eval_pos = [int(next(eval_rng) * (len(val_ids) - a.block - 1)) for _ in range(n_eval_sub)]
+    eval_vx = torch.stack([val_ids[p:p + a.block] for p in eval_pos])
+    eval_vy = torch.stack([val_ids[p + 1:p + a.block + 1] for p in eval_pos])
+    try:
+        model = torch.compile(model)  # PyTorch 2.0 (2023 frontier), free 1.5-2x where supported
+        compiled = True
+    except Exception:
+        compiled = False
+    print('compile=%s evalSub=%d' % (compiled, n_eval_sub), flush=True)
     model.train()
     best = None
     for it in range(1, a.iters + 1):
@@ -86,21 +100,13 @@ def main():
         opt.zero_grad()
         loss.backward()
         opt.step()
-        if it % 250 == 0 or it == a.iters:
+        if it % 500 == 0 or it == a.iters:
             model.eval()
             with torch.no_grad():
-                tot_ce, tot_n = 0.0, 0
-                for s in range(0, len(val_ids) - a.block - 1, 512):
-                    e = min(s + 512, len(val_ids) - a.block - 1)
-                    if e <= s:
-                        break
-                    vx = torch.stack([val_ids[p:p + a.block] for p in range(s, e)])
-                    vy = torch.stack([val_ids[p + 1:p + a.block + 1] for p in range(s, e)])
-                    lg = model(vx)
-                    tot_ce += nn.functional.cross_entropy(lg.reshape(-1, V), vy.reshape(-1), reduction='sum').item()
-                    tot_n += (e - s) * a.block
-                vppl = math.exp(tot_ce / tot_n)
-            print('iter %d/%d loss=%.4f valPpl=%.2f sec=%d' % (it, a.iters, loss.item(), vppl, time.time() - t0), flush=True)
+                lg = model(eval_vx)
+                sub_ce = nn.functional.cross_entropy(lg.reshape(-1, V), eval_vy.reshape(-1)).item()
+                vppl = math.exp(sub_ce)
+            print('iter %d/%d loss=%.4f subPpl=%.2f sec=%d' % (it, a.iters, loss.item(), vppl, time.time() - t0), flush=True)
             if best is None or vppl < best[0]:
                 best = (vppl, {k: v.detach().clone() for k, v in model.state_dict().items()})
             model.train()
