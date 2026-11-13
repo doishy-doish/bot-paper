@@ -17,7 +17,7 @@ jobs:
       matrix:
         corpus: [shakes, ts]
         W: [8, 16]
-        ada: [0, 1]
+        ada: [0, 1, 2]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -67,17 +67,20 @@ jobs:
           const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
           runs.sort((a, b) => (a.corpus < b.corpus ? -1 : 1) || a.W - b.W || a.ada - b.ada);
           fs.writeFileSync('/tmp/h4.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'h4-adaptive-lambda', runs}, null, 1));
-          let md = '# H4: per-query adaptive lambda (L=lam*confidence) vs fixed lambda\nSame protocol as H1 (P=8000, H=256, no-gen, sup only). Adaptive scales each query by top-1 weight fraction g.\n\n| corpus | W | mode | interp acc/ppl (lam*) |\n|---|---|---|---|\n';
+          let md = '# H4/H5: per-query adaptive lambda vs fixed lambda\nSame protocol as H1 (P=8000, H=256, no-gen, sup only). ada=1 scales by top-1 fraction g; ada=2 scales by negentropy (1-h).\n\n| corpus | W | mode | interp acc/ppl (lam*) |\n|---|---|---|---|\n';
           for (const m of runs) {
-            const v = m.ada === 1 ? (m.adaAcc.toFixed(3) + '/' + m.adaPpl.toFixed(2) + ' (' + m.adaLamSel + ')') : (m.interpAcc.toFixed(3) + '/' + m.interpPpl.toFixed(2) + ' (' + m.interpLambda + ')');
-            md += '| ' + m.corpus + ' | ' + m.W + ' | ' + (m.ada === 1 ? 'adaptive' : 'fixed') + ' | ' + v + ' |\n';
+            const v = m.ada === 0 ? (m.interpAcc.toFixed(3) + '/' + m.interpPpl.toFixed(2) + ' (' + m.interpLambda + ')') : (m.adaAcc.toFixed(3) + '/' + m.adaPpl.toFixed(2) + ' (' + m.adaLamSel + ')');
+            md += '| ' + m.corpus + ' | ' + m.W + ' | ' + (m.ada === 0 ? 'fixed' : (m.ada === 1 ? 'adapt-g' : 'adapt-ent')) + ' | ' + v + ' |\n';
           }
           for (const corpus of ['shakes', 'ts']) for (const W of [8, 16]) {
             const g = runs.filter(m => m.corpus === corpus && m.W === W);
             if (g.length < 2) continue;
-            const f = g.find(m => m.ada === 0), a = g.find(m => m.ada === 1);
-            md += '\n' + corpus + ' W' + W + ': fixed interpPpl=' + f.interpPpl.toFixed(2) + ' vs adaptive interpPpl=' + a.adaPpl.toFixed(2) + '. ';
-            md += (a.adaPpl < f.interpPpl) ? 'VERDICT: ADAPTIVE WINS (per-query confidence fixes the dilution).' : 'VERDICT: ADAPTIVE FAILS (fixed lam still better; dilution is not confidence-shaped).';
+            const f = g.find(m => m.ada === 0);
+            const bs = g.filter(m => m.ada !== 0).sort((x, y) => x.adaPpl - y.adaPpl);
+            if (!bs.length) continue;
+            const b = bs[0], bl = b.ada === 1 ? 'g' : 'ent';
+            md += '\n' + corpus + ' W' + W + ': fixed interpPpl=' + f.interpPpl.toFixed(2) + ' vs best-adaptive(' + bl + ') interpPpl=' + b.adaPpl.toFixed(2) + '. ';
+            md += (b.adaPpl < f.interpPpl) ? 'VERDICT: ADAPTIVE WINS via ' + bl + '.' : 'VERDICT: ADAPTIVE FAILS (dilution is neither top1- nor entropy-shaped).';
             md += '\n';
           }
           process.stdout.write(md);
