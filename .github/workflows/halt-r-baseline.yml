@@ -38,6 +38,8 @@ jobs:
           wc -c /tmp/corpus.txt
       - name: train + eval tiny transformer (CPU)
         run: python3 halt-r/torch-tiny-lm.py --data /tmp/corpus.txt --out out/base-${{ matrix.corpus }} --tag ${{ matrix.corpus }} --iters ${{ matrix.iters }}
+      - name: export GGUF (sloppy-python to rust track)
+        run: python3 halt-r/export-gguf.py --pt out/base-${{ matrix.corpus }}/tiny.pt --vocab out/base-${{ matrix.corpus }}/vocab.json --ref out/base-${{ matrix.corpus }}/ref-${{ matrix.corpus }}.json --out out/base-${{ matrix.corpus }}/tinygpt-${{ matrix.corpus }}.gguf
       - uses: actions/upload-artifact@v4
         with:
           name: lm-base-${{ matrix.corpus }}
@@ -88,9 +90,16 @@ jobs:
           for r in runs:
               md += '| %s | %d | %d | %d | %.3f/%.2f | %.3f/%.2f |\n' % (r['corpus'], r['params'], r['iters'], r['trainSec'], r['fullVal']['acc'], r['fullVal']['ppl'], r['q100']['acc'], r['q100']['ppl'])
           open('halt-r/baseline.md', 'w').write(md)
+          import shutil, os
+          for f in glob.glob('models/*/tinygpt-*.gguf') + glob.glob('models/*/ref-*.json'):
+              shutil.copy(f, 'halt-r/' + f.split('/')[-1])
+          for f in glob.glob('models/*/vocab.json'):
+              tag = os.path.basename(os.path.dirname(f)).replace('lm-base-', '')
+              shutil.copy(f, 'halt-r/vocab-%s.json' % tag)
+          print('gguf artifacts copied')
           print(md)
           EOF
-            git add halt-r/baseline.json halt-r/baseline.md
+            git add halt-r/baseline.json halt-r/baseline.md halt-r/tinygpt-*.gguf halt-r/ref-*.json halt-r/vocab-*.json
             git diff --cached --quiet && exit 0
             git commit -m "halt-r: tiny-transformer baseline $(date -u +%F)"
             git push origin main && exit 0
