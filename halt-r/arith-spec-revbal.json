@@ -1,0 +1,48 @@
+{
+ "task": "arith-revbal-corpus",
+ "trainSums": "0-150",
+ "testSums": "0-150 disjoint unseen pairs",
+ "reversed": true,
+ "balanced": [
+  1620,
+  1620,
+  1620
+ ],
+ "testBalanced": [
+  180,
+  180,
+  180
+ ],
+ "lineFmt": "%02d+%02d=REV(%03d)\\n",
+ "lineLen": 10,
+ "trainLines": 4860,
+ "testLines": 540,
+ "totalChars": 54000,
+ "cut": 48600,
+ "boundaryExact": true,
+ "vocab": [
+  "\n",
+  "+",
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "="
+ ],
+ "V": 13,
+ "W": 16,
+ "testWindows": 5385,
+ "matchFree": 1.0,
+ "cites": [
+  "2310.16028",
+  "2307.03381"
+ ],
+ "shaFull": "5328c328d278064751ba8ac3d5d69fbe4988fb93051b1de2efc71c7a8f866b57",
+ "shaTrain": "748b6cb2d08b6edccf84eb39307b68a416f3c1199bf140c15fb0ec9bb32be711"
+}
