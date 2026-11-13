@@ -1,12 +1,15 @@
 PROMPT: "o;\nFor I have bi"
 HOP: "     ih                                                                                             "
 BI: "nd the the the the the the the the the the the the the the the the the the the the the the the the t"
+CITE: []
 ---
 PROMPT: "If he be credulo"
 HOP: "  a                                                                                                 "
 BI: "ur the the the the the the the the the the the the the the the the the the the the the the the the t"
+CITE: []
 ---
 PROMPT: " too? Good Lord,"
 HOP: "                                                                                                    "
 BI: " the the the the the the the the the the the the the the the the the the the the the the the the the"
+CITE: []
 ---

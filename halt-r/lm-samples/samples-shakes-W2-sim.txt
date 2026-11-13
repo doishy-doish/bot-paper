@@ -1,12 +1,15 @@
 PROMPT: "r "
 HOP: "the the the the the the the the the the the the the the the the the the the the the the the the the "
 BI: "the the the the the the the the the the the the the the the the the the the the the the the the the "
+CITE: []
 ---
 PROMPT: "be"
 HOP: " the the the the the the the the the the the the the the the the the the the the the the the the the"
 BI: " the the the the the the the the the the the the the the the the the the the the the the the the the"
+CITE: []
 ---
 PROMPT: "d,"
 HOP: " and the the the the the the the the the the the the the the the the the the the the the the the the"
 BI: " the the the the the the the the the the the the the the the the the the the the the the the the the"
+CITE: []
 ---
