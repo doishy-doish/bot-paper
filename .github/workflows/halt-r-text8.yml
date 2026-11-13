@@ -1,0 +1,105 @@
+name: halt-r-text8
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/lm-shakespeare.mjs'
+      - '.github/workflows/halt-r-text8.yml'
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: text8 W${{ matrix.W }} ${{ matrix.proj }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        W: [2, 4, 8]
+        proj: [raw, sim]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fetch text8 (public research text, 100MB)
+        run: |
+          curl -sSL http://mattmahoney.net/dc/text8.zip -o /tmp/text8.zip
+          python3 -c "import zipfile; zipfile.ZipFile('/tmp/text8.zip').extractall('/tmp')"
+          wc -c /tmp/text8
+          head -c 200 /tmp/text8
+      - name: bench
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/text8 --out out/text8-W${{ matrix.W }}-${{ matrix.proj }} --tag text8 --W ${{ matrix.W }} --P 8000 --trials 100 --proj ${{ matrix.proj }} --H 256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lm-text8-W${{ matrix.W }}-${{ matrix.proj }}
+          path: out/text8-W${{ matrix.W }}-${{ matrix.proj }}/
+          retention-days: 30
+  collect:
+    name: collect text8 bench
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: lm-text8-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: merge table with BPC
+        run: |
+          node - <<'EOF'
+          const fs = require('node:fs'), path = require('node:path');
+          const bpc = p => Math.log2(p);
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          walk('models');
+          const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+          runs.sort((a, b) => a.W - b.W || (a.proj < b.proj ? -1 : 1));
+          fs.writeFileSync('halt-r/text8-bench.json', JSON.stringify({date: new Date().toISOString().slice(0, 10), task: 'text8-pilot', target2018: 1.18, runs}, null, 1));
+          let md = '# HALT-R on text8 (pilot, measured, CI)\nSame protocol as lm bench (90/10 split, seed-2000 q100, P=8000). BPC = log2(char-ppl). 2018-era target: Al-Rfou et al. 12L Transformer 44M = 1.18 BPC on text8 (Transformer-XL Table 3).\n\n| W | proj | hop acc/ppl/BPC | bigram acc/ppl/BPC | interp acc/ppl/BPC (locked lam) |\n|---|---|---|---|---|\n';
+          for (const r of runs) md += '| ' + r.W + ' | ' + r.proj + ' | ' + r.acc.toFixed(3) + '/' + r.ppl.toFixed(2) + '/' + bpc(r.ppl).toFixed(2) + ' | ' + r.bigramAcc.toFixed(3) + '/' + r.bigramPpl.toFixed(2) + '/' + bpc(r.bigramPpl).toFixed(2) + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + '/' + bpc(r.interpPpl).toFixed(2) + ' (lam=' + r.interpLambda + ') |\n';
+          const best = runs.reduce((a, b) => (bpc(b.interpPpl) < bpc(a.interpPpl) ? b : a), runs[0]);
+          md += '\nBest interp BPC: ' + bpc(best.interpPpl).toFixed(2) + ' (W=' + best.W + ' ' + best.proj + ') vs 2018 target 1.18. Gap: ' + (bpc(best.interpPpl) - 1.18).toFixed(2) + ' bpc.\n';
+          fs.writeFileSync('halt-r/text8-bench.md', md);
+          console.log(md);
+          EOF
+          cat halt-r/text8-bench.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit bench back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            node - <<'EOF'
+          const fs = require('node:fs'), path = require('node:path');
+          const bpc = p => Math.log2(p);
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          walk('models');
+          const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+          runs.sort((a, b) => a.W - b.W || (a.proj < b.proj ? -1 : 1));
+          fs.writeFileSync('halt-r/text8-bench.json', JSON.stringify({date: new Date().toISOString().slice(0, 10), task: 'text8-pilot', target2018: 1.18, runs}, null, 1));
+          let md = '# HALT-R on text8 (pilot, measured, CI)\nSame protocol as lm bench (90/10 split, seed-2000 q100, P=8000). BPC = log2(char-ppl). 2018-era target: Al-Rfou et al. 12L Transformer 44M = 1.18 BPC on text8 (Transformer-XL Table 3).\n\n| W | proj | hop acc/ppl/BPC | bigram acc/ppl/BPC | interp acc/ppl/BPC (locked lam) |\n|---|---|---|---|---|\n';
+          for (const r of runs) md += '| ' + r.W + ' | ' + r.proj + ' | ' + r.acc.toFixed(3) + '/' + r.ppl.toFixed(2) + '/' + bpc(r.ppl).toFixed(2) + ' | ' + r.bigramAcc.toFixed(3) + '/' + r.bigramPpl.toFixed(2) + '/' + bpc(r.bigramPpl).toFixed(2) + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + '/' + bpc(r.interpPpl).toFixed(2) + ' (lam=' + r.interpLambda + ') |\n';
+          const best = runs.reduce((a, b) => (bpc(b.interpPpl) < bpc(a.interpPpl) ? b : a), runs[0]);
+          md += '\nBest interp BPC: ' + bpc(best.interpPpl).toFixed(2) + ' (W=' + best.W + ' ' + best.proj + ') vs 2018 target 1.18. Gap: ' + (bpc(best.interpPpl) - 1.18).toFixed(2) + ' bpc.\n';
+          fs.writeFileSync('halt-r/text8-bench.md', md);
+          console.log(md);
+          EOF
+            git add halt-r/text8-bench.json halt-r/text8-bench.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: text8 pilot $(date -u +%F)"
+            git push origin main && exit 0
+            sleep 10
+          done
+          exit 1
