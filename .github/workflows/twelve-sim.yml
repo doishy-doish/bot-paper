@@ -73,8 +73,12 @@ jobs:
       - name: official 42-check suite, both entries (via test/run.sh = build + start + test)
         run: |
           set +e
-          echo "=== kensac test/run.sh ==="
+          echo "=== kensac test/run.sh (native codegen; portable retry on SIGILL hosts) ==="
           bash upstream/test/run.sh upstream/submissions/rust-iouring-kensac 2>&1 | tee /tmp/test-kensac.log; K_RC=${PIPESTATUS[0]}
+          if [ "$K_RC" != 0 ] && grep -q "SIGILL" /tmp/test-kensac.log; then
+            echo "--- native codegen faults on this host; rebuilding kensac portable ---"
+            RUSTFLAGS="-C target-cpu=x86-64" bash upstream/test/run.sh upstream/submissions/rust-iouring-kensac 2>&1 | tee /tmp/test-kensac.log; K_RC=${PIPESTATUS[0]}
+          fi
           echo "kensac test exit: $K_RC"
           echo "=== rust-direct test/run.sh ==="
           bash upstream/test/run.sh self/twelve/submissions/rust-direct-challenger 2>&1 | tee /tmp/test-ours.log; O_RC=${PIPESTATUS[0]}
