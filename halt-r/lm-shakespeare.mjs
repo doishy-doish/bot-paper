@@ -112,6 +112,12 @@ if (process.argv[2] === 'decrypt'){
   if (CAPAB !== 'none' && CAPAB !== 'canary') fail('usage: --capab none|canary');
   const H6 = gv('h6', '0'); // reframed consolidate-wins logistic gate (0=off bit-identical, 1=on)
   if (H6 !== '0' && H6 !== '1') fail('usage: --h6 0|1');
+  const PEN = parseFloat(gv('pen', '0')); // H10 degeneration penalty (0=off bit-identical)
+  if (![0, 0.5, 1, 2].includes(PEN)) fail('usage: --pen 0|0.5|1|2');
+  const SPLIT = gv('split', '0'); // C5 memorized-vs-novel query split (0=off bit-identical, 1=report split)
+  if (SPLIT !== '0' && SPLIT !== '1') fail('usage: --split 0|1');
+  const PROV = gv('prov', '0'); // C3 provenance cites (0=off bit-identical, 1=attach top-3 store neighbors per sample)
+  if (PROV !== '0' && PROV !== '1') fail('usage: --prov 0|1');
   const kei = a.indexOf('--key-env');
   const secret = process.env[kei >= 0 ? a[kei + 1] : 'SCRAMBLE'];
   if (!secret && !noEnc) fail('SCRAMBLE key missing (refuses plaintext save; --no-encrypt for smoke only)');
@@ -162,7 +168,7 @@ if (process.argv[2] === 'decrypt'){
   let X = new Int8Array(P * D), next = new Uint8Array(P), spos = new Int32Array(P);
   let flopSteps = 0; // recall iterations actually executed (all phases) -> evalMflops
   const r = rng(SEED), q = new Float32Array(D);
-  if (PROJ === 'sup'){
+  if (PROJ === 'sup' || PROJ === 'sup2'){ // sup2: per-(position,char) scales (strict generalization of sup)
     // H1 learned encoder: positions that predict the label get bigger projection
     // magnitude, so dots are dominated by predictive (usually suffix) positions and
     // partial matches concentrate instead of diffusing. Same random-direction code
@@ -192,10 +198,29 @@ if (process.argv[2] === 'decrypt'){
     let aMean = 0; for (let k = 0; k < W; k++) aMean += aK[k]; aMean /= W;
     if (aMean > 1e-9){ for (let k = 0; k < W; k++) aK[k] /= aMean; }
     else { for (let k = 0; k < W; k++) aK[k] = 1; } // no signal: fall back to sim
+    let A2 = null; // sup2: per-(position,char) predictive scales (W*V params, seconds, same code path)
+    if (PROJ === 'sup2'){
+      A2 = new Float64Array(W * V);
+      for (let k = 0; k < W; k++){
+        const groups = new Map();
+        for (let s = 0; s < P; s++){ const c = trainIds[spos[s] + k], n = next[s]; let g = groups.get(c); if (!g){ g = new Uint32Array(V); groups.set(c, g); } g[n]++; }
+        for (let c = 0; c < V; c++){
+          const g = groups.get(c);
+          if (!g){ A2[k * V + c] = 0; continue; }
+          let b = 0; for (let cc = 1; cc < V; cc++) if (g[cc] > g[b]) b = cc;
+          let correct = 0, tot = 0;
+          for (let s = 0; s < P; s++){ if (trainIds[spos[s] + k] === c){ tot++; if (b === next[s]) correct++; } }
+          A2[k * V + c] = tot ? Math.max(0, correct / tot - 1 / V) : 0;
+        }
+      }
+      let m2 = 0; for (let i = 0; i < A2.length; i++) m2 += A2[i]; m2 /= A2.length;
+      if (m2 > 1e-9){ for (let i = 0; i < A2.length; i++) A2[i] /= m2; } else { for (let i = 0; i < A2.length; i++) A2[i] = 1; }
+      console.log('sup2 scales computed mean-normed');
+    }
     const rr3 = rng(SEED + 3), inv = Math.sqrt(1 / Din);
     M = new Float32Array(Din * H);
     for (let k = 0; k < W; k++) for (let c = 0; c < V; c++){
-      const sc = aK[k], base = (k * V + c) * H;
+      const sc = PROJ === 'sup2' ? A2[k * V + c] : aK[k], base = (k * V + c) * H;
       for (let h = 0; h < H; h++) M[base + h] = gauss1(rr3) * inv * sc;
     }
     console.log(`sup position scales a=[${[...aK].map(a => a.toFixed(2)).join(' ')}]`);
@@ -243,6 +268,36 @@ if (process.argv[2] === 'decrypt'){
   function scoreW(qq, qIds, qpos, beta, maxS){
     if (SCORE === 'maxsim') return maxsimW(qIds, qpos, beta);
     return recallW(qq, X, P, D, beta, maxS);
+  }
+  let trainWinSet = null; // C5: memorized-vs-novel split (descriptive, no lam mix)
+  function wkey(ids, p){
+    let h1 = 0, h2 = 0;
+    for (let k = 0; k < W; k++){ h1 = (h1 * 131 + ids[p + k]) % 1000000007; h2 = (h2 * 137 + ids[p + k]) % 1000000009; }
+    return h1 + ':' + h2;
+  }
+  function splitEval(n, seed){
+    if (!trainWinSet){
+      trainWinSet = new Set();
+      for (let p = 0; p + W <= trainIds.length; p++) trainWinSet.add(wkey(trainIds, p));
+    }
+    const rr = rng(seed), qq = new Float32Array(D);
+    let mA = 0, mB = 0, mN = 0, nA = 0, nB = 0, nN = 0;
+    for (let t = 0; t < n; t++){
+      const pos = Math.floor(rr() * (valIds.length - W - 1));
+      const mem = trainWinSet.has(wkey(valIds, pos));
+      featPM(valIds, pos, qq);
+      const { w, steps: sS } = scoreW(qq, valIds, pos, runQueries.beta, 12);
+      flopSteps += sS;
+      const dist = predictNext(w, next, V);
+      const trueNext = valIds[pos + W];
+      const ha = argmax(dist) === trueNext ? 1 : 0;
+      const off = valIds[pos + W - 1] * V;
+      let best = 0, bestC = -1;
+      for (let c = 0; c < V; c++){ const cc = bi[off + c] + 1; if (cc > bestC){ bestC = cc; best = c; } }
+      const ba = best === trueNext ? 1 : 0;
+      if (mem){ mA += ha; mB += ba; mN++; } else { nA += ha; nB += ba; nN++; }
+    }
+    return { memAcc: mN ? mA / mN : -1, memBi: mN ? mB / mN : -1, memN: mN, novAcc: nN ? nA / nN : -1, novBi: nN ? nB / nN : -1, novN: nN };
   }
   const runQueries = (n, seed) => {
     const rr = rng(seed), dist_sum = { acc: 0, ce: 0, steps: 0 };
@@ -300,6 +355,7 @@ if (process.argv[2] === 'decrypt'){
   runQueries.beta = BSEL === 'ppl' ? bestPpl.beta : best.beta;
   const e = runQueries(TR, 2000);
   const biE = bigramEval(TR, 2000), uniE = uniEval(TR, 2000);
+  const split = SPLIT === '1' ? splitEval(TR, 2002) : null;
   // ---- C1+C2 canary: implanted facts, edit flips, exact forget (store surgery, zero gradients) ----
   let canRemember = -1, canEditFlip = -1, canForgetLeak = -1, collatBase = -1, collatAfter = -1;
   if (CAPAB === 'canary'){
@@ -362,6 +418,19 @@ if (process.argv[2] === 'decrypt'){
     for (let i = 0; i < V; i++) dist[i] /= (tot + 1e-12 * V);
     return dist;
   }
+  function penPick(dist, win){ // H10: degeneration penalty over top-8 (PEN=0 -> plain argmax)
+    if (PEN === 0) return argmax(dist);
+    const K = Math.min(8, V);
+    const order = [...Array(V).keys()].sort((a, b) => dist[b] - dist[a]).slice(0, K);
+    let bi = order[0], bs = -1e30;
+    for (const c of order){
+      let rep = 0;
+      for (let k = 0; k < W; k++) if (win[k] === c){ rep = 1; break; }
+      const s = Math.log(dist[c] + 1e-12) - PEN * rep;
+      if (s > bs){ bs = s; bi = c; }
+    }
+    return bi;
+  }
   function genText(kind, pos){
     const win = new Array(W);
     for (let k = 0; k < W; k++) win[k] = valIds[pos + k];
@@ -369,7 +438,7 @@ if (process.argv[2] === 'decrypt'){
     for (let k = 0; k < W; k++) text += chars[win[k]];
     for (let t = 0; t < GEN_LEN; t++){
       let ni;
-      if (kind === 'hop') ni = argmax(distOf(win));
+      if (kind === 'hop'){ const dd = distOf(win); ni = penPick(dd, win); }
       else { const row = win[W - 1] * V; let b = -1; ni = 0; for (let c = 0; c < V; c++){ if (bi[row + c] > b){ b = bi[row + c]; ni = c; } } }
       text += chars[ni];
       for (let k = 0; k < W - 1; k++) win[k] = win[k + 1];
@@ -386,13 +455,26 @@ if (process.argv[2] === 'decrypt'){
     let ok = 0; for (const wd of words) if (wordSet.has(wd)) ok++;
     return { rep4: total ? 1 - grams.size / total : 0, wordValid: words.length ? ok / words.length : 0 };
   }
+  function provCite(pos){ // C3: top-3 retrieved store windows for the prompt, as text
+    const cqq = new Float32Array(D);
+    featPM(valIds, pos, cqq);
+    const rw = scoreW(cqq, valIds, pos, runQueries.beta, 12);
+    const idx = [...Array(P).keys()].sort((a, b) => rw.w[b] - rw.w[a]).slice(0, 3);
+    return idx.map(s => {
+      const sp = spos[s];
+      let str = '';
+      for (let k = 0; k < W + 1 && sp + k < trainIds.length; k++) str += chars[trainIds[sp + k]];
+      return { store: s, next: chars[next[s]], ctx: str };
+    });
+  }
   const samples = [];
   let qRep = 0, qWord = 0;
   for (const pos of gPrompts){
     const h = genText('hop', pos), b = genText('bi', pos);
     const qh = qualityOf(h);
     qRep += qh.rep4; qWord += qh.wordValid;
-    samples.push({ prompt: h.slice(0, W), hop: h.slice(W), bi: b.slice(W) });
+    const cite = (PROV === '1') ? provCite(pos) : [];
+    samples.push({ prompt: h.slice(0, W), hop: h.slice(W), bi: b.slice(W), cite });
   }
   const quality = { n: GEN_N, genLen: GEN_LEN, rep4: GEN_N ? qRep / GEN_N : 0, wordValid: GEN_N ? qWord / GEN_N : 0 };
   console.log(`gen rep4=${quality.rep4.toFixed(3)} wordValid=${quality.wordValid.toFixed(3)}`);
@@ -577,10 +659,12 @@ if (process.argv[2] === 'decrypt'){
   metrics.biAccRep = repStats[0].acc; metrics.biPplRep = repStats[0].ppl;
   metrics.gateTau = GATE; metrics.pruneKeep = KEEP; metrics.Peff = P; metrics.gatedFracRep = gatedFracRep;
   metrics.canRemember = canRemember; metrics.canEditFlip = canEditFlip; metrics.canForgetLeak = canForgetLeak; metrics.collatBase = collatBase; metrics.collatAfter = collatAfter; metrics.canaryN = CAPAB === 'canary' ? 20 : 0;
+  metrics.pen = PEN; metrics.prov = parseInt(PROV) || 0;
+  if (split){ metrics.memAcc = split.memAcc; metrics.memBiAcc = split.memBi; metrics.memN = split.memN; metrics.novAcc = split.novAcc; metrics.novBiAcc = split.novBi; metrics.novN = split.novN; }
   metrics.h6 = parseInt(H6) || 0; metrics.h6LamSel = h6LamSel; metrics.h6AccSel = h6AccSel; metrics.h6PplSel = h6PplSel; metrics.h6Acc = h6Acc; metrics.h6Ppl = h6Ppl; metrics.h6AUC = h6AUC;
   writeFileSync(outDir + '/metrics.json', JSON.stringify(metrics));
   let stxt = '';
-  for (const s of samples) stxt += 'PROMPT: ' + JSON.stringify(s.prompt) + '\nHOP: ' + JSON.stringify(s.hop) + '\nBI: ' + JSON.stringify(s.bi) + '\n---\n';
+  for (const s of samples) stxt += 'PROMPT: ' + JSON.stringify(s.prompt) + '\nHOP: ' + JSON.stringify(s.hop) + '\nBI: ' + JSON.stringify(s.bi) + '\nCITE: ' + JSON.stringify(s.cite || []) + '\n---\n';
   writeFileSync(outDir + '/samples-' + tag + '-W' + W + '-' + PROJ + '.txt', stxt);
   if (failN){ console.log('lm-shakespeare: ' + failN + ' FAILURES'); process.exit(1); }
   console.log('lm-shakespeare: benched');
