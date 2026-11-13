@@ -12,6 +12,7 @@ import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'node:
 
 const DEF = { W: 32, P: 8000, trials: 100, probeN: 10 };
 const BETAS = [0.1, 0.3, 1.0, 3.0, 10.0];
+const LAMBDAS = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0]; // kNN-LM (Khandelwal et al 2019) interpolation grid
 const SEED = 7;
 function fail(m){ console.error('FAIL ' + m); process.exit(1); }
 function rng(seed){ let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
@@ -264,6 +265,52 @@ if (process.argv[2] === 'decrypt'){
   console.log(`gen rep4=${quality.rep4.toFixed(3)} wordValid=${quality.wordValid.toFixed(3)}`);
   let failN = 0;
   const check = (n, c, d) => { console.log(((c ? 'PASS' : 'FAIL') + ' ' + n + ' ' + (d || ''))); if (!c) failN++; };
+  // kNN-LM prescription (Khandelwal et al 2019, "Generalization through Memorization"):
+  // the paper's SOTA (-2.9 ppl, no extra training) comes from p = lam*p_kNN + (1-lam)*p_LM,
+  // NOT from head-to-head comparison. We never mixed -- this rung adds the lam sweep.
+  // Select lam on seed-2000 queries (same stream as the main eval above, so comparable),
+  // lock it, report on fresh seed-2001 queries (honest generalization).
+  function hopBiDists(n, seed){
+    const rr = rng(seed), qq = new Float32Array(D);
+    const rows = [];
+    for (let t = 0; t < n; t++){
+      const pos = Math.floor(rr() * (valIds.length - W - 1));
+      featPM(valIds, pos, qq);
+      const trueNext = valIds[pos + W];
+      const { w } = recallW(qq, X, P, D, best.beta, 12);
+      const hd = predictNext(w, next, V);
+      let tot = 0; for (let i = 0; i < V; i++) tot += hd[i];
+      for (let i = 0; i < V; i++) hd[i] /= (tot + 1e-12 * V);
+      const off = valIds[pos + W - 1] * V;
+      let rtot = V; for (let c = 0; c < V; c++) rtot += bi[off + c];
+      const bd = new Float64Array(V);
+      for (let c = 0; c < V; c++) bd[c] = (bi[off + c] + 1) / rtot;
+      rows.push({ hd, bd, trueNext });
+    }
+    return rows;
+  }
+  function lamStats(rows){
+    return LAMBDAS.map(lam => {
+      let acc = 0, ce = 0;
+      for (const qr of rows){
+        let bp = -1, bci = 0;
+        for (let c = 0; c < V; c++){ const p = lam * qr.hd[c] + (1 - lam) * qr.bd[c]; if (p > bp){ bp = p; bci = c; } }
+        if (bci === qr.trueNext) acc++;
+        ce += -Math.log(Math.max(lam * qr.hd[qr.trueNext] + (1 - lam) * qr.bd[qr.trueNext], 1e-12));
+      }
+      return { lam, acc: acc / rows.length, ppl: Math.exp(ce / rows.length) };
+    });
+  }
+  const selRows = hopBiDists(TR, 2000), selStats = lamStats(selRows);
+  let bestLam = selStats[0];
+  for (const s of selStats) if (s.acc > bestLam.acc || (s.acc === bestLam.acc && s.ppl < bestLam.ppl)) bestLam = s;
+  const repRows = hopBiDists(TR, 2001), repStats = lamStats(repRows);
+  const repLocked = repStats[LAMBDAS.indexOf(bestLam.lam)];
+  console.log('interp select: ' + selStats.map(s => `lam=${s.lam} acc=${s.acc.toFixed(3)} ppl=${s.ppl.toFixed(2)}`).join(' | '));
+  console.log(`interp locked lam=${bestLam.lam} report acc=${repLocked.acc.toFixed(3)} ppl=${repLocked.ppl.toFixed(2)}`);
+  // pairing self-check: lam=0 must reproduce the bigram eval exactly (same queries, same Laplace)
+  check('interp-lam0==bigram-select', Math.abs(selStats[0].acc - biE.acc) < 1e-9 && Math.abs(selStats[0].ppl - biE.ppl) / biE.ppl < 1e-9,
+    `lam0 ${selStats[0].acc.toFixed(3)}/${selStats[0].ppl.toFixed(2)} vs bigram ${biE.acc.toFixed(3)}/${biE.ppl.toFixed(2)}`);
   // hard gate = machinery (the exact stored KEY must win, whatever its label);
   // labels are ambiguous under duplicate contexts, so patterns — not next-chars — are the check
   {
@@ -291,6 +338,12 @@ if (process.argv[2] === 'decrypt'){
   if (!noEnc){ const wj = JSON.stringify(encryptWrap(plain, secret)); writeFileSync(outDir + '/model.bin.enc', wj); encBytes = wj.length; console.log(`enc bytes=${encBytes} sha256=${sum}`); }
   else { writeFileSync(outDir + '/model.bin', plain); console.log(`plain-smoke bytes=${plain.length} sha256=${sum}`); }
   const metrics = { ...meta, trials: TR, flips: 'n/a-nextchar', acc: e.acc, ppl: e.ppl, avgSteps: e.avgSteps, bigramAcc: biE.acc, bigramPpl: biE.ppl, unigramAcc: uniE.acc, unigramPpl: uniE.ppl, beatUni: e.acc > uniE.acc, quality, buildMs, evalMs, maxRssMB: rssMB(), encBytes, evalScope: 'heldout-val' };
+  // kNN-LM interpolation results (locked-lam report on fresh seed-2001 queries)
+  metrics.interpLambda = bestLam.lam;
+  metrics.interpAccSel = bestLam.acc; metrics.interpPplSel = bestLam.ppl;
+  metrics.interpAcc = repLocked.acc; metrics.interpPpl = repLocked.ppl;
+  metrics.hopAccRep = repStats[LAMBDAS.length - 1].acc; metrics.hopPplRep = repStats[LAMBDAS.length - 1].ppl;
+  metrics.biAccRep = repStats[0].acc; metrics.biPplRep = repStats[0].ppl;
   writeFileSync(outDir + '/metrics.json', JSON.stringify(metrics));
   let stxt = '';
   for (const s of samples) stxt += 'PROMPT: ' + JSON.stringify(s.prompt) + '\nHOP: ' + JSON.stringify(s.hop) + '\nBI: ' + JSON.stringify(s.bi) + '\n---\n';
