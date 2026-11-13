@@ -1,0 +1,100 @@
+name: halt-r-psweep-sup
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/halt-r-psweep-sup.yml'
+permissions:
+  contents: write
+jobs:
+  sweep:
+    name: psweep-sup ${{ matrix.corpus }} W${{ matrix.W }} P${{ matrix.P }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        corpus: [shakes, ts]
+        W: [8, 16]
+        P: [2000, 8000, 32000, 128000]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fetch corpus
+        run: |
+          if [ "${{ matrix.corpus }}" = ts ]; then
+            curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          else
+            curl -sSL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus.txt
+          fi
+          wc -c /tmp/corpus.txt
+          head -c 200 /tmp/corpus.txt
+      - name: sweep bench sup only
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/psweep-sup-${{ matrix.corpus }}-W${{ matrix.W }}-P${{ matrix.P }} --tag ${{ matrix.corpus }} --W ${{ matrix.W }} --P ${{ matrix.P }} --trials 100 --proj sup --H 256 --no-gen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: psweep-sup-${{ matrix.corpus }}-W${{ matrix.W }}-P${{ matrix.P }}
+          path: out/psweep-sup-${{ matrix.corpus }}-W${{ matrix.W }}-P${{ matrix.P }}/
+          retention-days: 30
+  collect:
+    name: collect P-sweep under sup
+    needs: sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: psweep-sup-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: slope table plus verdict
+        run: |
+          node - <<'EOF' | tee /tmp/psweep-sup.md
+          const fs = require('node:fs'), path = require('node:path');
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          try { walk('models'); } catch (e) { console.log('no metrics found'); process.exit(0); }
+          const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+          runs.sort((a, b) => (a.corpus < b.corpus ? -1 : 1) || a.W - b.W || a.P0 - b.P0);
+          fs.writeFileSync('/tmp/psweep-sup.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'psweep-under-sup', runs}, null, 1));
+          let md = '# P-sweep under sup: does the learned encoder keep moving the wall with P?\nSame protocol as H1 (90/10 split, seed-2000 select, seed-2001 locked report, H=256, no-gen), proj=sup only.\n\n| corpus | W | P | interp acc/ppl (lam*) | hop acc/ppl | bigram acc/ppl |\n|---|---|---|---|---|---|\n';
+          for (const m of runs) md += '| ' + m.corpus + ' | ' + m.W + ' | ' + m.P0 + ' | ' + m.interpAcc.toFixed(3) + '/' + m.interpPpl.toFixed(2) + ' (' + m.interpLambda + ') | ' + m.acc.toFixed(3) + '/' + m.ppl.toFixed(2) + ' | ' + m.bigramAcc.toFixed(3) + '/' + m.bigramPpl.toFixed(2) + ' |\n';
+          for (const corpus of ['shakes', 'ts']) for (const W of [8, 16]) {
+            const g = runs.filter(m => m.corpus === corpus && m.W === W).sort((x, y) => x.P0 - y.P0);
+            if (g.length < 2) continue;
+            const lo = g[0], hi = g[g.length - 1];
+            const slope = (hi.interpPpl - lo.interpPpl) / (Math.log2(hi.P0) - Math.log2(lo.P0));
+            md += '\n' + corpus + ' W' + W + ': P' + lo.P0 + ' interpPpl=' + lo.interpPpl.toFixed(2) + ' -> P' + hi.P0 + ' interpPpl=' + hi.interpPpl.toFixed(2) + ' (slope ' + slope.toFixed(3) + '/dbl, max-P lam*=' + hi.interpLambda + '). ';
+            md += (hi.interpPpl < lo.interpPpl && hi.interpLambda > 0) ? 'VERDICT: WALL KEEPS MOVING with P under sup.' : 'VERDICT: PLATEAU under sup at this range.';
+            md += '\n';
+          }
+          process.stdout.write(md);
+          EOF
+          cp /tmp/psweep-sup.json halt-r/psweep-sup.json
+          cp /tmp/psweep-sup.md halt-r/psweep-sup.md
+          cat halt-r/psweep-sup.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit sweep back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/psweep-sup.json halt-r/psweep-sup.json
+            cp /tmp/psweep-sup.md halt-r/psweep-sup.md
+            git add halt-r/psweep-sup.json halt-r/psweep-sup.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: psweep under sup $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
