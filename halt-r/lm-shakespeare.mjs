@@ -108,6 +108,8 @@ if (process.argv[2] === 'decrypt'){
   const ADA = gv('ada', '0'); // H4/H5 adaptive-lambda: 0=off(fixed lam), 1=L=lam*top1frac(g), 2=L=lam*negentropy(1-h); default 0
   const SCORE = gv('score', 'whole'); // H7: whole=window dot (default, bit-identical), maxsim=late-interaction sum_j max_k match
   if (SCORE !== 'whole' && SCORE !== 'maxsim') fail('usage: --score whole|maxsim');
+  const CAPAB = gv('capab', 'none'); // C-rungs: none (default, bit-identical), canary=C1 edit + C2 exact-forget (three phases, one job)
+  if (CAPAB !== 'none' && CAPAB !== 'canary') fail('usage: --capab none|canary');
   const kei = a.indexOf('--key-env');
   const secret = process.env[kei >= 0 ? a[kei + 1] : 'SCRAMBLE'];
   if (!secret && !noEnc) fail('SCRAMBLE key missing (refuses plaintext save; --no-encrypt for smoke only)');
@@ -296,6 +298,47 @@ if (process.argv[2] === 'decrypt'){
   runQueries.beta = BSEL === 'ppl' ? bestPpl.beta : best.beta;
   const e = runQueries(TR, 2000);
   const biE = bigramEval(TR, 2000), uniE = uniEval(TR, 2000);
+  // ---- C1+C2 canary: implanted facts, edit flips, exact forget (store surgery, zero gradients) ----
+  let canRemember = -1, canEditFlip = -1, canForgetLeak = -1, collatBase = -1, collatAfter = -1;
+  if (CAPAB === 'canary'){
+    const CAN_N = 20, crr = rng(SEED + 99);
+    const cfreq = new Uint32Array(V);
+    for (let i = 0; i < trainIds.length; i++) cfreq[trainIds[i]]++;
+    let rare = 0, common = 0;
+    for (let c = 1; c < V; c++){ if (cfreq[c] < cfreq[rare]) rare = c; if (cfreq[c] > cfreq[common]) common = c; }
+    const cidx = [];
+    for (let i = 0; i < CAN_N; i++) cidx.push(Math.floor(crr() * P));
+    const cpos = cidx.map(s => spos[s]);
+    const cqq = new Float32Array(D), cbeta = runQueries.beta;
+    const askRare = (positions) => {
+      let hit = 0;
+      for (const p of positions){
+        featPM(trainIds, p, cqq);
+        const rw = scoreW(cqq, trainIds, p, cbeta, 12);
+        if (argmax(predictNext(rw.w, next, V)) === rare) hit++;
+      }
+      return hit / positions.length;
+    };
+    collatBase = e.acc;
+    for (const s of cidx) next[s] = rare;
+    canRemember = askRare(cpos);
+    for (let i = 0; i < CAN_N / 2; i++) next[cidx[i]] = common;
+    let flip = 0;
+    for (let i = 0; i < CAN_N / 2; i++){
+      featPM(trainIds, cpos[i], cqq);
+      const rw = scoreW(cqq, trainIds, cpos[i], cbeta, 12);
+      if (argmax(predictNext(rw.w, next, V)) === common) flip++;
+    }
+    canEditFlip = flip / (CAN_N / 2);
+    const drop = new Set(cidx);
+    const keep = [];
+    for (let s = 0; s < P; s++) if (!drop.has(s)) keep.push(s);
+    const cX = new Int8Array(keep.length * D), cN = new Uint8Array(keep.length), cS = new Int32Array(keep.length);
+    keep.forEach((s, i) => { cX.set(X.subarray(s * D, s * D + D), i * D); cN[i] = next[s]; cS[i] = spos[s]; });
+    X = cX; next = cN; spos = cS; P = keep.length;
+    canForgetLeak = askRare(cpos);
+    collatAfter = runQueries(TR, 2000).acc;
+  }
   const evalMs = Date.now() - t1;
   console.log(`eval beta=${best.beta} hopfield acc=${e.acc.toFixed(3)} ppl=${e.ppl.toFixed(2)} steps=${e.avgSteps.toFixed(2)} ms=${evalMs} rss=${rssMB()}MB`);
   console.log(`base bigram acc=${biE.acc.toFixed(3)} ppl=${biE.ppl.toFixed(2)} | unigram acc=${uniE.acc.toFixed(3)} ppl=${uniE.ppl.toFixed(2)}`);
@@ -432,6 +475,7 @@ if (process.argv[2] === 'decrypt'){
   }
   const gatedFracRep = repRows.length ? repRows.filter(qr => qr.g < GATE).length / repRows.length : 0;
   console.log(`gate tau=${GATE} pruneKeep=${KEEP} Peff=${P} gatedFrac=${gatedFracRep.toFixed(3)}`);
+  if (CAPAB === 'canary') console.log(`canary remember=${canRemember.toFixed(2)} editFlip=${canEditFlip.toFixed(2)} forgetLeak=${canForgetLeak.toFixed(3)} collat=${collatBase.toFixed(3)}->${collatAfter.toFixed(3)}`);
   console.log('interp select: ' + selStats.map(s => `lam=${s.lam} acc=${s.acc.toFixed(3)} ppl=${s.ppl.toFixed(2)}`).join(' | '));
   console.log(`interp locked lam=${bestLam.lam} report acc=${repLocked.acc.toFixed(3)} ppl=${repLocked.ppl.toFixed(2)}`);
   // pairing self-check: lam=0 must reproduce the bigram eval exactly (same queries, same Laplace)
@@ -475,6 +519,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.hopAccRep = repStats[LAMBDAS.length - 1].acc; metrics.hopPplRep = repStats[LAMBDAS.length - 1].ppl;
   metrics.biAccRep = repStats[0].acc; metrics.biPplRep = repStats[0].ppl;
   metrics.gateTau = GATE; metrics.pruneKeep = KEEP; metrics.Peff = P; metrics.gatedFracRep = gatedFracRep;
+  metrics.canRemember = canRemember; metrics.canEditFlip = canEditFlip; metrics.canForgetLeak = canForgetLeak; metrics.collatBase = collatBase; metrics.collatAfter = collatAfter; metrics.canaryN = CAPAB === 'canary' ? 20 : 0;
   writeFileSync(outDir + '/metrics.json', JSON.stringify(metrics));
   let stxt = '';
   for (const s of samples) stxt += 'PROMPT: ' + JSON.stringify(s.prompt) + '\nHOP: ' + JSON.stringify(s.hop) + '\nBI: ' + JSON.stringify(s.bi) + '\n---\n';
