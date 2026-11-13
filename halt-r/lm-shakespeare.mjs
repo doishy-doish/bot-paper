@@ -118,6 +118,11 @@ if (process.argv[2] === 'decrypt'){
   if (SPLIT !== '0' && SPLIT !== '1') fail('usage: --split 0|1');
   const PROV = gv('prov', '0'); // C3 provenance cites (0=off bit-identical, 1=attach top-3 store neighbors per sample)
   if (PROV !== '0' && PROV !== '1') fail('usage: --prov 0|1');
+  const TOK = gv('tok', 'char'); // H12 subword pilot: char (default, bit-identical), bpe (256 learned merges on train head)
+  if (TOK !== 'char' && TOK !== 'bpe') fail('usage: --tok char|bpe');
+  const MIX = gv('mix', 'none'); // gmix: none (default, bit-identical), gpt (mix hop + tiny-GPT dists from q100-gpt file, joined on pos)
+  if (MIX !== 'none' && MIX !== 'gpt') fail('usage: --mix none|gpt');
+  const GPTQ = gv('gptq', null);
   const kei = a.indexOf('--key-env');
   const secret = process.env[kei >= 0 ? a[kei + 1] : 'SCRAMBLE'];
   if (!secret && !noEnc) fail('SCRAMBLE key missing (refuses plaintext save; --no-encrypt for smoke only)');
@@ -125,13 +130,78 @@ if (process.argv[2] === 'decrypt'){
   const raw = readFileSync(dataPath, 'utf8');
   const cut = Math.floor(raw.length * 0.9);
   const train = raw.slice(0, cut), val = raw.slice(cut);
-  const { chars, toI, V } = buildVocab(train);
-  if (V > 200) fail('vocab blowup V=' + V);
-  console.log(`corpus chars=${raw.length} train=${train.length} val=${val.length} V=${V} W=${W} P=${P} proj=${PROJ}${PROJ === 'raw' ? '' : ' H=' + H} score=${SCORE}`);
-  const trainIds = new Uint16Array(train.length);
-  for (let i = 0; i < train.length; i++) trainIds[i] = toI[train[i]];
-  const valIds = new Uint16Array(val.length);
-  for (let i = 0; i < val.length; i++) valIds[i] = toI[val[i]] !== undefined ? toI[val[i]] : 0;
+  let { chars, toI, V } = buildVocab(train);
+  // H12 BPE pilot (JS-only, zero new deps, deterministic): learn 256 merges on the
+  // train head (500K chars, representative + 6x cheaper), encode full train/val.
+  // Primary verdict is internal (W16 lam* + interp vs base under the SAME tokenizer),
+  // so id-level ppl needs no cross-tokenizer BPC conversion in this pilot.
+  function learnBPE(sample, nMerges) {
+    const ch = [...new Set(sample)].sort();
+    const vocab = [...ch], pairRank = new Map();
+    let toks = [...sample].map(c => ch.indexOf(c));
+    const merges = [];
+    for (let m = 0; m < nMerges; m++) {
+      const counts = new Map(), firstSeen = new Map();
+      let order = 0;
+      for (let i = 0; i + 1 < toks.length; i++) {
+        const k = toks[i] * 1000003 + toks[i + 1];
+        if (!counts.has(k)) { counts.set(k, 0); firstSeen.set(k, order++); }
+        counts.set(k, counts.get(k) + 1);
+      }
+      let bk = -1, bc = 1;
+      for (const [k, c] of counts) {
+        if (c > bc || (c === bc && firstSeen.get(k) < firstSeen.get(bk))) { bc = c; bk = k; }
+      }
+      if (bk < 0) break;
+      const a = Math.floor(bk / 1000003), b = bk % 1000003;
+      const id = vocab.length;
+      vocab.push(vocab[a] + vocab[b]);
+      merges.push([a, b, id]);
+      const nt = [];
+      for (let i = 0; i < toks.length; i++) {
+        if (i + 1 < toks.length && toks[i] === a && toks[i + 1] === b) { nt.push(id); i++; }
+        else nt.push(toks[i]);
+      }
+      toks = nt;
+    }
+    return { vocab, merges };
+  }
+  function bpeEncode(text, ch, merges) {
+    const ci = new Map();
+    ch.forEach((c, i) => { ci.set(c, i); });
+    let toks = [...text].map(c => (ci.has(c) ? ci.get(c) : 0));
+    for (const [a, b, id] of merges) {
+      const nt = [];
+      for (let i = 0; i < toks.length; i++) {
+        if (i + 1 < toks.length && toks[i] === a && toks[i + 1] === b) { nt.push(id); i++; }
+        else nt.push(toks[i]);
+      }
+      toks = nt;
+    }
+    return toks;
+  }
+  let bpeMerges = 0, bpeMeanLen = 0;
+  let trainIds = null, valIds = null;
+  if (TOK === 'bpe') {
+    const bt0 = Date.now();
+    const { vocab, merges } = learnBPE(train.slice(0, 500000), 256);
+    bpeMerges = merges.length;
+    const ch0 = [...new Set(train)].sort();
+    const tIds = bpeEncode(train, ch0, merges), vIds = bpeEncode(val, ch0, merges);
+    let tl = 0;
+    for (const id of tIds) tl += vocab[id].length;
+    bpeMeanLen = tl / tIds.length;
+    console.log(`bpe merges=${bpeMerges} V=${vocab.length} meanTokLen=${bpeMeanLen.toFixed(2)} learnMs=${Date.now() - bt0}`);
+    chars = vocab; V = vocab.length;
+    trainIds = Uint32Array.from(tIds); valIds = Uint32Array.from(vIds);
+  } else {
+    trainIds = new Uint16Array(train.length);
+    for (let i = 0; i < train.length; i++) trainIds[i] = toI[train[i]];
+    valIds = new Uint16Array(val.length);
+    for (let i = 0; i < val.length; i++) valIds[i] = toI[val[i]] !== undefined ? toI[val[i]] : 0;
+  }
+  if (V > 2000) fail('vocab blowup V=' + V);
+  console.log(`corpus chars=${raw.length} train=${train.length} val=${val.length} V=${V} W=${W} P=${P} proj=${PROJ}${PROJ === 'raw' ? '' : ' H=' + H} score=${SCORE} tok=${TOK}${TOK === 'bpe' ? ' merges=' + bpeMerges : ''}`);
   // baselines on full train
   const uni = new Float64Array(V);
   for (let i = 0; i < trainIds.length; i++) uni[trainIds[i]]++;
@@ -139,6 +209,22 @@ if (process.argv[2] === 'decrypt'){
   const uniPred = argmax(uni);
   const bi = new Float64Array(V * V);
   for (let i = 0; i + 1 < trainIds.length; i++) bi[trainIds[i] * V + trainIds[i + 1]]++;
+  let gptMap = null; // gmix: pos -> {2000: probs, 2001: probs} from the tiny-GPT q100 streams
+  if (MIX === 'gpt') {
+    if (!GPTQ) fail('usage: --mix gpt needs --gptq <q100-gpt-tag.json>');
+    const gj = JSON.parse(readFileSync(GPTQ, 'utf8'));
+    if (gj.V !== V) fail('gptq V mismatch ' + gj.V + ' vs ' + V + ' (same corpus required)');
+    gptMap = new Map();
+    for (const s of ['2000', '2001']) {
+      const st = gj.streams[s];
+      if (!st) fail('gptq missing stream ' + s);
+      for (const q of st.queries) {
+        if (!gptMap.has(q.pos)) gptMap.set(q.pos, {});
+        gptMap.get(q.pos)[s] = q.probs;
+      }
+    }
+    console.log(`gmix gptq streams=2000,2001 entries=${gptMap.size}`);
+  }
   // store: seeded sampled train contexts (raw one-hot or SimHash-projected bits)
   const t0 = Date.now();
   const Din = W * V;
@@ -150,8 +236,8 @@ if (process.argv[2] === 'decrypt'){
     const rr2 = rng(SEED + 1), inv = Math.sqrt(1 / Din);
     for (let i = 0; i < M.length; i++) M[i] = gauss1(rr2) * inv;
   }
-  function featPM(ids, pos, out){ // ±1 features, length D
-    if (PROJ === 'sim' || PROJ === 'sup'){
+  function featPM(ids, pos, out){ // ±1 features, length D (FIX: was sim|sup only — sup2 scored raw garbage; now every projected PROJ shares the path)
+    if (PROJ !== 'raw'){
       for (let h = 0; h < H; h++) out[h] = 0;
       for (let k = 0; k < W; k++){
         const base = (k * V + ids[pos + k]) * H;
@@ -168,6 +254,7 @@ if (process.argv[2] === 'decrypt'){
   let X = new Int8Array(P * D), next = new Uint8Array(P), spos = new Int32Array(P);
   let flopSteps = 0; // recall iterations actually executed (all phases) -> evalMflops
   const r = rng(SEED), q = new Float32Array(D);
+  let encLossFirst = 0, encLossLast = 0; // trunk contrastive metrics (0 unless proj=enc)
   if (PROJ === 'sup' || PROJ === 'sup2'){ // sup2: per-(position,char) scales (strict generalization of sup)
     // H1 learned encoder: positions that predict the label get bigger projection
     // magnitude, so dots are dominated by predictive (usually suffix) positions and
@@ -225,6 +312,76 @@ if (process.argv[2] === 'decrypt'){
     }
     console.log(`sup position scales a=[${[...aK].map(a => a.toFixed(2)).join(' ')}]`);
     console.log(`sup position scales a=[${[...aK].map(a => a.toFixed(2)).join(' ')}]`);
+    for (let s = 0; s < P; s++){
+      featPM(trainIds, spos[s], q);
+      for (let j = 0; j < D; j++) X[s * D + j] = q[j] > 0 ? 1 : 0;
+    }
+  } else if (PROJ === 'enc'){ // TRUNK: contrastive-learned encoder (JS, CPU-cheap, zero python)
+    // Same store positions as sup (SEED stream) for comparability; M starts from the
+    // sim distribution (SEED+3 stream) and moves by InfoNCE SGD (SEED+4 batches):
+    // same-next-char contexts attract, batch peers repel (temp 0.2). Sign bits after
+    // training keep the EXACT sim code path (featPM identical).
+    for (let s = 0; s < P; s++){
+      const pos = Math.floor(r() * (trainIds.length - W));
+      spos[s] = pos;
+      next[s] = trainIds[pos + W];
+    }
+    const rrE = rng(SEED + 3), invE = Math.sqrt(1 / Din);
+    M = new Float32Array(Din * H);
+    for (let i = 0; i < M.length; i++) M[i] = gauss1(rrE) * invE;
+    const EB = 128, ESTEPS = 100, ELR = 0.05, ET = 0.2;
+    const br = rng(SEED + 4);
+    const Z = new Float32Array(EB * H), G = new Float32Array(EB * H), Zn = new Float32Array(EB);
+    const eidx = new Uint32Array(EB);
+    for (let st = 0; st < ESTEPS; st++){
+      for (let i = 0; i < EB; i++) eidx[i] = Math.floor(br() * P);
+      for (let i = 0; i < EB; i++){
+        for (let h = 0; h < H; h++) Z[i * H + h] = 0;
+        for (let k = 0; k < W; k++){
+          const base = (k * V + trainIds[spos[eidx[i]] + k]) * H;
+          for (let h = 0; h < H; h++) Z[i * H + h] += M[base + h];
+        }
+        let s2 = 0;
+        for (let h = 0; h < H; h++) s2 += Z[i * H + h] * Z[i * H + h];
+        Zn[i] = Math.sqrt(s2) + 1e-9;
+      }
+      G.fill(0);
+      let loss = 0, pairs = 0;
+      for (let i = 0; i < EB; i++){
+        let m = -1e30;
+        const sims = new Float32Array(EB);
+        for (let j = 0; j < EB; j++){
+          if (j === i) continue;
+          let d = 0;
+          for (let h = 0; h < H; h++) d += Z[i * H + h] * Z[j * H + h];
+          sims[j] = d / (Zn[i] * Zn[j] * ET);
+          if (sims[j] > m) m = sims[j];
+        }
+        let t = 0;
+        const p = new Float32Array(EB);
+        for (let j = 0; j < EB; j++){ if (j === i) continue; p[j] = Math.exp(sims[j] - m); t += p[j]; }
+        if (!(t > 0)) continue;
+        for (let j = 0; j < EB; j++){ if (j === i) continue; p[j] /= t; }
+        let npos = 0;
+        for (let j = 0; j < EB; j++) if (j !== i && next[eidx[j]] === next[eidx[i]]) npos++;
+        if (!npos) continue;
+        pairs++;
+        for (let j = 0; j < EB; j++){
+          if (j === i) continue;
+          const y = (next[eidx[j]] === next[eidx[i]]) ? 1 / npos : 0;
+          loss += -y * Math.log(p[j] + 1e-12);
+          const dd = (p[j] - y) / (Zn[i] * Zn[j] * ET);
+          for (let h = 0; h < H; h++){ G[i * H + h] += dd * Z[j * H + h]; G[j * H + h] += dd * Z[i * H + h]; }
+        }
+      }
+      if (st === 0) encLossFirst = loss / Math.max(1, pairs);
+      if (st === ESTEPS - 1) encLossLast = loss / Math.max(1, pairs);
+      for (let i = 0; i < EB; i++) for (let k = 0; k < W; k++){
+        const base = (k * V + trainIds[spos[eidx[i]] + k]) * H;
+        for (let h = 0; h < H; h++) M[base + h] -= ELR * G[i * H + h];
+      }
+    }
+    console.log(`enc contrastive steps=${ESTEPS} loss ${encLossFirst.toFixed(3)}->${encLossLast.toFixed(3)}`);
     for (let s = 0; s < P; s++){
       featPM(trainIds, spos[s], q);
       for (let j = 0; j < D; j++) X[s * D + j] = q[j] > 0 ? 1 : 0;
@@ -513,7 +670,7 @@ if (process.argv[2] === 'decrypt'){
       const bd = new Float64Array(V);
       for (let c = 0; c < V; c++) bd[c] = (bi[off + c] + 1) / rtot;
       let be = 0; for (let c = 0; c < V; c++){ const p = bd[c]; if (p > 0) be -= p * Math.log(p); } be /= Math.log(V);
-      rows.push({ hd, bd, trueNext, g: wmax / (wsum || 1), h: ent, m: (wmax - w2) / (wsum || 1), k10: kth / (wsum || 1), cov, be });
+      rows.push({ pos, hd, bd, trueNext, g: wmax / (wsum || 1), h: ent, m: (wmax - w2) / (wsum || 1), k10: kth / (wsum || 1), cov, be });
     }
     return rows;
   }
@@ -537,6 +694,33 @@ if (process.argv[2] === 'decrypt'){
   for (const s of selStats) if (s.ppl < bestLam.ppl || (s.ppl === bestLam.ppl && s.acc > bestLam.acc)) bestLam = s;
   const repRows = hopBiDists(TR, 2001), repStats = lamStats(repRows);
   const repLocked = repStats[LAMBDAS.indexOf(bestLam.lam)];
+  // gmix: hop + tiny-GPT (the paper's actual prescription — kNN mixed with a real LM,
+  // not a bigram). Joined on pos: full coverage iff W == trainer block (32).
+  function gmixStats(rows, stream) {
+    const cov = rows.filter(qr => gptMap.has(qr.pos) && gptMap.get(qr.pos)[stream]);
+    const stats = LAMBDAS.map(lam => {
+      let acc = 0, ce = 0;
+      for (const qr of cov) {
+        const gd = gptMap.get(qr.pos)[stream];
+        let bp = -1, bci = 0;
+        for (let c = 0; c < V; c++) { const p = lam * qr.hd[c] + (1 - lam) * gd[c]; if (p > bp) { bp = p; bci = c; } }
+        if (bci === qr.trueNext) acc++;
+        ce += -Math.log(Math.max(lam * qr.hd[qr.trueNext] + (1 - lam) * gd[qr.trueNext], 1e-12));
+      }
+      return { lam, acc: cov.length ? acc / cov.length : 0, ppl: cov.length ? Math.exp(ce / cov.length) : 0 };
+    });
+    return { cov: cov.length, stats };
+  }
+  let gptCover = 0, gptMixLamSel = -1, gptMixAccSel = 0, gptMixPplSel = 0, gptMixAcc = 0, gptMixPpl = 0;
+  if (MIX === 'gpt') {
+    const gSel = gmixStats(selRows, '2000');
+    let bestG = gSel.stats[0];
+    for (const s of gSel.stats) if (s.ppl < bestG.ppl || (s.ppl === bestG.ppl && s.acc > bestG.acc)) bestG = s;
+    const gRep = gmixStats(repRows, '2001');
+    const gr = gRep.stats[LAMBDAS.indexOf(bestG.lam)];
+    gptCover = gRep.cov; gptMixLamSel = bestG.lam; gptMixAccSel = bestG.acc; gptMixPplSel = bestG.ppl; gptMixAcc = gr.acc; gptMixPpl = gr.ppl;
+    console.log(`gmix select lam=${bestG.lam} acc=${bestG.acc.toFixed(3)} ppl=${bestG.ppl.toFixed(2)} cover=${gSel.cov}/${selRows.length} report acc=${gr.acc.toFixed(3)} ppl=${gr.ppl.toFixed(2)} cover=${gRep.cov}/${repRows.length}`);
+  }
   // H4 adaptive-lambda: per-query L_i = lam * retrieval confidence (top-1 weight fraction g).
   // Known kNN-LM pathology (TO-VERIFY cites): fixed lam lets noisy retrieval hurt the tokens
   // it cannot help; adaptive lam collapses toward bigram where retrieval is diffuse.
@@ -655,6 +839,11 @@ if (process.argv[2] === 'decrypt'){
   metrics.interpLambda = bestLam.lam;
   metrics.interpAccSel = bestLam.acc; metrics.interpPplSel = bestLam.ppl;
   metrics.interpAcc = repLocked.acc; metrics.interpPpl = repLocked.ppl;
+  metrics.mix = MIX; metrics.gptCover = gptCover; metrics.gptMixLamSel = gptMixLamSel;
+  metrics.gptMixAccSel = gptMixAccSel; metrics.gptMixPplSel = gptMixPplSel;
+  metrics.gptMixAcc = gptMixAcc; metrics.gptMixPpl = gptMixPpl;
+  metrics.tok = TOK; metrics.bpeMerges = bpeMerges; metrics.bpeMeanLen = bpeMeanLen;
+  metrics.encLossFirst = encLossFirst; metrics.encLossLast = encLossLast;
   metrics.hopAccRep = repStats[LAMBDAS.length - 1].acc; metrics.hopPplRep = repStats[LAMBDAS.length - 1].ppl;
   metrics.biAccRep = repStats[0].acc; metrics.biPplRep = repStats[0].ppl;
   metrics.gateTau = GATE; metrics.pruneKeep = KEEP; metrics.Peff = P; metrics.gatedFracRep = gatedFracRep;

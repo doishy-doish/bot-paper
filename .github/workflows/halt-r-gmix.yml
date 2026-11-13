@@ -1,0 +1,96 @@
+name: halt-r-gmix
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/lm-shakespeare.mjs'
+      - '.github/workflows/halt-r-gmix.yml'
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: gmix ${{ matrix.corpus }} W32
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        corpus: [shakes, ts]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: check gptq present (baseline rev-2 must have landed)
+        run: test -f halt-r/q100-gpt-${{ matrix.corpus }}.json || (echo "FAIL missing halt-r/q100-gpt-${{ matrix.corpus }}.json - rerun after baseline rev-2 collects"; exit 1)
+      - name: fetch corpus (public domain / public research text)
+        run: |
+          if [ "${{ matrix.corpus }}" = ts ]; then
+            curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          else
+            curl -sSL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus.txt
+          fi
+          wc -c /tmp/corpus.txt
+      - name: bench hop+GPT mix (W32 = trainer block, full pos join)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/gmix-${{ matrix.corpus }} --tag ${{ matrix.corpus }} --W 32 --P 8000 --trials 100 --proj sup --H 256 --mix gpt --gptq halt-r/q100-gpt-${{ matrix.corpus }}.json --no-gen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gmix-${{ matrix.corpus }}
+          path: out/gmix-${{ matrix.corpus }}/
+          retention-days: 30
+  collect:
+    name: collect gmix verdict
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gmix-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: three-way verdict (hop+bigram vs hop+GPT vs GPT-alone)
+        run: |
+          node - <<'EOF' | tee /tmp/gmix.md
+          const fs = require('node:fs'), path = require('node:path');
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          walk('models');
+          const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+          const base = JSON.parse(fs.readFileSync('halt-r/baseline.json', 'utf8'));
+          fs.writeFileSync('/tmp/gmix.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'gmix-hop-plus-gpt', runs}, null, 1));
+          let md = '# gmix: hop + tiny-GPT (the paper\'s actual prescription)\nSame protocol, W32 = trainer block (full pos join). hop+bigram from lm-bench W32 rows; GPT-alone from baseline rev-2 q100.\n\n| corpus | hop+bigram acc/ppl | hop+GPT acc/ppl (lam*) | GPT-alone acc/ppl | cover |\n|---|---|---|---|---|\n';
+          for (const m of runs) {
+            const g = base.runs.find(r => r.corpus === m.corpus);
+            md += '| ' + m.corpus + ' | ' + m.interpAcc.toFixed(3) + '/' + m.interpPpl.toFixed(2) + ' | ' + m.gptMixAcc.toFixed(3) + '/' + m.gptMixPpl.toFixed(2) + ' (' + m.gptMixLamSel + ') | ' + g.q100.acc.toFixed(3) + '/' + g.q100.ppl.toFixed(2) + ' | ' + m.gptCover + '/' + m.trials + ' |\n';
+            const win = m.gptMixPpl < m.interpPpl ? 'VERDICT: MIX WINS (hop+GPT beats hop+bigram).' : 'VERDICT: MIX FAILS (bigram mix stands).';
+            md += '\n' + m.corpus + ' W32: ' + win + '\n';
+          }
+          process.stdout.write(md);
+          EOF
+          cp /tmp/gmix.json halt-r/gmix.json
+          cp /tmp/gmix.md halt-r/gmix.md
+          cat halt-r/gmix.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit gmix back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/gmix.json halt-r/gmix.json
+            cp /tmp/gmix.md halt-r/gmix.md
+            git add halt-r/gmix.json halt-r/gmix.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: gmix hop-plus-gpt $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1

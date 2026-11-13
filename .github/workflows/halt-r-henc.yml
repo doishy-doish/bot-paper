@@ -1,0 +1,98 @@
+name: halt-r-henc
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/lm-shakespeare.mjs'
+      - '.github/workflows/halt-r-henc.yml'
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: henc ${{ matrix.corpus }} W${{ matrix.W }} ${{ matrix.proj }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        corpus: [shakes, ts]
+        W: [8, 16]
+        proj: [sup, enc]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fetch corpus (public domain / public research text)
+        run: |
+          if [ "${{ matrix.corpus }}" = ts ]; then
+            curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          else
+            curl -sSL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus.txt
+          fi
+          wc -c /tmp/corpus.txt
+      - name: bench trunk (contrastive encoder vs sup control, JS-only)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/henc-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.proj }} --tag ${{ matrix.corpus }} --W ${{ matrix.W }} --P 8000 --trials 100 --proj ${{ matrix.proj }} --H 256 --no-gen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: henc-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.proj }}
+          path: out/henc-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.proj }}/
+          retention-days: 30
+  collect:
+    name: collect trunk verdict
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: henc-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: encoder-vs-scales verdict
+        run: |
+          node - <<'EOF' | tee /tmp/henc.md
+          const fs = require('node:fs'), path = require('node:path');
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          walk('models');
+          const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+          runs.sort((a, b) => (a.corpus < b.corpus ? -1 : 1) || a.W - b.W || (a.proj < b.proj ? -1 : 1));
+          fs.writeFileSync('/tmp/henc.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'henc-trunk', runs}, null, 1));
+          let md = '# H-enc: contrastive-learned encoder vs sup scales (measured, CI)\nSame protocol (P=8000, H=256, no-gen). enc: 100 SGD steps, batch 128, InfoNCE same-next attract (JS-only, zero python). sup rows are same-workflow controls.\n\n| corpus | W | proj | encLoss first->last | interp acc/ppl (lam*) |\n|---|---|---|---|---|\n';
+          for (const r of runs) md += '| ' + r.corpus + ' | ' + r.W + ' | ' + r.proj + ' | ' + r.encLossFirst.toFixed(3) + '->' + r.encLossLast.toFixed(3) + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + ' (' + r.interpLambda + ') |\n';
+          for (const corpus of ['shakes', 'ts']) for (const W of [8, 16]) {
+            const s = runs.find(r => r.corpus === corpus && r.W === W && r.proj === 'sup');
+            const e = runs.find(r => r.corpus === corpus && r.W === W && r.proj === 'enc');
+            if (!s || !e) continue;
+            const wins = e.interpLambda > 0 && e.interpPpl < s.interpPpl;
+            md += '\n' + corpus + ' W' + W + ': sup ' + s.interpPpl.toFixed(2) + ' vs enc ' + e.interpPpl.toFixed(2) + ' (lam*=' + e.interpLambda + '). ' + (wins ? 'VERDICT: LEARNING CRACKS IT (encoder beats scales).' : 'VERDICT: SCALES STAND (learning adds nothing).') + '\n';
+          }
+          process.stdout.write(md);
+          EOF
+          cp /tmp/henc.json halt-r/henc.json
+          cp /tmp/henc.md halt-r/henc.md
+          cat halt-r/henc.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit henc back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/henc.json halt-r/henc.json
+            cp /tmp/henc.md halt-r/henc.md
+            git add halt-r/henc.json halt-r/henc.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: henc trunk $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
