@@ -149,6 +149,22 @@ def main():
                    'arch': {'n_embd': a.n_embd, 'n_head': a.n_head, 'n_layer': a.n_layer},
                    'iters': a.iters, 'block': a.block, 'seed': a.seed, 'chars': len(raw),
                    'fullVal': full, 'q100': q100, 'trainSec': train_sec}, f)
+    # GGUF-track artifacts: raw weights (compile-prefix stripped), vocab, reference
+    # logits for Rust-twin parity (5 fixed contexts, full last-position logit vectors).
+    stripped = {(k[10:] if k.startswith('_orig_mod.') else k): v for k, v in best[1].items()}
+    torch.save(stripped, os.path.join(a.out, 'tiny.pt'))
+    with open(os.path.join(a.out, 'vocab.json'), 'w') as f:
+        json.dump({'vocab': vocab, 'V': V, 'block': a.block,
+                   'n_embd': a.n_embd, 'n_head': a.n_head, 'n_layer': a.n_layer}, f)
+    ref_rng, refs = lcg(1234), []
+    for _ in range(5):
+        pos = int(next(ref_rng) * (len(val_ids) - a.block - 1))
+        ctx = val_ids[pos:pos + a.block].unsqueeze(0)
+        lg = model(ctx)[0, -1].tolist()
+        refs.append({'ids': ctx[0].tolist(), 'logits': lg,
+                     'argmax': int(torch.tensor(lg).argmax())})
+    with open(os.path.join(a.out, 'ref-%s.json' % a.tag), 'w') as f:
+        json.dump({'tag': a.tag, 'refs': refs}, f)
     print('torch-tiny-lm: done')
 
 main()
