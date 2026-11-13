@@ -3,7 +3,8 @@ on:
   workflow_dispatch: {}
   push:
     paths:
-      - 'halt-r/torch-tiny-lm.py'
+      - 'halt-r/train-tiny-lm.py'
+      - 'halt-r/export-gguf.py'
       - '.github/workflows/halt-r-baseline.yml'
 permissions:
   contents: write
@@ -39,7 +40,7 @@ jobs:
           fi
           wc -c /tmp/corpus.txt
       - name: train + eval tiny transformer (CPU)
-        run: python3 halt-r/torch-tiny-lm.py --data /tmp/corpus.txt --out out/base-${{ matrix.corpus }} --tag ${{ matrix.corpus }} --iters ${{ matrix.iters }}
+        run: python3 halt-r/train-tiny-lm.py --data /tmp/corpus.txt --out out/base-${{ matrix.corpus }} --tag ${{ matrix.corpus }} --iters ${{ matrix.iters }}
       - name: export GGUF (sloppy-python to rust track)
         run: python3 halt-r/export-gguf.py --pt out/base-${{ matrix.corpus }}/tiny.pt --vocab out/base-${{ matrix.corpus }}/vocab.json --ref out/base-${{ matrix.corpus }}/ref-${{ matrix.corpus }}.json --out out/base-${{ matrix.corpus }}/tinygpt-${{ matrix.corpus }}.gguf
       - uses: actions/upload-artifact@v4
@@ -98,10 +99,12 @@ jobs:
           for f in glob.glob('models/*/vocab.json'):
               tag = os.path.basename(os.path.dirname(f)).replace('lm-base-', '')
               shutil.copy(f, 'halt-r/vocab-%s.json' % tag)
+          for f in glob.glob('models/*/q100-gpt-*.json'):
+              shutil.copy(f, 'halt-r/' + f.split('/')[-1])
           print('gguf artifacts copied')
           print(md)
           EOF
-            git add halt-r/baseline.json halt-r/baseline.md halt-r/tinygpt-*.gguf halt-r/ref-*.json halt-r/vocab-*.json
+            git add halt-r/baseline.json halt-r/baseline.md halt-r/tinygpt-*.gguf halt-r/ref-*.json halt-r/vocab-*.json halt-r/q100-gpt-*.json
             git diff --cached --quiet && exit 0
             git commit -m "halt-r: tiny-transformer baseline $(date -u +%F)"
             git push origin main && exit 0

@@ -1,14 +1,15 @@
-# export-gguf.py: sloppy-python -> GGUF. Converts a torch-tiny-lm.py tiny.pt +
-# vocab.json into a GGUF v3 file (arch "halt-tinygpt") + verifies it by reading
+# export-gguf.py: sloppy-python -> GGUF. Converts a train-tiny-lm.py tiny.pt +
+# vocab.json into a GGUF v3 file (arch "halt-tinygpt" rev 2) + verifies it by reading
 # the bytes back. Only deps: torch + struct (both already in the baseline job).
 #
-# Tensor layout for the Rust twin (row-major, F32):
-#   tok.weight (V,E), pos.weight (T,E),
-#   blk.L attn.qkv_w (3E,E), attn.qkv_b (3E), attn.out_w (E,E), attn.out_b (E),
-#   ln1/ln2/final ln.{w,b} (E), mlp.fc_w (4E,E), mlp.fc_b (4E), mlp.proj_w (E,4E),
-#   mlp.proj_b (E), head.weight (V,E, no bias).
-# Forward notes (must match torch exactly): pre-LN blocks, MHA scale=1/sqrt(E/H),
-# causal mask, MLP nn.GELU exact-erf, final LN, untied head.
+# Tensor layout for the Rust twin (row-major, F32) — rev 2 (RoPE, no abs pos):
+#   tok.weight (V,E),
+#   blk.L attn.qkv_w (3E,E, no bias), attn.out_w (E,E, no bias),
+#   ln1/ln2/final ln.{w} (E, RMSNorm scale only, no bias),
+#   mlp.gate_w (H,E), mlp.up_w (H,E), mlp.down_w (E,H, all no bias).
+# Forward notes (must match torch exactly): pre-RMSNorm blocks, fused QKV split into
+# q/k/v heads, RoPE base 10000 on q/k (head_dim even), causal SDPA scale=1/sqrt(head_dim),
+# SwiGLU MLP silu(gate)*up -> down, final RMSNorm, untied head.
 # Usage: python3 halt-r/export-gguf.py --pt out/tiny.pt --vocab out/vocab.json
 #        --ref out/ref-tag.json --out out/tinygpt-tag.gguf
 import argparse, hashlib, json, struct
@@ -54,13 +55,12 @@ def r_val(d, o, t):
         return (et, out), o
     raise SystemExit('FAIL bad kv type %r' % t)
 
-ORDER = ['tok.weight', 'pos.weight']
+ORDER = ['tok.weight']
 def layer_names(l):
     p = 'blk.%d.' % l
-    return [p + n for n in ('ln1.w', 'ln1.b', 'attn.qkv_w', 'attn.qkv_b', 'attn.out_w',
-                            'attn.out_b', 'ln2.w', 'ln2.b', 'mlp.fc_w', 'mlp.fc_b',
-                            'mlp.proj_w', 'mlp.proj_b')]
-TAIL = ['ln_f.w', 'ln_f.b', 'head.weight']
+    return [p + n for n in ('ln1.w', 'attn.qkv_w', 'attn.out_w', 'ln2.w',
+                            'mlp.gate_w', 'mlp.up_w', 'mlp.down_w')]
+TAIL = ['ln_f.w', 'head.weight']
 
 def main():
     ap = argparse.ArgumentParser()
@@ -78,20 +78,19 @@ def main():
     for l in range(L): names += layer_names(l)
     names += TAIL
     src = {
-        'tok.weight': sd['tok.weight'], 'pos.weight': sd['pos.weight'],
-        'ln_f.w': sd['ln.weight'], 'ln_f.b': sd['ln.bias'],
+        'tok.weight': sd['tok.weight'],
+        'ln_f.w': sd['ln.w'],
         'head.weight': sd['head.weight'],
     }
     for l in range(L):
         base, p = 'layers.%d.' % l, 'blk.%d.' % l
-        src[p + 'ln1.w'] = sd[base + 'ln1.weight']; src[p + 'ln1.b'] = sd[base + 'ln1.bias']
-        src[p + 'attn.qkv_w'] = sd[base + 'attn.in_proj_weight']
-        src[p + 'attn.qkv_b'] = sd[base + 'attn.in_proj_bias']
-        src[p + 'attn.out_w'] = sd[base + 'attn.out_proj.weight']
-        src[p + 'attn.out_b'] = sd[base + 'attn.out_proj.bias']
-        src[p + 'ln2.w'] = sd[base + 'ln2.weight']; src[p + 'ln2.b'] = sd[base + 'ln2.bias']
-        src[p + 'mlp.fc_w'] = sd[base + 'mlp.0.weight']; src[p + 'mlp.fc_b'] = sd[base + 'mlp.0.bias']
-        src[p + 'mlp.proj_w'] = sd[base + 'mlp.2.weight']; src[p + 'mlp.proj_b'] = sd[base + 'mlp.2.bias']
+        src[p + 'ln1.w'] = sd[base + 'ln1.w']
+        src[p + 'attn.qkv_w'] = sd[base + 'qkv.weight']
+        src[p + 'attn.out_w'] = sd[base + 'out.weight']
+        src[p + 'ln2.w'] = sd[base + 'ln2.w']
+        src[p + 'mlp.gate_w'] = sd[base + 'gate.weight']
+        src[p + 'mlp.up_w'] = sd[base + 'up.weight']
+        src[p + 'mlp.down_w'] = sd[base + 'down.weight']
     blobs, total = [], 0
     for n in names:
         arr = src[n].detach().to(torch.float32).contiguous().numpy()
@@ -104,7 +103,9 @@ def main():
           ('halt.n_layer', K_U32, L), ('halt.block', K_U32, T),
           ('halt.vocab_size', K_U32, V),
           ('halt.vocab', K_ARR, (K_STR, cfg['vocab'])),
-          ('halt.gelu', K_STR, 'exact-erf'), ('halt.mha_scale', K_STR, 'inv-sqrt-head-dim')]
+          ('halt.arch_rev', K_U32, 2), ('halt.norm', K_STR, 'rms'),
+           ('halt.mlp', K_STR, 'swiglu'), ('halt.pos', K_STR, 'rope-only'),
+           ('halt.rope_base', K_STR, '10000'), ('halt.mha_scale', K_STR, 'inv-sqrt-head-dim')]
     b = bytearray()
     b += struct.pack('<I', MAGIC) + struct.pack('<I', VERSION)
     b += struct.pack('<Q', len(names)) + struct.pack('<Q', len(kv))

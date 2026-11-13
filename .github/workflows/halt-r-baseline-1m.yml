@@ -3,7 +3,7 @@ on:
   workflow_dispatch: {}
   push:
     paths:
-      - 'halt-r/torch-tiny-lm.py'
+      - 'halt-r/train-tiny-lm.py'
       - '.github/workflows/halt-r-baseline-1m.yml'
 permissions:
   contents: write
@@ -53,7 +53,7 @@ jobs:
           fi
           wc -c /tmp/corpus.txt
       - name: train and eval bout
-        run: python3 halt-r/torch-tiny-lm.py --data /tmp/corpus.txt --out out/bout-${{ matrix.corpus }}-${{ matrix.model }}-${{ matrix.seed }} --tag ${{ matrix.corpus }} --iters ${{ matrix.iters }} --seed ${{ matrix.seed }} --n-embd ${{ matrix.n_embd }} --n-head ${{ matrix.n_head }} --n-layer ${{ matrix.n_layer }} --block ${{ matrix.block }}
+        run: python3 halt-r/train-tiny-lm.py --data /tmp/corpus.txt --out out/bout-${{ matrix.corpus }}-${{ matrix.model }}-${{ matrix.seed }} --tag ${{ matrix.corpus }} --iters ${{ matrix.iters }} --seed ${{ matrix.seed }} --n-embd ${{ matrix.n_embd }} --n-head ${{ matrix.n_head }} --n-layer ${{ matrix.n_layer }} --block ${{ matrix.block }}
       - uses: actions/upload-artifact@v4
         with:
           name: lm-bout-${{ matrix.corpus }}-${{ matrix.model }}-${{ matrix.seed }}
