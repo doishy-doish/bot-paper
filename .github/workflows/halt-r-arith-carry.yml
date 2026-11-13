@@ -160,6 +160,7 @@ jobs:
                   vocab.json) cp "$src" halt-r/vocab-arith-carry.json;;
                   donor-alone.json) cp "$src" halt-r/donor-alone-arith-carry.json;;
                   ref-arith-carry.json) cp "$src" halt-r/ref-arith-carry.json;;
+                  arith-spec.json) cp "$src" halt-r/arith-spec-carry.json;;
                   *) cp "$src" halt-r/"$f";;
                 esac
               fi
