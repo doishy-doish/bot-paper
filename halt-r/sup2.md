@@ -12,10 +12,10 @@ Same protocol (P=8000, H=256, fixed lam, no-gen). sup2 = W*V predictive scales (
 | ts | 8 | sup | linear-O(P·D) | 0.500/762790.74 | 0.540/7.56 (0.25) | 0.49/86 vs 0.57/14 |
 | ts | 8 | sup2 | linear-O(P·D) | 0.460/527.64 | 0.470/8.24 (0.25) | 0.51/86 vs 0.29/14 |
 
-shakes W8: sup interpPpl=13.18 vs sup2 interpPpl=12.88 d=0.30. VERDICT: SCALES-REFINE WINS. Memorized 0.34 (n=50) vs novel 0.24 (n=50).
+shakes W8: sup interpPpl=13.18 vs sup2 interpPpl=12.88 d=0.30 McNemar b/c=12/3 p=0.035 SIGNIFICANT. VERDICT: SCALES-REFINE WINS. Memorized 0.34 (n=50) vs novel 0.24 (n=50).
 
-shakes W16: sup interpPpl=12.41 vs sup2 interpPpl=12.19 d=0.22. VERDICT: SCALES-REFINE WINS. Memorized 0.00 (n=1) vs novel 0.25 (n=99).
+shakes W16: sup interpPpl=12.41 vs sup2 interpPpl=12.19 d=0.22 McNemar b/c=1/2 p=1.000. VERDICT: leans sup2, not significant. Memorized 0.00 (n=1) vs novel 0.25 (n=99).
 
-ts W8: sup interpPpl=7.56 vs sup2 interpPpl=8.24 d=-0.68. VERDICT: sup HOLDS (finer scales add nothing). Memorized 0.51 (n=86) vs novel 0.29 (n=14).
+ts W8: sup interpPpl=7.56 vs sup2 interpPpl=8.24 d=-0.68 McNemar b/c=3/10 p=0.092. VERDICT: sup HOLDS (finer scales add nothing). Memorized 0.51 (n=86) vs novel 0.29 (n=14).
 
-ts W16: sup interpPpl=11.47 vs sup2 interpPpl=10.81 d=0.66. VERDICT: SCALES-REFINE WINS. Memorized 0.31 (n=39) vs novel 0.31 (n=61).
+ts W16: sup interpPpl=11.47 vs sup2 interpPpl=10.81 d=0.66 McNemar b/c=4/3 p=1.000. VERDICT: leans sup2, not significant. Memorized 0.31 (n=39) vs novel 0.31 (n=61).
