@@ -38,7 +38,7 @@ try:
   f = flat(m.get('http_req_failed', {}))
   r = flat(m.get('http_reqs', {}))
   p95, p99 = d.get('p(95)', float('nan')), d.get('p(99)', float('nan'))
-  err = 100.0 * f.get('rate', 1.0)
+  err = 100.0 * f.get('rate', f.get('value', 1.0)) # k6>=0.50 flat rate metrics use `value`, not `rate`
   rps = r.get('rate', float('nan'))
   ok = p95 < 500 and p99 < 1000 and err < 1.0
   print(f"| {n} | {rps:.0f} | {p95:.0f} | {p99:.0f} | {err:.2f} | {'PASS' if ok else 'FAIL'} |")
