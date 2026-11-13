@@ -434,6 +434,67 @@ if (process.argv[2] === 'decrypt'){
       featPM(trainIds, spos[s], q);
       for (let j = 0; j < D; j++) X[s * D + j] = q[j] > 0 ? 1 : 0;
     }
+  } else if (PROJ === 'enc2'){ // TRUNK v2 (decision 2026-11-13): supervised linear-probe training.
+    // Same store positions as sup/enc (SEED stream) for comparability; M starts from the
+    // sim distribution (SEED+3). Probe U (V x H, SEED+6): z=sum_k M[k,c_k], logits=U z,
+    // CE SGD batch-128, ~300 steps, CPU-cheap, JS-only. Discards U; keeps M; sign bits
+    // via the EXACT sim code path (featPM identical). Rationale: contrastive same-next
+    // positives are noisy; the probe optimizes the ppl-relevant signal directly, and lets
+    // token rows share statistical strength across repeating units (BPE-compose: run enc2
+    // under --tok bpe too). Default-off bit-identical (old PROJ paths untouched).
+    for (let s = 0; s < P; s++){
+      const pos = Math.floor(r() * (trainIds.length - W));
+      spos[s] = pos;
+      next[s] = trainIds[pos + W];
+    }
+    const rrE2 = rng(SEED + 3), invE2 = Math.sqrt(1 / Din);
+    M = new Float32Array(Din * H);
+    for (let i = 0; i < M.length; i++) M[i] = gauss1(rrE2) * invE2;
+    const rrU = rng(SEED + 6), invU = Math.sqrt(1 / H);
+    const U = new Float32Array(V * H);
+    for (let i = 0; i < U.length; i++) U[i] = gauss1(rrU) * invU;
+    const EB2 = 128, ESTEPS2 = 300, ELR2 = 0.05;
+    const br2 = rng(SEED + 4);
+    const eidx2 = new Uint32Array(EB2);
+    const z2 = new Float32Array(EB2 * H), lg2 = new Float32Array(EB2 * V);
+    for (let st = 0; st < ESTEPS2; st++){
+      for (let i = 0; i < EB2; i++) eidx2[i] = Math.floor(br2() * P);
+      for (let i = 0; i < EB2; i++){
+        for (let h = 0; h < H; h++) z2[i * H + h] = 0;
+        for (let k = 0; k < W; k++){
+          const base = (k * V + trainIds[spos[eidx2[i]] + k]) * H;
+          for (let h = 0; h < H; h++) z2[i * H + h] += M[base + h];
+        }
+      }
+      let loss = 0;
+      const gz = new Float32Array(EB2 * H);
+      for (let i = 0; i < EB2; i++){
+        let m = -1e30;
+        for (let c = 0; c < V; c++){ let d = 0; for (let h = 0; h < H; h++) d += U[c * H + h] * z2[i * H + h]; lg2[i * V + c] = d; if (d > m) m = d; }
+        let t = 0;
+        for (let c = 0; c < V; c++){ const e = Math.exp(lg2[i * V + c] - m); lg2[i * V + c] = e; t += e; }
+        if (!(t > 0)) continue;
+        const y = next[eidx2[i]];
+        loss += -Math.log(Math.max(lg2[i * V + y] / t, 1e-12));
+        for (let c = 0; c < V; c++){
+          const dl = (lg2[i * V + c] / t) - (c === y ? 1 : 0);
+          for (let h = 0; h < H; h++){ gz[i * H + h] += U[c * H + h] * dl; U[c * H + h] -= ELR2 * dl * z2[i * H + h] / EB2; }
+        }
+      }
+      loss /= EB2;
+      if (st === 0) encLossFirst = loss;
+      if (st === ESTEPS2 - 1) encLossLast = loss;
+      for (let i = 0; i < EB2; i++) for (let k = 0; k < W; k++){
+        const base = (k * V + trainIds[spos[eidx2[i]] + k]) * H;
+        for (let h = 0; h < H; h++) M[base + h] -= ELR2 * gz[i * H + h] / EB2;
+      }
+    }
+    if (ORF === '1') orthCols(M, Din, H);
+    console.log(`enc2 supervised steps=${ESTEPS2} ce ${encLossFirst.toFixed(3)}->${encLossLast.toFixed(3)}`);
+    for (let s = 0; s < P; s++){
+      featPM(trainIds, spos[s], q);
+      for (let j = 0; j < D; j++) X[s * D + j] = q[j] > 0 ? 1 : 0;
+    }
   } else {
   for (let s = 0; s < P; s++){
     const pos = Math.floor(r() * (trainIds.length - W));
