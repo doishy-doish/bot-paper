@@ -176,8 +176,8 @@ if (process.argv[2] === 'decrypt'){
   const TOK = gv('tok', 'char'); // H12 subword pilot: char (default, bit-identical), bpe (256 learned merges on train head)
   if (TOK !== 'char' && TOK !== 'bpe') fail('usage: --tok char|bpe');
   const GRAFTGGUF = gv('graftgguf', null); // transplant: donor GGUF path (keys = frozen donor embeddings, zero training)
-  if (PROJ === 'graft' && TOK !== 'char') fail('usage: --proj graft needs --tok char (donor V is char-level)');
-  if (PROJ === 'graft' && !GRAFTGGUF) fail('usage: --proj graft needs --graftgguf <tinygpt.gguf>');
+  if ((PROJ === 'graft' || PROJ === 'graft2') && TOK !== 'char') fail('usage: --proj graft needs --tok char (donor V is char-level)');
+  if ((PROJ === 'graft' || PROJ === 'graft2') && !GRAFTGGUF) fail('usage: --proj graft needs --graftgguf <tinygpt.gguf>');
   const MIX = gv('mix', 'none'); // gmix: none (default, bit-identical), gpt (mix hop + tiny-GPT dists from q100-gpt file, joined on pos)
   if (MIX !== 'none' && MIX !== 'gpt') fail('usage: --mix none|gpt');
   const GPTQ = gv('gptq', null);
@@ -309,14 +309,14 @@ if (process.argv[2] === 'decrypt'){
   // store: seeded sampled train contexts (raw one-hot or SimHash-projected bits)
   const t0 = Date.now();
   const Din = W * V;
-  let graftEmb = null, GE = 0; // transplant: frozen donor token rows (zero training)
-  if (PROJ === 'graft'){
+  let graftEmb = null, GE = 0, graftWhite = null, graftBind = null; // transplant: frozen donor token rows (zero training)
+  if (PROJ === 'graft' || PROJ === 'graft2'){
     const g = readGraftEmb(GRAFTGGUF, V);
     graftEmb = g.emb; GE = g.GE;
     console.log(`graft donor=${GRAFTGGUF} V=${V} E=${GE} D=${W * GE}`);
   }
-  const D = PROJ === 'raw' ? Din : (PROJ === 'graft' ? GE : H);
-  const FW = PROJ === 'graft' ? GE : H; // feature width: graft keys live in donor-embedding space
+  const D = PROJ === 'raw' ? Din : ((PROJ === 'graft' || PROJ === 'graft2') ? GE : H);
+  const FW = (PROJ === 'graft' || PROJ === 'graft2') ? GE : H; // feature width: graft keys live in donor-embedding space
   function gauss1(rr){ let u = 0, v = 0; while (!u) u = rr(); while (!v) v = rr(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
   let M = null; // projection matrix (sim: random Gaussian; sup: supervised from store labels)
   function orthCols(Mm, rows, cols){ // ORF: Gram-Schmidt on column (feature) directions, per-column norms preserved (scales survive rotation)
@@ -340,6 +340,24 @@ if (process.argv[2] === 'decrypt'){
       const base = (k * V + c) * GE, src = c * GE;
       for (let e = 0; e < GE; e++) M[base + e] = graftEmb[src + e];
     }
+  }
+  if (PROJ === 'graft2'){ // aligned transplant: whiten donor space + bind positions (zero training, deterministic)
+    const mu = new Float64Array(GE), sd = new Float64Array(GE);
+    for (let c = 0; c < V; c++) for (let e = 0; e < GE; e++) mu[e] += graftEmb[c * GE + e];
+    for (let e = 0; e < GE; e++) mu[e] /= V;
+    for (let c = 0; c < V; c++) for (let e = 0; e < GE; e++){ const d = graftEmb[c * GE + e] - mu[e]; sd[e] += d * d; }
+    for (let e = 0; e < GE; e++) sd[e] = Math.sqrt(sd[e] / V + 1e-12) || 1;
+    graftWhite = new Float32Array(V * GE);
+    for (let c = 0; c < V; c++) for (let e = 0; e < GE; e++) graftWhite[c * GE + e] = (graftEmb[c * GE + e] - mu[e]) / sd[e];
+    const br = rng(SEED + 9);
+    graftBind = new Float32Array(W * GE);
+    for (let k = 0; k < W; k++) for (let e = 0; e < GE; e++) graftBind[k * GE + e] = br() < 0.5 ? 1 : -1;
+    M = new Float32Array(Din * GE);
+    for (let k = 0; k < W; k++) for (let c = 0; c < V; c++){
+      const base = (k * V + c) * GE, src = c * GE;
+      for (let e = 0; e < GE; e++) M[base + e] = graftWhite[src + e] * graftBind[k * GE + e];
+    }
+    console.log('graft2 whiten+bind ready V=' + V + ' E=' + GE + ' W=' + W);
   }
   function featPM(ids, pos, out){ // ±1 features, length D (every projected PROJ incl. graft shares the path)
     if (PROJ !== 'raw'){
@@ -1307,7 +1325,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.tmp = parseInt(TMP) || 0; metrics.tmpT = tmpT; metrics.tmpAccSel = tmpAccSel; metrics.tmpPplSel = tmpPplSel; metrics.tmpAcc = tmpAcc; metrics.tmpPpl = tmpPpl;
   metrics.conf = parseInt(CONF) || 0; metrics.confAbs = confAbs; metrics.confAcc = confAcc; metrics.confPpl = confPpl;
   metrics.orf = parseInt(ORF) || 0;
-  metrics.graft = PROJ === 'graft' ? 1 : 0; metrics.graftE = GE; metrics.graftFile = PROJ === 'graft' ? GRAFTGGUF : null;
+  metrics.graft = PROJ === 'graft2' ? 2 : (PROJ === 'graft' ? 1 : 0); metrics.graftE = GE; metrics.graftFile = (PROJ === 'graft' || PROJ === 'graft2') ? GRAFTGGUF : null;
   metrics.c2d = parseInt(C2D) || 0; metrics.canRemDetail = canRemDetail; metrics.canEditDetail = canEditDetail;
   metrics.repHitH = repHitH;
   metrics.hedgeAcc = hedgeAcc; metrics.hedgePpl = hedgePpl; metrics.hedgeNeff = hedgeNeff;
