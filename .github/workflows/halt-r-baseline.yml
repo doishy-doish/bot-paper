@@ -27,7 +27,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: install torch CPU
-        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install numpy
       - name: fetch corpus (public domain / public research text)
         run: |
           if [ "${{ matrix.corpus }}" = ts ]; then
