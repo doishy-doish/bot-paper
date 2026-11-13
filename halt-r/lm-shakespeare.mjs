@@ -103,6 +103,9 @@ if (process.argv[2] === 'decrypt'){
   const GATE = parseFloat(gv('gate', 0)), KEEP = parseFloat(gv('pruneKeep', 1)); // B1 confidence gate, B2 store prune
   const tag = gv('tag', 'shakes');
   const PROJ = gv('proj', 'raw'), H = parseInt(gv('H', 256));
+  const BSEL = gv('betaSel', 'acc');
+  if (BSEL !== 'acc' && BSEL !== 'ppl') fail('usage: --betaSel acc|ppl');
+  const ADA = gv('ada', '0') === '1'; // H4 adaptive-lambda: per-query L=lam*confidence; default 0 = legacy fixed-lam only
   const kei = a.indexOf('--key-env');
   const secret = process.env[kei >= 0 ? a[kei + 1] : 'SCRAMBLE'];
   if (!secret && !noEnc) fail('SCRAMBLE key missing (refuses plaintext save; --no-encrypt for smoke only)');
@@ -258,14 +261,16 @@ if (process.argv[2] === 'decrypt'){
     return { acc: acc / n, ppl: Math.exp(ce / n) };
   };
   const t1 = Date.now();
-  let best = null;
+  let best = null, bestPpl = null; // best = acc-first (legacy); bestPpl = ppl-first (H2)
   for (const beta of BETAS){
     runQueries.beta = beta;
     const m = runQueries(DEF.probeN, 1000);
     console.log(`probe beta=${beta} acc=${m.acc.toFixed(3)} ppl=${m.ppl.toFixed(2)} steps=${m.avgSteps.toFixed(1)}`);
     if (!best || m.acc > best.acc || (m.acc === best.acc && m.ppl < best.ppl)) best = { beta, ...m };
+    if (!bestPpl || m.ppl < bestPpl.ppl || (m.ppl === bestPpl.ppl && m.acc > bestPpl.acc)) bestPpl = { beta, ...m };
   }
-  runQueries.beta = best.beta;
+  console.log(`probe best acc beta=${best.beta} acc=${best.acc.toFixed(3)} ppl=${best.ppl.toFixed(2)} | best ppl beta=${bestPpl.beta} acc=${bestPpl.acc.toFixed(3)} ppl=${bestPpl.ppl.toFixed(2)}`);
+  runQueries.beta = BSEL === 'ppl' ? bestPpl.beta : best.beta;
   const e = runQueries(TR, 2000);
   const biE = bigramEval(TR, 2000), uniE = uniEval(TR, 2000);
   const evalMs = Date.now() - t1;
@@ -372,6 +377,33 @@ if (process.argv[2] === 'decrypt'){
   for (const s of selStats) if (s.ppl < bestLam.ppl || (s.ppl === bestLam.ppl && s.acc > bestLam.acc)) bestLam = s;
   const repRows = hopBiDists(TR, 2001), repStats = lamStats(repRows);
   const repLocked = repStats[LAMBDAS.indexOf(bestLam.lam)];
+  // H4 adaptive-lambda: per-query L_i = lam * retrieval confidence (top-1 weight fraction g).
+  // Known kNN-LM pathology (TO-VERIFY cites): fixed lam lets noisy retrieval hurt the tokens
+  // it cannot help; adaptive lam collapses toward bigram where retrieval is diffuse.
+  // Cheap: reuses hopBiDists rows, no extra recall passes.
+  function adaStats(rows){
+    return LAMBDAS.map(lam => {
+      let acc = 0, ce = 0;
+      for (const qr of rows){
+        const L = (GATE > 0 && qr.g < GATE) ? 0 : lam * qr.g;
+        let bp = -1, bci = 0;
+        for (let c = 0; c < V; c++){ const p = L * qr.hd[c] + (1 - L) * qr.bd[c]; if (p > bp){ bp = p; bci = c; } }
+        if (bci === qr.trueNext) acc++;
+        ce += -Math.log(Math.max(L * qr.hd[qr.trueNext] + (1 - L) * qr.bd[qr.trueNext], 1e-12));
+      }
+      return { lam, acc: acc / rows.length, ppl: Math.exp(ce / rows.length) };
+    });
+  }
+  let adaLamSel = -1, adaAccSel = 0, adaPplSel = 0, adaAcc = 0, adaPpl = 0;
+  if (ADA){
+    const selAda = adaStats(selRows);
+    let bestAda = selAda[0];
+    for (const s of selAda) if (s.ppl < bestAda.ppl || (s.ppl === bestAda.ppl && s.acc > bestAda.acc)) bestAda = s;
+    const repAda = adaStats(repRows);
+    const ra = repAda[LAMBDAS.indexOf(bestAda.lam)];
+    adaLamSel = bestAda.lam; adaAccSel = bestAda.acc; adaPplSel = bestAda.ppl; adaAcc = ra.acc; adaPpl = ra.ppl;
+    console.log(`adaptive interp select lam=${bestAda.lam} acc=${bestAda.acc.toFixed(3)} ppl=${bestAda.ppl.toFixed(2)} report acc=${ra.acc.toFixed(3)} ppl=${ra.ppl.toFixed(2)}`);
+  }
   const gatedFracRep = repRows.length ? repRows.filter(qr => qr.g < GATE).length / repRows.length : 0;
   console.log(`gate tau=${GATE} pruneKeep=${KEEP} Peff=${P} gatedFrac=${gatedFracRep.toFixed(3)}`);
   console.log('interp select: ' + selStats.map(s => `lam=${s.lam} acc=${s.acc.toFixed(3)} ppl=${s.ppl.toFixed(2)}`).join(' | '));
@@ -403,12 +435,12 @@ if (process.argv[2] === 'decrypt'){
   // save wrapped store
   const plain = Buffer.concat([Buffer.from(X), Buffer.from(next)]);
   const sum = sha256hex(plain);
-  const meta = { task: 'nextchar-heldout', corpus: tag, proj: PROJ, W, P: P0, P0, Peff: P, V, D, seed: SEED, beta: best.beta, bytes: plain.length, sha256: sum, enc: noEnc ? 'none-smoke' : 'AES-256-GCM-v1', chars: raw.length };
+  const meta = { task: 'nextchar-heldout', corpus: tag, proj: PROJ, W, P: P0, P0, Peff: P, V, D, seed: SEED, beta: BSEL === 'ppl' ? bestPpl.beta : best.beta, betaSel: BSEL, bytes: plain.length, sha256: sum, enc: noEnc ? 'none-smoke' : 'AES-256-GCM-v1', chars: raw.length };
   writeFileSync(outDir + '/meta.json', JSON.stringify(meta));
   let encBytes = 0;
   if (!noEnc){ const wj = JSON.stringify(encryptWrap(plain, secret)); writeFileSync(outDir + '/model.bin.enc', wj); encBytes = wj.length; console.log(`enc bytes=${encBytes} sha256=${sum}`); }
   else { writeFileSync(outDir + '/model.bin', plain); console.log(`plain-smoke bytes=${plain.length} sha256=${sum}`); }
-  const metrics = { ...meta, trials: TR, flips: 'n/a-nextchar', acc: e.acc, ppl: e.ppl, avgSteps: e.avgSteps, bigramAcc: biE.acc, bigramPpl: biE.ppl, unigramAcc: uniE.acc, unigramPpl: uniE.ppl, beatUni: e.acc > uniE.acc, quality, buildMs, evalMs, maxRssMB: rssMB(), encBytes, evalScope: 'heldout-val', evalMflops, buildMflops, flopSteps };
+  const metrics = { ...meta, trials: TR, flips: 'n/a-nextchar', acc: e.acc, ppl: e.ppl, avgSteps: e.avgSteps, bigramAcc: biE.acc, bigramPpl: biE.ppl, unigramAcc: uniE.acc, unigramPpl: uniE.ppl, beatUni: e.acc > uniE.acc, quality, buildMs, evalMs, maxRssMB: rssMB(), encBytes, evalScope: 'heldout-val', evalMflops, buildMflops, flopSteps, betaSel: BSEL, betaAcc: best.beta, betaPpl: bestPpl.beta, ada: ADA ? 1 : 0, adaLamSel, adaAccSel, adaPplSel, adaAcc, adaPpl };
   // kNN-LM interpolation results (locked-lam report on fresh seed-2001 queries)
   metrics.interpLambda = bestLam.lam;
   metrics.interpAccSel = bestLam.acc; metrics.interpPplSel = bestLam.ppl;
