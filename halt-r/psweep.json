@@ -8,6 +8,8 @@
    "proj": "sim",
    "W": 2,
    "P": 2000,
+   "P0": 2000,
+   "Peff": 2000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -32,9 +34,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 17,
-   "evalMs": 1152,
-   "maxRssMB": 85,
+   "buildMs": 25,
+   "evalMs": 861,
+   "maxRssMB": 80.9,
    "encBytes": 685541,
    "evalScope": "heldout-val",
    "evalMflops": 491.5,
@@ -51,7 +53,6 @@
    "biPplRep": 11.006389660346303,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 2000,
    "gatedFracRep": 0
   },
   {
@@ -60,6 +61,8 @@
    "proj": "sim",
    "W": 2,
    "P": 8000,
+   "P0": 8000,
+   "Peff": 8000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -84,9 +87,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 42,
-   "evalMs": 2540,
-   "maxRssMB": 100.1,
+   "buildMs": 41,
+   "evalMs": 2543,
+   "maxRssMB": 94.5,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 1601.5,
@@ -103,7 +106,6 @@
    "biPplRep": 11.006389660346303,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 8000,
    "gatedFracRep": 0
   },
   {
@@ -112,6 +114,8 @@
    "proj": "sim",
    "W": 2,
    "P": 32000,
+   "P0": 32000,
+   "Peff": 32000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -136,9 +140,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 179,
-   "evalMs": 17132,
-   "maxRssMB": 142.1,
+   "buildMs": 155,
+   "evalMs": 14688,
+   "maxRssMB": 145.9,
    "encBytes": 10965542,
    "evalScope": "heldout-val",
    "evalMflops": 5783.6,
@@ -155,7 +159,6 @@
    "biPplRep": 11.006389660346303,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 32000,
    "gatedFracRep": 0
   },
   {
@@ -164,6 +167,8 @@
    "proj": "sim",
    "W": 2,
    "P": 128000,
+   "P0": 128000,
+   "Peff": 128000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -188,9 +193,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 371,
-   "evalMs": 30134,
-   "maxRssMB": 335.3,
+   "buildMs": 692,
+   "evalMs": 60051,
+   "maxRssMB": 334.4,
    "encBytes": 43861543,
    "evalScope": "heldout-val",
    "evalMflops": 23068.7,
@@ -207,7 +212,6 @@
    "biPplRep": 11.006389660346303,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 128000,
    "gatedFracRep": 0
   },
   {
@@ -216,6 +220,8 @@
    "proj": "sim",
    "W": 4,
    "P": 2000,
+   "P0": 2000,
+   "Peff": 2000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -240,9 +246,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 22,
-   "evalMs": 2417,
-   "maxRssMB": 82.6,
+   "buildMs": 29,
+   "evalMs": 2837,
+   "maxRssMB": 82.2,
    "encBytes": 685541,
    "evalScope": "heldout-val",
    "evalMflops": 1073.2,
@@ -259,7 +265,6 @@
    "biPplRep": 11.848986027482697,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 2000,
    "gatedFracRep": 0
   },
   {
@@ -268,6 +273,8 @@
    "proj": "sim",
    "W": 4,
    "P": 8000,
+   "P0": 8000,
+   "Peff": 8000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -293,8 +300,8 @@
     "wordValid": 0
    },
    "buildMs": 54,
-   "evalMs": 6254,
-   "maxRssMB": 96.9,
+   "evalMs": 5588,
+   "maxRssMB": 92.3,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 2383.9,
@@ -311,7 +318,6 @@
    "biPplRep": 11.848986027482697,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 8000,
    "gatedFracRep": 0
   },
   {
@@ -320,6 +326,8 @@
    "proj": "sim",
    "W": 4,
    "P": 32000,
+   "P0": 32000,
+   "Peff": 32000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -344,9 +352,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 187,
-   "evalMs": 18300,
-   "maxRssMB": 141.8,
+   "buildMs": 213,
+   "evalMs": 21804,
+   "maxRssMB": 142.7,
    "encBytes": 10965542,
    "evalScope": "heldout-val",
    "evalMflops": 8093.7,
@@ -363,7 +371,6 @@
    "biPplRep": 11.848986027482697,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 32000,
    "gatedFracRep": 0
   },
   {
@@ -372,6 +379,8 @@
    "proj": "sim",
    "W": 4,
    "P": 128000,
+   "P0": 128000,
+   "Peff": 128000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -396,9 +405,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 847,
-   "evalMs": 74902,
-   "maxRssMB": 334.4,
+   "buildMs": 682,
+   "evalMs": 67000,
+   "maxRssMB": 333.5,
    "encBytes": 43861543,
    "evalScope": "heldout-val",
    "evalMflops": 27721.7,
@@ -415,7 +424,6 @@
    "biPplRep": 11.848986027482697,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 128000,
    "gatedFracRep": 0
   },
   {
@@ -424,6 +432,8 @@
    "proj": "sim",
    "W": 8,
    "P": 2000,
+   "P0": 2000,
+   "Peff": 2000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -448,9 +458,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 34,
-   "evalMs": 5392,
-   "maxRssMB": 80.3,
+   "buildMs": 37,
+   "evalMs": 6032,
+   "maxRssMB": 72.5,
    "encBytes": 685541,
    "evalScope": "heldout-val",
    "evalMflops": 2132,
@@ -467,7 +477,6 @@
    "biPplRep": 13.487851327097836,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 2000,
    "gatedFracRep": 0
   },
   {
@@ -476,6 +485,8 @@
    "proj": "sim",
    "W": 8,
    "P": 8000,
+   "P0": 8000,
+   "Peff": 8000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -500,9 +511,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 92,
-   "evalMs": 21766,
-   "maxRssMB": 86.6,
+   "buildMs": 90,
+   "evalMs": 21771,
+   "maxRssMB": 85.3,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 8761.3,
@@ -519,7 +530,6 @@
    "biPplRep": 13.487851327097836,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 8000,
    "gatedFracRep": 0
   },
   {
@@ -528,6 +538,8 @@
    "proj": "sim",
    "W": 8,
    "P": 32000,
+   "P0": 32000,
+   "Peff": 32000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -552,9 +564,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 248,
-   "evalMs": 75086,
-   "maxRssMB": 139.6,
+   "buildMs": 179,
+   "evalMs": 60505,
+   "maxRssMB": 144.2,
    "encBytes": 10965542,
    "evalScope": "heldout-val",
    "evalMflops": 34357.2,
@@ -571,7 +583,6 @@
    "biPplRep": 13.487851327097836,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 32000,
    "gatedFracRep": 0
   },
   {
@@ -580,6 +591,8 @@
    "proj": "sim",
    "W": 8,
    "P": 128000,
+   "P0": 128000,
+   "Peff": 128000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -604,9 +617,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 1150,
-   "evalMs": 186587,
-   "maxRssMB": 311.5,
+   "buildMs": 940,
+   "evalMs": 162794,
+   "maxRssMB": 334.5,
    "encBytes": 43861543,
    "evalScope": "heldout-val",
    "evalMflops": 63242.2,
@@ -623,7 +636,6 @@
    "biPplRep": 13.487851327097836,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 128000,
    "gatedFracRep": 0
   },
   {
@@ -632,6 +644,8 @@
    "proj": "sim",
    "W": 16,
    "P": 2000,
+   "P0": 2000,
+   "Peff": 2000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -656,9 +670,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 56,
-   "evalMs": 6511,
-   "maxRssMB": 81.3,
+   "buildMs": 34,
+   "evalMs": 4613,
+   "maxRssMB": 83.4,
    "encBytes": 685541,
    "evalScope": "heldout-val",
    "evalMflops": 2526.2,
@@ -675,7 +689,6 @@
    "biPplRep": 13.680846299338056,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 2000,
    "gatedFracRep": 0
   },
   {
@@ -684,6 +697,8 @@
    "proj": "sim",
    "W": 16,
    "P": 8000,
+   "P0": 8000,
+   "Peff": 8000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -708,9 +723,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 140,
-   "evalMs": 25147,
-   "maxRssMB": 82.6,
+   "buildMs": 133,
+   "evalMs": 24923,
+   "maxRssMB": 85.4,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 9887.7,
@@ -727,7 +742,6 @@
    "biPplRep": 13.680846299338056,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 8000,
    "gatedFracRep": 0
   },
   {
@@ -736,6 +750,8 @@
    "proj": "sim",
    "W": 16,
    "P": 32000,
+   "P0": 32000,
+   "Peff": 32000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -760,9 +776,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 326,
-   "evalMs": 87778,
-   "maxRssMB": 137.3,
+   "buildMs": 320,
+   "evalMs": 88563,
+   "maxRssMB": 142.3,
    "encBytes": 10965542,
    "evalScope": "heldout-val",
    "evalMflops": 40206.3,
@@ -779,7 +795,6 @@
    "biPplRep": 13.680846299338056,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 32000,
    "gatedFracRep": 0
   },
   {
@@ -788,6 +803,8 @@
    "proj": "sim",
    "W": 16,
    "P": 128000,
+   "P0": 128000,
+   "Peff": 128000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -812,9 +829,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 1006,
-   "evalMs": 298191,
-   "maxRssMB": 333.7,
+   "buildMs": 1725,
+   "evalMs": 417922,
+   "maxRssMB": 334.3,
    "encBytes": 43861543,
    "evalScope": "heldout-val",
    "evalMflops": 165937.2,
@@ -831,7 +848,6 @@
    "biPplRep": 13.680846299338056,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 128000,
    "gatedFracRep": 0
   },
   {
@@ -840,6 +856,8 @@
    "proj": "sim",
    "W": 32,
    "P": 2000,
+   "P0": 2000,
+   "Peff": 2000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -864,9 +882,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 51,
-   "evalMs": 3979,
-   "maxRssMB": 83.6,
+   "buildMs": 87,
+   "evalMs": 6392,
+   "maxRssMB": 73.5,
    "encBytes": 685541,
    "evalScope": "heldout-val",
    "evalMflops": 2209.8,
@@ -883,7 +901,6 @@
    "biPplRep": 9.823870092140574,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 2000,
    "gatedFracRep": 0
   },
   {
@@ -892,6 +909,8 @@
    "proj": "sim",
    "W": 32,
    "P": 8000,
+   "P0": 8000,
+   "Peff": 8000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -916,9 +935,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 128,
-   "evalMs": 15591,
-   "maxRssMB": 86.1,
+   "buildMs": 210,
+   "evalMs": 21210,
+   "maxRssMB": 83.7,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 8146.9,
@@ -935,7 +954,6 @@
    "biPplRep": 9.823870092140574,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 8000,
    "gatedFracRep": 0
   },
   {
@@ -944,6 +962,8 @@
    "proj": "sim",
    "W": 32,
    "P": 32000,
+   "P0": 32000,
+   "Peff": 32000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -968,9 +988,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 607,
-   "evalMs": 72500,
-   "maxRssMB": 145.1,
+   "buildMs": 722,
+   "evalMs": 83277,
+   "maxRssMB": 140.9,
    "encBytes": 10965542,
    "evalScope": "heldout-val",
    "evalMflops": 32210.9,
@@ -987,7 +1007,6 @@
    "biPplRep": 9.823870092140574,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 32000,
    "gatedFracRep": 0
   },
   {
@@ -996,6 +1015,8 @@
    "proj": "sim",
    "W": 32,
    "P": 128000,
+   "P0": 128000,
+   "Peff": 128000,
    "V": 65,
    "D": 256,
    "seed": 7,
@@ -1020,9 +1041,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 2765,
-   "evalMs": 340071,
-   "maxRssMB": 340,
+   "buildMs": 2762,
+   "evalMs": 339993,
+   "maxRssMB": 339.2,
    "encBytes": 43861543,
    "evalScope": "heldout-val",
    "evalMflops": 129892.4,
@@ -1039,7 +1060,6 @@
    "biPplRep": 9.823870092140574,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 128000,
    "gatedFracRep": 0
   },
   {
@@ -1048,6 +1068,8 @@
    "proj": "sim",
    "W": 2,
    "P": 2000,
+   "P0": 2000,
+   "Peff": 2000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1072,9 +1094,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 24,
-   "evalMs": 1160,
-   "maxRssMB": 129.7,
+   "buildMs": 16,
+   "evalMs": 706,
+   "maxRssMB": 129,
    "encBytes": 685541,
    "evalScope": "heldout-val",
    "evalMflops": 445.4,
@@ -1091,7 +1113,6 @@
    "biPplRep": 9.004125680213708,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 2000,
    "gatedFracRep": 0
   },
   {
@@ -1100,6 +1121,8 @@
    "proj": "sim",
    "W": 2,
    "P": 8000,
+   "P0": 8000,
+   "Peff": 8000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1124,9 +1147,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 43,
-   "evalMs": 3468,
-   "maxRssMB": 133.9,
+   "buildMs": 57,
+   "evalMs": 4593,
+   "maxRssMB": 135.4,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 1536,
@@ -1143,7 +1166,6 @@
    "biPplRep": 9.004125680213708,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 8000,
    "gatedFracRep": 0
   },
   {
@@ -1152,6 +1174,8 @@
    "proj": "sim",
    "W": 2,
    "P": 32000,
+   "P0": 32000,
+   "Peff": 32000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1176,9 +1200,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 184,
-   "evalMs": 14177,
-   "maxRssMB": 156.2,
+   "buildMs": 180,
+   "evalMs": 14349,
+   "maxRssMB": 154.9,
    "encBytes": 10965542,
    "evalScope": "heldout-val",
    "evalMflops": 5734.4,
@@ -1195,7 +1219,6 @@
    "biPplRep": 9.004125680213708,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 32000,
    "gatedFracRep": 0
   },
   {
@@ -1204,6 +1227,8 @@
    "proj": "sim",
    "W": 2,
    "P": 128000,
+   "P0": 128000,
+   "Peff": 128000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1228,9 +1253,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 375,
-   "evalMs": 28709,
-   "maxRssMB": 358.7,
+   "buildMs": 517,
+   "evalMs": 52244,
+   "maxRssMB": 361,
    "encBytes": 43861543,
    "evalScope": "heldout-val",
    "evalMflops": 22937.6,
@@ -1247,7 +1272,6 @@
    "biPplRep": 9.004125680213708,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 128000,
    "gatedFracRep": 0
   },
   {
@@ -1256,6 +1280,8 @@
    "proj": "sim",
    "W": 4,
    "P": 2000,
+   "P0": 2000,
+   "Peff": 2000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1280,9 +1306,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 18,
-   "evalMs": 1707,
-   "maxRssMB": 124.5,
+   "buildMs": 28,
+   "evalMs": 2464,
+   "maxRssMB": 128,
    "encBytes": 685541,
    "evalScope": "heldout-val",
    "evalMflops": 914.4,
@@ -1299,7 +1325,6 @@
    "biPplRep": 9.986729069370352,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 2000,
    "gatedFracRep": 0
   },
   {
@@ -1308,6 +1333,8 @@
    "proj": "sim",
    "W": 4,
    "P": 8000,
+   "P0": 8000,
+   "Peff": 8000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1332,9 +1359,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 74,
-   "evalMs": 8052,
-   "maxRssMB": 130.4,
+   "buildMs": 72,
+   "evalMs": 8632,
+   "maxRssMB": 128.6,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 2977.8,
@@ -1351,7 +1378,6 @@
    "biPplRep": 9.986729069370352,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 8000,
    "gatedFracRep": 0
   },
   {
@@ -1360,6 +1386,8 @@
    "proj": "sim",
    "W": 4,
    "P": 32000,
+   "P0": 32000,
+   "Peff": 32000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1384,9 +1412,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 224,
-   "evalMs": 21778,
-   "maxRssMB": 160.3,
+   "buildMs": 191,
+   "evalMs": 18306,
+   "maxRssMB": 143.9,
    "encBytes": 10965542,
    "evalScope": "heldout-val",
    "evalMflops": 8224.8,
@@ -1403,7 +1431,6 @@
    "biPplRep": 9.986729069370352,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 32000,
    "gatedFracRep": 0
   },
   {
@@ -1412,6 +1439,8 @@
    "proj": "sim",
    "W": 4,
    "P": 128000,
+   "P0": 128000,
+   "Peff": 128000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1436,9 +1465,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 856,
-   "evalMs": 78291,
-   "maxRssMB": 355.1,
+   "buildMs": 846,
+   "evalMs": 78340,
+   "maxRssMB": 359.9,
    "encBytes": 43861543,
    "evalScope": "heldout-val",
    "evalMflops": 30736.4,
@@ -1455,7 +1484,6 @@
    "biPplRep": 9.986729069370352,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 128000,
    "gatedFracRep": 0
   },
   {
@@ -1464,6 +1492,8 @@
    "proj": "sim",
    "W": 8,
    "P": 2000,
+   "P0": 2000,
+   "Peff": 2000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1488,9 +1518,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 29,
-   "evalMs": 3360,
-   "maxRssMB": 124.1,
+   "buildMs": 37,
+   "evalMs": 3905,
+   "maxRssMB": 126,
    "encBytes": 685541,
    "evalScope": "heldout-val",
    "evalMflops": 1557.5,
@@ -1507,7 +1537,6 @@
    "biPplRep": 11.028279505331088,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 2000,
    "gatedFracRep": 0
   },
   {
@@ -1516,6 +1545,8 @@
    "proj": "sim",
    "W": 8,
    "P": 8000,
+   "P0": 8000,
+   "Peff": 8000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1540,9 +1571,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 76,
-   "evalMs": 14410,
-   "maxRssMB": 110.6,
+   "buildMs": 69,
+   "evalMs": 14408,
+   "maxRssMB": 130.8,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 6361.1,
@@ -1559,7 +1590,6 @@
    "biPplRep": 11.028279505331088,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 8000,
    "gatedFracRep": 0
   },
   {
@@ -1568,6 +1598,8 @@
    "proj": "sim",
    "W": 8,
    "P": 32000,
+   "P0": 32000,
+   "Peff": 32000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1592,9 +1624,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 275,
-   "evalMs": 35304,
-   "maxRssMB": 154.4,
+   "buildMs": 290,
+   "evalMs": 39291,
+   "maxRssMB": 149.9,
    "encBytes": 10965542,
    "evalScope": "heldout-val",
    "evalMflops": 12271.6,
@@ -1611,7 +1643,6 @@
    "biPplRep": 11.028279505331088,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 32000,
    "gatedFracRep": 0
   },
   {
@@ -1620,6 +1651,8 @@
    "proj": "sim",
    "W": 8,
    "P": 128000,
+   "P0": 128000,
+   "Peff": 128000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1644,9 +1677,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 1142,
-   "evalMs": 190876,
-   "maxRssMB": 323.6,
+   "buildMs": 1122,
+   "evalMs": 190840,
+   "maxRssMB": 324.9,
    "encBytes": 43861543,
    "evalScope": "heldout-val",
    "evalMflops": 77529.1,
@@ -1663,7 +1696,6 @@
    "biPplRep": 11.028279505331088,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 128000,
    "gatedFracRep": 0
   },
   {
@@ -1672,6 +1704,8 @@
    "proj": "sim",
    "W": 16,
    "P": 2000,
+   "P0": 2000,
+   "Peff": 2000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1696,9 +1730,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 58,
-   "evalMs": 6467,
-   "maxRssMB": 114.1,
+   "buildMs": 34,
+   "evalMs": 4494,
+   "maxRssMB": 127.6,
    "encBytes": 685541,
    "evalScope": "heldout-val",
    "evalMflops": 2519,
@@ -1715,7 +1749,6 @@
    "biPplRep": 11.946129354433861,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 2000,
    "gatedFracRep": 0
   },
   {
@@ -1724,6 +1757,8 @@
    "proj": "sim",
    "W": 16,
    "P": 8000,
+   "P0": 8000,
+   "Peff": 8000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1748,9 +1783,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 112,
-   "evalMs": 21859,
-   "maxRssMB": 132.5,
+   "buildMs": 97,
+   "evalMs": 18155,
+   "maxRssMB": 146,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 10174.5,
@@ -1767,7 +1802,6 @@
    "biPplRep": 11.946129354433861,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 8000,
    "gatedFracRep": 0
   },
   {
@@ -1776,6 +1810,8 @@
    "proj": "sim",
    "W": 16,
    "P": 32000,
+   "P0": 32000,
+   "Peff": 32000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1800,9 +1836,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 372,
-   "evalMs": 85868,
-   "maxRssMB": 161.1,
+   "buildMs": 422,
+   "evalMs": 108016,
+   "maxRssMB": 157.8,
    "encBytes": 10965542,
    "evalScope": "heldout-val",
    "evalMflops": 40140.8,
@@ -1819,7 +1855,6 @@
    "biPplRep": 11.946129354433861,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 32000,
    "gatedFracRep": 0
   },
   {
@@ -1828,6 +1863,8 @@
    "proj": "sim",
    "W": 16,
    "P": 128000,
+   "P0": 128000,
+   "Peff": 128000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1852,9 +1889,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 1400,
-   "evalMs": 333579,
-   "maxRssMB": 359.7,
+   "buildMs": 1581,
+   "evalMs": 420315,
+   "maxRssMB": 346.2,
    "encBytes": 43861543,
    "evalScope": "heldout-val",
    "evalMflops": 157351.9,
@@ -1871,7 +1908,6 @@
    "biPplRep": 11.946129354433861,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 128000,
    "gatedFracRep": 0
   },
   {
@@ -1880,6 +1916,8 @@
    "proj": "sim",
    "W": 32,
    "P": 2000,
+   "P0": 2000,
+   "Peff": 2000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1904,9 +1942,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 94,
-   "evalMs": 6018,
-   "maxRssMB": 126.7,
+   "buildMs": 75,
+   "evalMs": 5759,
+   "maxRssMB": 111.6,
    "encBytes": 685541,
    "evalScope": "heldout-val",
    "evalMflops": 2284.5,
@@ -1923,7 +1961,6 @@
    "biPplRep": 9.857847542887097,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 2000,
    "gatedFracRep": 0
   },
   {
@@ -1932,6 +1969,8 @@
    "proj": "sim",
    "W": 32,
    "P": 8000,
+   "P0": 8000,
+   "Peff": 8000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -1956,9 +1995,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 183,
-   "evalMs": 20102,
-   "maxRssMB": 130.4,
+   "buildMs": 159,
+   "evalMs": 19868,
+   "maxRssMB": 131.9,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 9007.1,
@@ -1975,7 +2014,6 @@
    "biPplRep": 9.857847542887097,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 8000,
    "gatedFracRep": 0
   },
   {
@@ -1984,6 +2022,8 @@
    "proj": "sim",
    "W": 32,
    "P": 32000,
+   "P0": 32000,
+   "Peff": 32000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -2008,9 +2048,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 428,
-   "evalMs": 61565,
-   "maxRssMB": 162.7,
+   "buildMs": 616,
+   "evalMs": 79452,
+   "maxRssMB": 161.9,
    "encBytes": 10965542,
    "evalScope": "heldout-val",
    "evalMflops": 35536.9,
@@ -2027,7 +2067,6 @@
    "biPplRep": 9.857847542887097,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 32000,
    "gatedFracRep": 0
   },
   {
@@ -2036,6 +2075,8 @@
    "proj": "sim",
    "W": 32,
    "P": 128000,
+   "P0": 128000,
+   "Peff": 128000,
    "V": 79,
    "D": 256,
    "seed": 7,
@@ -2060,9 +2101,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 2764,
-   "evalMs": 369666,
-   "maxRssMB": 331.9,
+   "buildMs": 2749,
+   "evalMs": 369259,
+   "maxRssMB": 346.8,
    "encBytes": 43861543,
    "evalScope": "heldout-val",
    "evalMflops": 143786,
@@ -2079,7 +2120,6 @@
    "biPplRep": 9.857847542887097,
    "gateTau": 0,
    "pruneKeep": 1,
-   "Peff": 128000,
    "gatedFracRep": 0
   }
  ]
