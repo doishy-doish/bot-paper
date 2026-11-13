@@ -1,0 +1,486 @@
+{
+ "date": "2026-11-13",
+ "task": "tiny-vs-1m-bout-20way",
+ "runs": [
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "shakes",
+   "V": 65,
+   "params": 110464,
+   "arch": {
+    "n_embd": 64,
+    "n_head": 2,
+    "n_layer": 2
+   },
+   "iters": 6000,
+   "block": 32,
+   "seed": 7,
+   "chars": 1115394,
+   "fullVal": {
+    "acc": 0.43344392056104103,
+    "ppl": 6.831003359950142
+   },
+   "q100": {
+    "acc": 0.44,
+    "ppl": 7.112778121496361
+   },
+   "trainSec": 94
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "shakes",
+   "V": 65,
+   "params": 110464,
+   "arch": {
+    "n_embd": 64,
+    "n_head": 2,
+    "n_layer": 2
+   },
+   "iters": 6000,
+   "block": 32,
+   "seed": 11,
+   "chars": 1115394,
+   "fullVal": {
+    "acc": 0.42751183782184077,
+    "ppl": 6.898842354858986
+   },
+   "q100": {
+    "acc": 0.38,
+    "ppl": 7.055721217737582
+   },
+   "trainSec": 73
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "shakes",
+   "V": 65,
+   "params": 110464,
+   "arch": {
+    "n_embd": 64,
+    "n_head": 2,
+    "n_layer": 2
+   },
+   "iters": 6000,
+   "block": 32,
+   "seed": 13,
+   "chars": 1115394,
+   "fullVal": {
+    "acc": 0.42998505699193773,
+    "ppl": 6.854229632202593
+   },
+   "q100": {
+    "acc": 0.49,
+    "ppl": 5.907599323483849
+   },
+   "trainSec": 90
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "shakes",
+   "V": 65,
+   "params": 110464,
+   "arch": {
+    "n_embd": 64,
+    "n_head": 2,
+    "n_layer": 2
+   },
+   "iters": 6000,
+   "block": 32,
+   "seed": 17,
+   "chars": 1115394,
+   "fullVal": {
+    "acc": 0.43023364004053555,
+    "ppl": 6.7643816722520675
+   },
+   "q100": {
+    "acc": 0.45,
+    "ppl": 6.785228353755996
+   },
+   "trainSec": 93
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "shakes",
+   "V": 65,
+   "params": 110464,
+   "arch": {
+    "n_embd": 64,
+    "n_head": 2,
+    "n_layer": 2
+   },
+   "iters": 6000,
+   "block": 32,
+   "seed": 19,
+   "chars": 1115394,
+   "fullVal": {
+    "acc": 0.42836772579299953,
+    "ppl": 6.816562855812234
+   },
+   "q100": {
+    "acc": 0.46,
+    "ppl": 5.785442386007865
+   },
+   "trainSec": 103
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "shakes",
+   "V": 65,
+   "params": 818176,
+   "arch": {
+    "n_embd": 128,
+    "n_head": 4,
+    "n_layer": 4
+   },
+   "iters": 6000,
+   "block": 64,
+   "seed": 7,
+   "chars": 1115394,
+   "fullVal": {
+    "acc": 0.49669334492038575,
+    "ppl": 5.479075689854348
+   },
+   "q100": {
+    "acc": 0.44,
+    "ppl": 7.748391488231614
+   },
+   "trainSec": 708
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "shakes",
+   "V": 65,
+   "params": 818176,
+   "arch": {
+    "n_embd": 128,
+    "n_head": 4,
+    "n_layer": 4
+   },
+   "iters": 6000,
+   "block": 64,
+   "seed": 11,
+   "chars": 1115394,
+   "fullVal": {
+    "acc": 0.49491141511549674,
+    "ppl": 5.475206360143365
+   },
+   "q100": {
+    "acc": 0.46,
+    "ppl": 6.7833271336281
+   },
+   "trainSec": 699
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "shakes",
+   "V": 65,
+   "params": 818176,
+   "arch": {
+    "n_embd": 128,
+    "n_head": 4,
+    "n_layer": 4
+   },
+   "iters": 6000,
+   "block": 64,
+   "seed": 13,
+   "chars": 1115394,
+   "fullVal": {
+    "acc": 0.4973657210136802,
+    "ppl": 5.449423483674957
+   },
+   "q100": {
+    "acc": 0.46,
+    "ppl": 7.6520010781659815
+   },
+   "trainSec": 717
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "shakes",
+   "V": 65,
+   "params": 818176,
+   "arch": {
+    "n_embd": 128,
+    "n_head": 4,
+    "n_layer": 4
+   },
+   "iters": 6000,
+   "block": 64,
+   "seed": 17,
+   "chars": 1115394,
+   "fullVal": {
+    "acc": 0.49480418815878,
+    "ppl": 5.4018699969277675
+   },
+   "q100": {
+    "acc": 0.45,
+    "ppl": 6.9035590140283745
+   },
+   "trainSec": 541
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "shakes",
+   "V": 65,
+   "params": 818176,
+   "arch": {
+    "n_embd": 128,
+    "n_head": 4,
+    "n_layer": 4
+   },
+   "iters": 6000,
+   "block": 64,
+   "seed": 19,
+   "chars": 1115394,
+   "fullVal": {
+    "acc": 0.49028607871720115,
+    "ppl": 5.532826233543383
+   },
+   "q100": {
+    "acc": 0.44,
+    "ppl": 7.14410694545824
+   },
+   "trainSec": 435
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "ts",
+   "V": 79,
+   "params": 112256,
+   "arch": {
+    "n_embd": 64,
+    "n_head": 2,
+    "n_layer": 2
+   },
+   "iters": 9000,
+   "block": 32,
+   "seed": 7,
+   "chars": 2998738,
+   "fullVal": {
+    "acc": 0.5960793595605671,
+    "ppl": 3.731253815805852
+   },
+   "q100": {
+    "acc": 0.59,
+    "ppl": 4.1928329093172305
+   },
+   "trainSec": 124
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "ts",
+   "V": 79,
+   "params": 112256,
+   "arch": {
+    "n_embd": 64,
+    "n_head": 2,
+    "n_layer": 2
+   },
+   "iters": 9000,
+   "block": 32,
+   "seed": 11,
+   "chars": 2998738,
+   "fullVal": {
+    "acc": 0.5873755798906753,
+    "ppl": 3.8326248519780757
+   },
+   "q100": {
+    "acc": 0.61,
+    "ppl": 4.444735784192319
+   },
+   "trainSec": 105
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "ts",
+   "V": 79,
+   "params": 112256,
+   "arch": {
+    "n_embd": 64,
+    "n_head": 2,
+    "n_layer": 2
+   },
+   "iters": 9000,
+   "block": 32,
+   "seed": 13,
+   "chars": 2998738,
+   "fullVal": {
+    "acc": 0.588766525425142,
+    "ppl": 3.820008937782792
+   },
+   "q100": {
+    "acc": 0.59,
+    "ppl": 4.348609758621761
+   },
+   "trainSec": 126
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "ts",
+   "V": 79,
+   "params": 112256,
+   "arch": {
+    "n_embd": 64,
+    "n_head": 2,
+    "n_layer": 2
+   },
+   "iters": 9000,
+   "block": 32,
+   "seed": 17,
+   "chars": 2998738,
+   "fullVal": {
+    "acc": 0.5865230447136982,
+    "ppl": 3.827428813683848
+   },
+   "q100": {
+    "acc": 0.55,
+    "ppl": 4.287273128534347
+   },
+   "trainSec": 112
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "ts",
+   "V": 79,
+   "params": 112256,
+   "arch": {
+    "n_embd": 64,
+    "n_head": 2,
+    "n_layer": 2
+   },
+   "iters": 9000,
+   "block": 32,
+   "seed": 19,
+   "chars": 2998738,
+   "fullVal": {
+    "acc": 0.587343687987967,
+    "ppl": 3.8173848364586496
+   },
+   "q100": {
+    "acc": 0.6,
+    "ppl": 4.617220448163465
+   },
+   "trainSec": 121
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "ts",
+   "V": 79,
+   "params": 821760,
+   "arch": {
+    "n_embd": 128,
+    "n_head": 4,
+    "n_layer": 4
+   },
+   "iters": 9000,
+   "block": 64,
+   "seed": 7,
+   "chars": 2998738,
+   "fullVal": {
+    "acc": 0.6728819431704852,
+    "ppl": 2.8697830156557274
+   },
+   "q100": {
+    "acc": 0.69,
+    "ppl": 2.988154150695513
+   },
+   "trainSec": 1114
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "ts",
+   "V": 79,
+   "params": 821760,
+   "arch": {
+    "n_embd": 128,
+    "n_head": 4,
+    "n_layer": 4
+   },
+   "iters": 9000,
+   "block": 64,
+   "seed": 11,
+   "chars": 2998738,
+   "fullVal": {
+    "acc": 0.6687191366003022,
+    "ppl": 2.9016093175992363
+   },
+   "q100": {
+    "acc": 0.67,
+    "ppl": 2.929223460124997
+   },
+   "trainSec": 1129
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "ts",
+   "V": 79,
+   "params": 821760,
+   "arch": {
+    "n_embd": 128,
+    "n_head": 4,
+    "n_layer": 4
+   },
+   "iters": 9000,
+   "block": 64,
+   "seed": 13,
+   "chars": 2998738,
+   "fullVal": {
+    "acc": 0.6696481134655731,
+    "ppl": 2.8968711293547824
+   },
+   "q100": {
+    "acc": 0.67,
+    "ppl": 2.92293516175949
+   },
+   "trainSec": 1288
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "ts",
+   "V": 79,
+   "params": 821760,
+   "arch": {
+    "n_embd": 128,
+    "n_head": 4,
+    "n_layer": 4
+   },
+   "iters": 9000,
+   "block": 64,
+   "seed": 17,
+   "chars": 2998738,
+   "fullVal": {
+    "acc": 0.6687529602180055,
+    "ppl": 2.9001045218183923
+   },
+   "q100": {
+    "acc": 0.65,
+    "ppl": 3.0294540214992405
+   },
+   "trainSec": 1104
+  },
+  {
+   "task": "tiny-transformer-baseline",
+   "corpus": "ts",
+   "V": 79,
+   "params": 821760,
+   "arch": {
+    "n_embd": 128,
+    "n_head": 4,
+    "n_layer": 4
+   },
+   "iters": 9000,
+   "block": 64,
+   "seed": 19,
+   "chars": 2998738,
+   "fullVal": {
+    "acc": 0.6717718614184364,
+    "ppl": 2.8755785450848252
+   },
+   "q100": {
+    "acc": 0.7,
+    "ppl": 2.9079593879017382
+   },
+   "trainSec": 1093
+  }
+ ]
+}
