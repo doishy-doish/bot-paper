@@ -16,9 +16,25 @@ jobs:
       - name: install wasm target
         run: rustup target add wasm32-unknown-unknown
       - name: build recall core
-        run: cd halt-r/rust-recall && cargo build --release --target wasm32-unknown-unknown && cp target/wasm32-unknown-unknown/release/halt_r_recall.wasm recall.wasm && ls -l recall.wasm
+        run: cd halt-r/rust-recall && cargo build --release --lib --target wasm32-unknown-unknown && cp target/wasm32-unknown-unknown/release/halt_r_recall.wasm recall.wasm && ls -l recall.wasm
       - name: test wasm vs JS reference
         run: cd halt-r/rust-recall && node test-recall.mjs
+  cli:
+    name: native CLI (terminal twin) selftest + smoke + cross-check
+    runs-on: ubuntu-latest  # public runner, CPU only, no secrets
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: build native CLI
+        run: cd halt-r/rust-recall && cargo build --release --bin halt-r-cli && ls -l target/release/halt-r-cli
+      - name: CLI selftest (synthetic, offline)
+        run: cd halt-r/rust-recall && ./target/release/halt-r-cli selftest
+      - name: CLI synth smoke (offline)
+        run: cd halt-r/rust-recall && ./target/release/halt-r-cli lm --synth 300000 --W 8 --P 2000 --trials 50 --proj sim
+      - name: CLI shakes cross-check (same protocol as JS bench job)
+        run: |
+          curl -sSL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/shakes.txt
+          cd halt-r/rust-recall && ./target/release/halt-r-cli lm --data /tmp/shakes.txt --W 4 --P 8000 --trials 100 --proj sim
       - name: upload wasm artifact
         uses: actions/upload-artifact@v4
         with:
