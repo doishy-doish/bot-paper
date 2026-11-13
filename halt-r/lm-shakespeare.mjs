@@ -384,7 +384,8 @@ if (process.argv[2] === 'decrypt'){
   const t0 = Date.now();
   const Din = W * V;
   let graftEmb = null, GE = 0, graftWhite = null, graftBind = null; // transplant: frozen donor token rows (zero training)
-  const K5 = 512; // graft5 shared-probe anchor count: order of the 1-bit bound (m>=594, log10 reading), D=512
+  const K5 = parseInt(gv('anchors', '512')); // graft5 anchor count (K-sweep 512/256/128/64; default 512 = bit-identical graft5; order of the 1-bit bound m>=594, D=K5)
+  if (![64, 128, 256, 512].includes(K5)) fail('usage: --anchors 64|128|256|512');
   if (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5'){
     const g = readGraftEmb(GRAFTGGUF, V);
     graftEmb = g.emb; GE = g.GE;
