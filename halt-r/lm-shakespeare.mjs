@@ -223,7 +223,7 @@ if (process.argv[2] === 'decrypt'){
   const noEnc = a.includes('--no-encrypt');
   const noGen = a.includes('--no-gen'); // P-sweep: skip generation (costly, unneeded per-P)
   const dataPath = gv('data', null), outDir = gv('out', null);
-  if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100] [--proj raw|...|graft] [--graftgguf <tinygpt.gguf>] [--no-gen]');
+  if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100] [--proj raw|...|graft5] [--graftgguf <tinygpt.gguf>] [--no-gen]');
   const W = parseInt(gv('W', DEF.W)), TR = parseInt(gv('trials', DEF.trials));
   let P = parseInt(gv('P', DEF.P));
   const P0 = P; // requested store size; P becomes Peff after B2 prune
@@ -248,8 +248,8 @@ if (process.argv[2] === 'decrypt'){
   const TOK = gv('tok', 'char'); // H12 subword pilot: char (default, bit-identical), bpe (256 learned merges on train head)
   if (TOK !== 'char' && TOK !== 'bpe') fail('usage: --tok char|bpe');
   const GRAFTGGUF = gv('graftgguf', null); // transplant: donor GGUF path (keys = frozen donor embeddings, zero training)
-  if ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4') && TOK !== 'char') fail('usage: --proj graft needs --tok char (donor V is char-level)');
-  if ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4') && !GRAFTGGUF) fail('usage: --proj graft needs --graftgguf <tinygpt.gguf>');
+  if ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5') && TOK !== 'char') fail('usage: --proj graft needs --tok char (donor V is char-level)');
+  if ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5') && !GRAFTGGUF) fail('usage: --proj graft needs --graftgguf <tinygpt.gguf>');
   const MIX = gv('mix', 'none'); // gmix: none (default, bit-identical), gpt (mix hop + tiny-GPT dists from q100-gpt file, joined on pos)
   if (MIX !== 'none' && MIX !== 'gpt') fail('usage: --mix none|gpt');
   const GPTQ = gv('gptq', null);
@@ -384,13 +384,14 @@ if (process.argv[2] === 'decrypt'){
   const t0 = Date.now();
   const Din = W * V;
   let graftEmb = null, GE = 0, graftWhite = null, graftBind = null; // transplant: frozen donor token rows (zero training)
-  if (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4'){
+  const K5 = 512; // graft5 shared-probe anchor count: order of the 1-bit bound (m>=594, log10 reading), D=512
+  if (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5'){
     const g = readGraftEmb(GRAFTGGUF, V);
     graftEmb = g.emb; GE = g.GE;
     console.log(`graft donor=${GRAFTGGUF} V=${V} E=${GE} D=${W * GE}`);
   }
-  const D = PROJ === 'raw' ? Din : (PROJ === 'graft3' ? V : (((PROJ === 'graft' || PROJ === 'graft2') || PROJ === 'graft4') ? GE : H));
-  const FW = PROJ === 'graft3' ? V : ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft4') ? GE : H); // feature width: graft keys live in donor space (graft3: anchor space)
+  const D = PROJ === 'raw' ? Din : (PROJ === 'graft3' ? V : (PROJ === 'graft5' ? K5 : (((PROJ === 'graft' || PROJ === 'graft2') || PROJ === 'graft4') ? GE : H)));
+  const FW = PROJ === 'graft3' ? V : (PROJ === 'graft5' ? K5 : ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft4') ? GE : H)); // feature width: graft keys live in donor space (graft3: anchor space, graft5: probe-anchor space)
   function gauss1(rr){ let u = 0, v = 0; while (!u) u = rr(); while (!v) v = rr(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
   let M = null; // projection matrix (sim: random Gaussian; sup: supervised from store labels)
   function orthCols(Mm, rows, cols){ // ORF: Gram-Schmidt on column (feature) directions, per-column norms preserved (scales survive rotation)
@@ -467,6 +468,46 @@ if (process.argv[2] === 'decrypt'){
       }
     }
     console.log('graft4 zca+orth ready V=' + V + ' E=' + GE + ' W=' + W);
+  }
+  if (PROJ === 'graft5'){ // anchor-energy transplant keys (math backtrack B2+B3 fused, zero training, deterministic):
+    // shared probes: K5 windows sampled from train (SEED+13), embedded as whitened-donor-row
+    // sums (graft2 transform, campaign-best). Token key = RANKED cosine to anchors (rank-robust
+    // a la Anchor Energy 2002.01615; isometry-invariant a la relative reps 2209.15430, so no
+    // cross-space alignment step is needed — distances survive rotation by construction).
+    // Per-position sign bind (SEED+14) carries order through the featPM sum+sign path. D=K5=512.
+    const mu5 = new Float64Array(GE), sd5 = new Float64Array(GE);
+    for (let c = 0; c < V; c++) for (let e = 0; e < GE; e++) mu5[e] += graftEmb[c * GE + e];
+    for (let e = 0; e < GE; e++) mu5[e] /= V;
+    for (let c = 0; c < V; c++) for (let e = 0; e < GE; e++){ const d = graftEmb[c * GE + e] - mu5[e]; sd5[e] += d * d; }
+    for (let e = 0; e < GE; e++) sd5[e] = Math.sqrt(sd5[e] / V + 1e-12) || 1;
+    const dw5 = new Float32Array(V * GE);
+    for (let c = 0; c < V; c++) for (let e = 0; e < GE; e++) dw5[c * GE + e] = (graftEmb[c * GE + e] - mu5[e]) / sd5[e];
+    const ar5 = rng(SEED + 13);
+    const aEmb5 = new Float32Array(K5 * GE), aN5 = new Float64Array(K5);
+    for (let a = 0; a < K5; a++){
+      const start = Math.floor(ar5() * (trainIds.length - W));
+      for (let k = 0; k < W; k++){ const c = trainIds[start + k]; for (let e = 0; e < GE; e++) aEmb5[a * GE + e] += dw5[c * GE + e]; }
+      let s = 0; for (let e = 0; e < GE; e++) s += aEmb5[a * GE + e] * aEmb5[a * GE + e];
+      aN5[a] = Math.sqrt(s) + 1e-12;
+    }
+    const dn5 = new Float64Array(V);
+    for (let c = 0; c < V; c++){ let s = 0; for (let e = 0; e < GE; e++) s += dw5[c * GE + e] * dw5[c * GE + e]; dn5[c] = Math.sqrt(s) + 1e-12; }
+    const rel5 = new Float32Array(V * K5), ord5 = new Float64Array(K5), idx5 = [];
+    for (let a = 0; a < K5; a++) idx5.push(a);
+    for (let c = 0; c < V; c++){
+      for (let a = 0; a < K5; a++){ let d = 0; for (let e = 0; e < GE; e++) d += dw5[c * GE + e] * aEmb5[a * GE + e]; ord5[a] = d / (dn5[c] * aN5[a]); }
+      idx5.sort((x, y) => ord5[x] - ord5[y]);
+      for (let r = 0; r < K5; r++) rel5[c * K5 + idx5[r]] = (2 * r / (K5 - 1)) - 1;
+    }
+    const br5 = rng(SEED + 14);
+    const bind5 = new Float32Array(W * K5);
+    for (let k = 0; k < W; k++) for (let a = 0; a < K5; a++) bind5[k * K5 + a] = br5() < 0.5 ? 1 : -1;
+    M = new Float32Array(Din * K5);
+    for (let k = 0; k < W; k++) for (let c = 0; c < V; c++){
+      const base = (k * V + c) * K5, src = c * K5;
+      for (let a = 0; a < K5; a++) M[base + a] = rel5[src + a] * bind5[k * K5 + a];
+    }
+    console.log('graft5 anchor-energy ready V=' + V + ' E=' + GE + ' W=' + W + ' K=' + K5);
   }
   function featPM(ids, pos, out){ // ±1 features, length D (every projected PROJ incl. graft shares the path)
     if (PROJ !== 'raw'){
@@ -1499,7 +1540,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.conf = parseInt(CONF) || 0; metrics.confAbs = confAbs; metrics.confAcc = confAcc; metrics.confPpl = confPpl;
   metrics.orf = parseInt(ORF) || 0;
   metrics.rawfast = parseInt(RAWFAST) || 0;
-  metrics.graft = PROJ === 'graft4' ? 4 : (PROJ === 'graft3' ? 3 : (PROJ === 'graft2' ? 2 : (PROJ === 'graft' ? 1 : 0))); metrics.graftE = PROJ === 'graft3' ? V : GE; metrics.graftFile = (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4') ? GRAFTGGUF : null;
+  metrics.graft = PROJ === 'graft5' ? 5 : (PROJ === 'graft4' ? 4 : (PROJ === 'graft3' ? 3 : (PROJ === 'graft2' ? 2 : (PROJ === 'graft' ? 1 : 0)))); metrics.graftE = PROJ === 'graft3' ? V : (PROJ === 'graft5' ? K5 : GE); metrics.graftFile = (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5') ? GRAFTGGUF : null;
   metrics.c2d = parseInt(C2D) || 0; metrics.canRemDetail = canRemDetail; metrics.canEditDetail = canEditDetail;
   metrics.repHitH = repHitH;
   metrics.hedgeAcc = hedgeAcc; metrics.hedgePpl = hedgePpl; metrics.hedgeNeff = hedgeNeff;
