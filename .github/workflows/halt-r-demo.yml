@@ -1,0 +1,57 @@
+name: halt-r-demo
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/demo-ingest.mjs'
+      - '.github/workflows/halt-r-demo.yml'
+permissions:
+  contents: write
+jobs:
+  demo:
+    name: ingest demo pull-check-save
+    runs-on: ubuntu-latest # public runner, CPU only, no secrets (donor GGUF + q100 are committed data)
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: pull, check, ingest, save
+        run: node halt-r/demo-ingest.mjs --model both --pull --dir /tmp/demo-cache --out out/demo | tee /tmp/demo-log.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demo-ingest
+          path: out/demo/
+          retention-days: 30
+  collect:
+    name: collect demo artifact
+    needs: demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: demo-ingest
+          path: models/
+      - name: stage post-ingestion model
+        run: |
+          cp models/demo-ingest/demo-ingest-model.json halt-r/demo-ingest-model.json
+          cp models/demo-ingest/demo-ingest.md halt-r/demo-ingest.md
+          cat halt-r/demo-ingest.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit demo back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp models/demo-ingest/demo-ingest-model.json halt-r/demo-ingest-model.json
+            cp models/demo-ingest/demo-ingest.md halt-r/demo-ingest.md
+            git add halt-r/demo-ingest-model.json halt-r/demo-ingest.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: ingest demo pull-check-save $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
