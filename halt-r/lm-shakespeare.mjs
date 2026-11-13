@@ -223,7 +223,7 @@ if (process.argv[2] === 'decrypt'){
   const noEnc = a.includes('--no-encrypt');
   const noGen = a.includes('--no-gen'); // P-sweep: skip generation (costly, unneeded per-P)
   const dataPath = gv('data', null), outDir = gv('out', null);
-  if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100] [--proj raw|...|graft5] [--graftgguf <tinygpt.gguf>] [--no-gen]');
+  if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100] [--proj raw|sim|sup|enc|enc2|ict|fsq|graft5] [--graftgguf <tinygpt.gguf>] [--no-gen]');
   const W = parseInt(gv('W', DEF.W)), TR = parseInt(gv('trials', DEF.trials));
   let P = parseInt(gv('P', DEF.P));
   const P0 = P; // requested store size; P becomes Peff after B2 prune
@@ -394,6 +394,11 @@ if (process.argv[2] === 'decrypt'){
   const D = PROJ === 'raw' ? Din : (PROJ === 'graft3' ? V : (PROJ === 'graft5' ? K5 : (((PROJ === 'graft' || PROJ === 'graft2') || PROJ === 'graft4') ? GE : H)));
   const FW = PROJ === 'graft3' ? V : (PROJ === 'graft5' ? K5 : ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft4') ? GE : H)); // feature width: graft keys live in donor space (graft3: anchor space, graft5: probe-anchor space)
   function gauss1(rr){ let u = 0, v = 0; while (!u) u = rr(); while (!v) v = rr(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  function fsqQ(x){ // F1 finite-scalar quantization: L=8 uniform levels in [-3,3]; straight-through in training (grad passes as identity); pure, no CLI refs
+    const B = 3, L = 8;
+    const v = x < -B ? -B : (x > B ? B : x);
+    return Math.round(v * (L - 1) / (2 * B)) * (2 * B / (L - 1));
+  }
   let M = null; // projection matrix (sim: random Gaussian; sup: supervised from store labels)
   function orthCols(Mm, rows, cols){ // ORF: Gram-Schmidt on column (feature) directions, per-column norms preserved (scales survive rotation)
     const n0 = new Float64Array(cols);
@@ -517,6 +522,7 @@ if (process.argv[2] === 'decrypt'){
         const base = (k * V + ids[pos + k]) * FW;
         for (let h = 0; h < FW; h++) out[h] += M[base + h];
       }
+      if (PROJ === 'fsq'){ for (let h = 0; h < FW; h++) out[h] = fsqQ(out[h]); } // F1: quantize-before-sign so eval keys match FSQ-trained M; other PROJs untouched
       for (let h = 0; h < FW; h++) out[h] = out[h] >= 0 ? 1 : -1;
     } else {
       out.fill(0);
@@ -529,6 +535,7 @@ if (process.argv[2] === 'decrypt'){
   let flopSteps = 0; // recall iterations actually executed (all phases) -> evalMflops
   const r = rng(SEED), q = new Float32Array(D);
   let encLossFirst = 0, encLossLast = 0; // trunk contrastive metrics (0 unless proj=enc)
+  let fsqCodes = 0, fsqReuse = 0; // F1 code-reuse diagnostic (distinct 64-bit-prefix patterns; 0 unless proj=fsq)
   if (PROJ === 'sup' || PROJ === 'sup2'){ // sup2: per-(position,char) scales (strict generalization of sup)
     // H1 learned encoder: positions that predict the label get bigger projection
     // magnitude, so dots are dominated by predictive (usually suffix) positions and
@@ -780,6 +787,66 @@ if (process.argv[2] === 'decrypt'){
     for (let s = 0; s < P; s++){
       featPM(trainIds, spos[s], q);
       for (let j = 0; j < D; j++) X[s * D + j] = q[j] > 0 ? 1 : 0;
+    }
+  } else if (PROJ === 'fsq'){ // F1 discrete compositional keys (prior-art checked 2026-11-13): supervised probe THROUGH FSQ (straight-through), same streams/steps as enc2 for comparability
+    for (let s = 0; s < P; s++){
+      const pos = Math.floor(r() * (trainIds.length - W));
+      spos[s] = pos;
+      next[s] = trainIds[pos + W];
+    }
+    const rrF = rng(SEED + 3), invF = Math.sqrt(1 / Din);
+    M = new Float32Array(Din * H);
+    for (let i = 0; i < M.length; i++) M[i] = gauss1(rrF) * invF;
+    const rrUF = rng(SEED + 6), invUF = Math.sqrt(1 / H);
+    const UF = new Float32Array(V * H);
+    for (let i = 0; i < UF.length; i++) UF[i] = gauss1(rrUF) * invUF;
+    const EBF = 128, ESTEPSF = 300, ELRF = 0.05;
+    const brF = rng(SEED + 4);
+    const eidxF = new Uint32Array(EBF);
+    const zF = new Float32Array(EBF * H), lgF = new Float32Array(EBF * V);
+    for (let st = 0; st < ESTEPSF; st++){
+      for (let i = 0; i < EBF; i++) eidxF[i] = Math.floor(brF() * P);
+      for (let i = 0; i < EBF; i++){
+        for (let h = 0; h < H; h++) zF[i * H + h] = 0;
+        for (let k = 0; k < W; k++){
+          const base = (k * V + trainIds[spos[eidxF[i]] + k]) * H;
+          for (let h = 0; h < H; h++) zF[i * H + h] += M[base + h];
+        }
+        for (let h = 0; h < H; h++) zF[i * H + h] = fsqQ(zF[i * H + h]); // straight-through: forward quantizes, grad below flows as identity
+      }
+      let loss = 0;
+      const gzF = new Float32Array(EBF * H);
+      for (let i = 0; i < EBF; i++){
+        let m = -1e30;
+        for (let c = 0; c < V; c++){ let d = 0; for (let h = 0; h < H; h++) d += UF[c * H + h] * zF[i * H + h]; lgF[i * V + c] = d; if (d > m) m = d; }
+        let t = 0;
+        for (let c = 0; c < V; c++){ const e = Math.exp(lgF[i * V + c] - m); lgF[i * V + c] = e; t += e; }
+        if (!(t > 0)) continue;
+        const y = next[eidxF[i]];
+        loss += -Math.log(Math.max(lgF[i * V + y] / t, 1e-12));
+        for (let c = 0; c < V; c++){
+          const dl = (lgF[i * V + c] / t) - (c === y ? 1 : 0);
+          for (let h = 0; h < H; h++){ gzF[i * H + h] += UF[c * H + h] * dl; UF[c * H + h] -= ELRF * dl * zF[i * H + h] / EBF; }
+        }
+      }
+      loss /= EBF;
+      if (st === 0) encLossFirst = loss;
+      if (st === ESTEPSF - 1) encLossLast = loss;
+      for (let i = 0; i < EBF; i++) for (let k = 0; k < W; k++){
+        const base = (k * V + trainIds[spos[eidxF[i]] + k]) * H;
+        for (let h = 0; h < H; h++) M[base + h] -= ELRF * gzF[i * H + h] / EBF;
+      }
+    }
+    if (ORF === '1') orthCols(M, Din, H);
+    console.log(`fsq supervised-through-FSQ steps=${ESTEPSF} ce ${encLossFirst.toFixed(3)}->${encLossLast.toFixed(3)}`);
+    for (let s = 0; s < P; s++){
+      featPM(trainIds, spos[s], q);
+      for (let j = 0; j < D; j++) X[s * D + j] = q[j] > 0 ? 1 : 0;
+    }
+    { // code-reuse diagnostic: distinct 64-bit-prefix patterns (lower = more factor reuse than continuous unique keys)
+      const seen = new Set();
+      for (let s = 0; s < P; s++){ let k = ''; for (let j = 0; j < Math.min(D, 64); j++) k += X[s * D + j] ? '1' : '0'; seen.add(k); }
+      fsqCodes = seen.size; fsqReuse = 1 - seen.size / P;
     }
   } else {
   for (let s = 0; s < P; s++){
@@ -1555,6 +1622,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.smp = SMP;
   if (split){ metrics.memAcc = split.memAcc; metrics.memBiAcc = split.memBi; metrics.memN = split.memN; metrics.novAcc = split.novAcc; metrics.novBiAcc = split.novBi; metrics.novN = split.novN; }
   metrics.h6 = parseInt(H6) || 0; metrics.h6LamSel = h6LamSel; metrics.h6AccSel = h6AccSel; metrics.h6PplSel = h6PplSel; metrics.h6Acc = h6Acc; metrics.h6Ppl = h6Ppl; metrics.h6AUC = h6AUC;
+  metrics.fsq = PROJ === 'fsq' ? 1 : 0; metrics.fsqCodes = fsqCodes; metrics.fsqReuse = fsqReuse;
   writeFileSync(outDir + '/metrics.json', JSON.stringify(metrics));
   let stxt = '';
   for (const s of samples) stxt += 'PROMPT: ' + JSON.stringify(s.prompt) + '\nHOP: ' + JSON.stringify(s.hop) + '\nBI: ' + JSON.stringify(s.bi) + '\nCITE: ' + JSON.stringify(s.cite || []) + '\n---\n';
