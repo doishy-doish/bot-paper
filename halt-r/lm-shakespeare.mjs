@@ -110,6 +110,8 @@ if (process.argv[2] === 'decrypt'){
   if (SCORE !== 'whole' && SCORE !== 'maxsim') fail('usage: --score whole|maxsim');
   const CAPAB = gv('capab', 'none'); // C-rungs: none (default, bit-identical), canary=C1 edit + C2 exact-forget (three phases, one job)
   if (CAPAB !== 'none' && CAPAB !== 'canary') fail('usage: --capab none|canary');
+  const H6 = gv('h6', '0'); // reframed consolidate-wins logistic gate (0=off bit-identical, 1=on)
+  if (H6 !== '0' && H6 !== '1') fail('usage: --h6 0|1');
   const kei = a.indexOf('--key-env');
   const secret = process.env[kei >= 0 ? a[kei + 1] : 'SCRAMBLE'];
   if (!secret && !noEnc) fail('SCRAMBLE key missing (refuses plaintext save; --no-encrypt for smoke only)');
@@ -414,6 +416,13 @@ if (process.argv[2] === 'decrypt'){
       for (let i = 0; i < w.length; i++){ wsum += w[i]; if (w[i] > wmax) wmax = w[i]; }
       let ent = 1; // H5: normalized entropy of store weights (1=uniform/diffuse, 0=one-hot); same loop, no extra pass
       if (wsum > 0){ ent = 0; for (let i = 0; i < w.length; i++){ const p = w[i] / wsum; if (p > 0) ent -= p * Math.log(p); } ent /= Math.log(w.length); }
+      let w2 = 0, kth = 0, cov = 0; // H6: margin + kth-weight + coverage from same w, zero extra passes
+      if (wsum > 0){
+        const thr = wsum / w.length, top = [];
+        for (let i = 0; i < w.length; i++){ if (w[i] > thr) cov++; top.push(w[i]); }
+        top.sort((a, b) => b - a);
+        w2 = top.length > 1 ? top[1] : 0; kth = top.length > 9 ? top[9] : top[top.length - 1];
+      }
       const hd = predictNext(w, next, V);
       let tot = 0; for (let i = 0; i < V; i++) tot += hd[i];
       for (let i = 0; i < V; i++) hd[i] /= (tot + 1e-12 * V);
@@ -421,7 +430,8 @@ if (process.argv[2] === 'decrypt'){
       let rtot = V; for (let c = 0; c < V; c++) rtot += bi[off + c];
       const bd = new Float64Array(V);
       for (let c = 0; c < V; c++) bd[c] = (bi[off + c] + 1) / rtot;
-      rows.push({ hd, bd, trueNext, g: wmax / (wsum || 1), h: ent });
+      let be = 0; for (let c = 0; c < V; c++){ const p = bd[c]; if (p > 0) be -= p * Math.log(p); } be /= Math.log(V);
+      rows.push({ hd, bd, trueNext, g: wmax / (wsum || 1), h: ent, m: (wmax - w2) / (wsum || 1), k10: kth / (wsum || 1), cov, be });
     }
     return rows;
   }
@@ -476,6 +486,53 @@ if (process.argv[2] === 'decrypt'){
   const gatedFracRep = repRows.length ? repRows.filter(qr => qr.g < GATE).length / repRows.length : 0;
   console.log(`gate tau=${GATE} pruneKeep=${KEEP} Peff=${P} gatedFrac=${gatedFracRep.toFixed(3)}`);
   if (CAPAB === 'canary') console.log(`canary remember=${canRemember.toFixed(2)} editFlip=${canEditFlip.toFixed(2)} forgetLeak=${canForgetLeak.toFixed(3)} collat=${collatBase.toFixed(3)}->${collatAfter.toFixed(3)}`);
+  // ---- H6 reframed: consolidate-wins logistic gate (6 features, zero pretraining) ----
+  let h6LamSel = -1, h6AccSel = 0, h6PplSel = 0, h6Acc = 0, h6Ppl = 0, h6AUC = 0;
+  if (H6 === '1'){
+    const F = (qr) => [qr.g, 1 - qr.h, qr.m, qr.k10, qr.cov / P, 1 - qr.be];
+    const ME = 6, mu = new Array(ME).fill(0), sd = new Array(ME).fill(0);
+    for (const qr of selRows){ const f = F(qr); for (let j = 0; j < ME; j++) mu[j] += f[j]; }
+    for (let j = 0; j < ME; j++) mu[j] /= selRows.length;
+    for (const qr of selRows){ const f = F(qr); for (let j = 0; j < ME; j++) sd[j] += (f[j] - mu[j]) * (f[j] - mu[j]); }
+    for (let j = 0; j < ME; j++) sd[j] = Math.sqrt(sd[j] / selRows.length) || 1;
+    const Z = selRows.map(qr => F(qr).map((v, j) => (v - mu[j]) / sd[j]));
+    const Y = selRows.map(qr => (-Math.log(Math.max(qr.hd[qr.trueNext], 1e-12)) < -Math.log(Math.max(qr.bd[qr.trueNext], 1e-12))) ? 1 : 0);
+    let hw = new Array(ME).fill(0), hb = 0;
+    for (let e = 0; e < 500; e++){
+      const gw = new Array(ME).fill(0); let gb = 0;
+      for (let i = 0; i < Z.length; i++){
+        let z = hb; for (let j = 0; j < ME; j++) z += hw[j] * Z[i][j];
+        const p = 1 / (1 + Math.exp(-z)), d = p - Y[i]; gb += d;
+        for (let j = 0; j < ME; j++) gw[j] += d * Z[i][j];
+      }
+      for (let j = 0; j < ME; j++) hw[j] -= 0.1 * gw[j] / Z.length; hb -= 0.1 * gb / Z.length;
+    }
+    const P1 = (qr) => { const f = F(qr); let z = hb; for (let j = 0; j < ME; j++) z += hw[j] * (f[j] - mu[j]) / sd[j]; return 1 / (1 + Math.exp(-z)); };
+    const order = selRows.map((qr, i) => i).sort((a, b) => P1(selRows[b]) - P1(selRows[a]));
+    let tp = 0, auc = 0; const npos = Y.reduce((a, v) => a + v, 0), nneg = Y.length - npos;
+    for (const i of order){ if (Y[i]) tp++; else auc += tp; }
+    h6AUC = (npos && nneg) ? auc / (npos * nneg) : 0;
+    function h6Stats(rows){
+      return LAMBDAS.map(lam => {
+        let acc = 0, ce = 0;
+        for (const qr of rows){
+          const L = lam * P1(qr);
+          let bp = -1, bci = 0;
+          for (let c = 0; c < V; c++){ const p = L * qr.hd[c] + (1 - L) * qr.bd[c]; if (p > bp){ bp = p; bci = c; } }
+          if (bci === qr.trueNext) acc++;
+          ce += -Math.log(Math.max(L * qr.hd[qr.trueNext] + (1 - L) * qr.bd[qr.trueNext], 1e-12));
+        }
+        return { lam, acc: acc / rows.length, ppl: Math.exp(ce / rows.length) };
+      });
+    }
+    const selH6 = h6Stats(selRows);
+    let bestH6 = selH6[0];
+    for (const s of selH6) if (s.ppl < bestH6.ppl || (s.ppl === bestH6.ppl && s.acc > bestH6.acc)) bestH6 = s;
+    const repH6 = h6Stats(repRows);
+    const rh = repH6[LAMBDAS.indexOf(bestH6.lam)];
+    h6LamSel = bestH6.lam; h6AccSel = bestH6.acc; h6PplSel = bestH6.ppl; h6Acc = rh.acc; h6Ppl = rh.ppl;
+    console.log(`h6 gate select lam=${bestH6.lam} acc=${bestH6.acc.toFixed(3)} ppl=${bestH6.ppl.toFixed(2)} auc=${h6AUC.toFixed(3)} report acc=${rh.acc.toFixed(3)} ppl=${rh.ppl.toFixed(2)}`);
+  }
   console.log('interp select: ' + selStats.map(s => `lam=${s.lam} acc=${s.acc.toFixed(3)} ppl=${s.ppl.toFixed(2)}`).join(' | '));
   console.log(`interp locked lam=${bestLam.lam} report acc=${repLocked.acc.toFixed(3)} ppl=${repLocked.ppl.toFixed(2)}`);
   // pairing self-check: lam=0 must reproduce the bigram eval exactly (same queries, same Laplace)
@@ -520,6 +577,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.biAccRep = repStats[0].acc; metrics.biPplRep = repStats[0].ppl;
   metrics.gateTau = GATE; metrics.pruneKeep = KEEP; metrics.Peff = P; metrics.gatedFracRep = gatedFracRep;
   metrics.canRemember = canRemember; metrics.canEditFlip = canEditFlip; metrics.canForgetLeak = canForgetLeak; metrics.collatBase = collatBase; metrics.collatAfter = collatAfter; metrics.canaryN = CAPAB === 'canary' ? 20 : 0;
+  metrics.h6 = parseInt(H6) || 0; metrics.h6LamSel = h6LamSel; metrics.h6AccSel = h6AccSel; metrics.h6PplSel = h6PplSel; metrics.h6Acc = h6Acc; metrics.h6Ppl = h6Ppl; metrics.h6AUC = h6AUC;
   writeFileSync(outDir + '/metrics.json', JSON.stringify(metrics));
   let stxt = '';
   for (const s of samples) stxt += 'PROMPT: ' + JSON.stringify(s.prompt) + '\nHOP: ' + JSON.stringify(s.hop) + '\nBI: ' + JSON.stringify(s.bi) + '\n---\n';
