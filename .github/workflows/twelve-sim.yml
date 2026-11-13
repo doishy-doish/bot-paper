@@ -5,13 +5,14 @@ on:
     paths:
       - '.github/workflows/twelve-sim.yml'
       - 'twelve/sim/incremental.sh'
+      - 'twelve/sim/search.sh'
 permissions:
   contents: read
 jobs:
   sim:
     name: twelve sim (test.sh + k6 smoke, kensac vs rust-direct)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: checkout self (our entries)
         uses: actions/checkout@v4
@@ -87,7 +88,7 @@ jobs:
           echo "K_RC=$K_RC O_RC=$O_RC" | tee /tmp/test-rc.env
           # do not fail the job here: kensac may refuse io_uring on hosted runners; summary reports it
           exit 0
-      - name: incremental ramp (10-25-50-100 users, same user model, same bars)
+      - name: max-hold search (official-style probes + bisect + hold, short-hold CI edition)
         run: |
           set -u
           export PATH="/usr/local/bin:$HOME/.cargo/bin:$PATH"
@@ -109,13 +110,13 @@ jobs:
           echo "K_OK=$K_OK O_OK=$O_OK" | tee /tmp/srv-status.env
           if [ "$K_OK" = 0 ]; then
             restart_fresh "upstream/submissions/rust-iouring-kensac" 3001 /tmp/kensac.db /tmp/srv-kensac.log || K_OK=$?
-            [ "$K_OK" = 0 ] && bash self/twelve/sim/incremental.sh http://127.0.0.1:3001 ../seed/tokens.json upstream/bench/load.js /tmp/ramp-kensac "10 25 50 100" || K_OK=$?
+            [ "$K_OK" = 0 ] && bash self/twelve/sim/search.sh http://127.0.0.1:3001 ../seed/tokens.json upstream/bench/load.js /tmp/ramp-kensac || K_OK=$?
           else
             echo "SKIP kensac ramp (server did not start; likely io_uring blocked on hosted runner)"
           fi
           if [ "$O_OK" = 0 ]; then
             restart_fresh "self/twelve/submissions/rust-direct-challenger" 3002 /tmp/ours.db /tmp/srv-ours.log || O_OK=$?
-            [ "$O_OK" = 0 ] && bash self/twelve/sim/incremental.sh http://127.0.0.1:3002 ../seed/tokens.json upstream/bench/load.js /tmp/ramp-ours "10 25 50 100" || O_OK=$?
+            [ "$O_OK" = 0 ] && bash self/twelve/sim/search.sh http://127.0.0.1:3002 ../seed/tokens.json upstream/bench/load.js /tmp/ramp-ours || O_OK=$?
           else
             echo "ours failed to start (unexpected: epoll/tokio should run anywhere)"
           fi
@@ -138,7 +139,7 @@ jobs:
           md += 'Hosted runner is a shared VM with noisy neighbors; the official box is a dedicated 1 vCPU Synteq VPS with a 16-core load rig and 5-min holds. Same-machine + same incremental ramp here measures _relative_ behavior only.\n\n';
           md += '## test.sh (42 checks, fresh DB)\n';
           md += '- kensac: ' + passed(testK) + '\n- ours (rust-direct): ' + passed(testO) + '\n';
-          md += '\n## incremental ramp (levels 10/25/50/100, 30s hold + 10s ramp each, same user model + pass bars as the official bench)\n';
+          md += '\n## max-hold search (doubling probes + bisect + short hold, same user model + pass bars as the official bench)\n';
           md += '### kensac' + (resK ? ` (max pass: ${resK.max_pass}, failed at: ${resK.failed_at || 'none — cleared all levels'})` : ' (no ramp output: server did not start or ramp skipped)') + '\n' + (tableK ? tableK + '\n' : '');
           md += '### ours (rust-direct)' + (resO ? ` (max pass: ${resO.max_pass}, failed at: ${resO.failed_at || 'none — cleared all levels'})` : ' (no ramp output)') + '\n' + (tableO ? tableO + '\n' : '');
           md += '\n## how to read this\n- If both pass test.sh and clear the same ramp levels, the entries are functionally equivalent at this scale; the req/s gap here is scheduling noise + shared-CPU, not rank.\n- If kensac fails to start (io_uring blocked) while ours starts, that is a portability signal in our favor for constrained hosts, not a performance claim.\n- Real verdict needs the official bench (16-core rig, 2-min probes + 5-min holds). This job is pre-benchmark signal only.\n';
