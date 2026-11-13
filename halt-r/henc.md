@@ -12,10 +12,10 @@ Same protocol (P=8000, H=256, no-gen). enc: 100 SGD steps, batch 128, InfoNCE sa
 | ts | 8 | enc | linear-O(P·D) | 4.971->4.600 | 0.430/8.00 (0.25) |
 | ts | 8 | sup | linear-O(P·D) | 0.000->0.000 | 0.540/7.56 (0.25) |
 
-shakes W8: sup 13.18 vs enc 12.54 (lam*=0.1). VERDICT: LEARNING CRACKS IT (encoder beats scales).
+shakes W8: sup 13.18 vs enc 12.54 (lam*=0.1). McNemar enc-vs-sup b/c=10/6 p=0.454. VERDICT: leans encoder, not significant.
 
-shakes W16: sup 12.41 vs enc 14.12 (lam*=0.1). VERDICT: SCALES STAND (learning adds nothing).
+shakes W16: sup 12.41 vs enc 14.12 (lam*=0.1). McNemar enc-vs-sup b/c=3/7 p=0.344. VERDICT: SCALES STAND (learning adds nothing).
 
-ts W8: sup 7.56 vs enc 8.00 (lam*=0.25). VERDICT: SCALES STAND (learning adds nothing).
+ts W8: sup 7.56 vs enc 8.00 (lam*=0.25). McNemar enc-vs-sup b/c=4/15 p=0.019 SIGNIFICANT. VERDICT: SCALES STAND (learning adds nothing).
 
-ts W16: sup 11.47 vs enc 10.71 (lam*=0.25). VERDICT: LEARNING CRACKS IT (encoder beats scales).
+ts W16: sup 11.47 vs enc 10.71 (lam*=0.25). McNemar enc-vs-sup b/c=3/3 p=1.000. VERDICT: leans encoder, not significant.
