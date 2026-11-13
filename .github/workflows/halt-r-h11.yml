@@ -1,0 +1,105 @@
+name: halt-r-h11
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/lm-shakespeare.mjs'
+      - '.github/workflows/halt-r-h11.yml'
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: h11 ${{ matrix.corpus }} W${{ matrix.W }} tmp${{ matrix.tmp }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        corpus: [shakes, ts]
+        W: [8, 16]
+        tmp: [0, 1]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fetch corpus (public domain / public research text)
+        run: |
+          if [ "${{ matrix.corpus }}" = ts ]; then
+            curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          else
+            curl -sSL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus.txt
+          fi
+          wc -c /tmp/corpus.txt
+      - name: bench h11 arm (JS-only, same code path)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/h11-${{ matrix.corpus }}-W${{ matrix.W }}-tmp${{ matrix.tmp }} --tag ${{ matrix.corpus }} --W ${{ matrix.W }} --P 8000 --trials 100 --proj sup --H 256 --sparse 0 --hedge 0 --tmp ${{ matrix.tmp }} --no-gen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: h11-${{ matrix.corpus }}-W${{ matrix.W }}-tmp${{ matrix.tmp }}
+          path: out/h11-${{ matrix.corpus }}-W${{ matrix.W }}-tmp${{ matrix.tmp }}/
+          retention-days: 30
+  collect:
+    name: collect h11 verdicts
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: h11-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: h11 post-hoc temperature verdicts
+        run: |
+          node - <<'EOF' | tee /tmp/h11.md
+          const fs = require('node:fs'), path = require('node:path');
+          const mcP = (b, c) => { const n = b + c; if (!n) return 1; const lo = Math.min(b, c);
+           let pk = Math.pow(0.5, n), tail = pk;
+           for (let k = 1; k <= lo; k++){ pk = pk * (n - k + 1) / k; tail += pk; }
+           return Math.min(1, 2 * tail); };
+           const pair = (s1, s2) => { let b = 0, c = 0;
+           for (let i = 0; i < Math.min(s1.length, s2.length); i++){ const a = s1[i], d = s2[i];
+           if (a === 'x' || d === 'x') continue;
+           if (a === '1' && d === '0') b++; if (a === '0' && d === '1') c++; }
+           return {b, c, p: mcP(b, c)}; };
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          walk('models');
+          const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+          runs.sort((a, b) => (a.corpus < b.corpus ? -1 : 1) || a.W - b.W || (a.tmp || 0) - (b.tmp || 0));
+          fs.writeFileSync('/tmp/h11.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'h11-temp', runs}, null, 1));
+          let md = "# H11: post-hoc temperature on mixed dist (measured, CI)\nSame protocol (P=8000, sup, no-gen). T grid 0.5..2 fit on select, locked report. Same rows, recalibrated.\n\n| corpus | W | tmp | interp acc/ppl (lam*) | tmp acc/ppl (T) |\n|---|---|---|---|---|\n";
+          for (const r of runs) md += '| ' + r.corpus + ' | ' + r.W + ' | ' + r.tmp + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + ' (' + r.interpLambda + ') | ' + r.tmpAcc.toFixed(3) + '/' + r.tmpPpl.toFixed(2) + ' (' + r.tmpT + ') |\n';
+          for (const corpus of ['shakes', 'ts']) for (const W of [8, 16]) {
+           const s1 = runs.find(r => r.corpus === corpus && r.W === W && r.tmp === 1);
+           const s0 = runs.find(r => r.corpus === corpus && r.W === W && r.tmp === 0);
+           if (!s0 || !s1) continue;
+           md += '\n' + corpus + ' W' + W + ' mixed ' + s1.interpPpl.toFixed(2) + ' -> T=' + s1.tmpT + ' ' + s1.tmpPpl.toFixed(2) + ' d=' + (s1.interpPpl - s1.tmpPpl).toFixed(2) + '.' + ' ' + (s1.tmpPpl < s1.interpPpl - 0.05 ? 'VERDICT: TEMPERATURE CLOSES.' : 'VERDICT: mixed temp stands.') + '\n';
+          }
+          process.stdout.write(md);
+          EOF
+          cp /tmp/h11.json halt-r/h11.json
+          cp /tmp/h11.md halt-r/h11.md
+          cat halt-r/h11.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit h11 back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/h11.json halt-r/h11.json
+            git add halt-r/h11.json halt-r/h11.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: h11 temp $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
