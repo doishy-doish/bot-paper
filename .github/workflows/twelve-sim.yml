@@ -104,13 +104,13 @@ jobs:
           echo "K_OK=$K_OK O_OK=$O_OK" | tee /tmp/srv-status.env
           if [ "$K_OK" = 0 ]; then
             restart_fresh "upstream/submissions/rust-iouring-kensac" 3001 /tmp/kensac.db /tmp/srv-kensac.log || K_OK=$?
-            [ "$K_OK" = 0 ] && bash self/twelve/sim/incremental.sh http://127.0.0.1:3001 upstream/seed/tokens.json upstream/bench/load.js /tmp/ramp-kensac "10 25 50 100" || K_OK=$?
+            [ "$K_OK" = 0 ] && bash self/twelve/sim/incremental.sh http://127.0.0.1:3001 ../seed/tokens.json upstream/bench/load.js /tmp/ramp-kensac "10 25 50 100" || K_OK=$?
           else
             echo "SKIP kensac ramp (server did not start; likely io_uring blocked on hosted runner)"
           fi
           if [ "$O_OK" = 0 ]; then
             restart_fresh "self/twelve/submissions/rust-direct-challenger" 3002 /tmp/ours.db /tmp/srv-ours.log || O_OK=$?
-            [ "$O_OK" = 0 ] && bash self/twelve/sim/incremental.sh http://127.0.0.1:3002 upstream/seed/tokens.json upstream/bench/load.js /tmp/ramp-ours "10 25 50 100" || O_OK=$?
+            [ "$O_OK" = 0 ] && bash self/twelve/sim/incremental.sh http://127.0.0.1:3002 ../seed/tokens.json upstream/bench/load.js /tmp/ramp-ours "10 25 50 100" || O_OK=$?
           else
             echo "ours failed to start (unexpected: epoll/tokio should run anywhere)"
           fi
