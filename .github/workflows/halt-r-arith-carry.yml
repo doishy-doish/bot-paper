@@ -1,0 +1,172 @@
+name: halt-r-arith-carry
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/halt-r-arith-carry.yml'
+      - 'halt-r/make-arith-carry.py'
+permissions:
+  contents: write
+jobs:
+  train:
+    name: arith-carry donor (sums 0-74, frozen after train)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: install torch CPU
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install numpy
+      - name: make carry-rich corpus (deterministic, boundary-proofed)
+        run: |
+          python3 halt-r/make-arith-carry.py --out /tmp/arith --W 8
+          wc -c /tmp/arith/arith-train.txt /tmp/arith/arith-full.txt
+      - name: train BIG carry donor (CPU, 1M-cell)
+        run: python3 halt-r/train-tiny-lm.py --data /tmp/arith/arith-train.txt --out out/donor --tag arith-carry --block 8 --iters 20000 --n-embd 128 --n-head 4 --n-layer 4
+      - name: export donor GGUF (transplant key source)
+        run: python3 halt-r/export-gguf.py --pt out/donor/tiny.pt --vocab out/donor/vocab.json --ref out/donor/ref-arith-carry.json --out out/donor/tinygpt-arith-carry.gguf
+      - name: emit test-range donor dists (bench-joinable, W-matched)
+        run: python3 halt-r/emit-q100.py --pt out/donor/tiny.pt --vocab out/donor/vocab.json --data /tmp/arith/arith-full.txt --W 8 --trials 100 --tag arith-carry-test --out out/donor
+      - name: stage corpus spec alongside donor
+        run: cp /tmp/arith/arith-spec.json out/donor/arith-spec.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arith-carry-donor
+          path: out/donor/
+          retention-days: 30
+  bench:
+    name: arith-carry bench ${{ matrix.arm }} (W8, held-out 75-99)
+    needs: train
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        arm: [interp, gpt, graft5]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@v4
+        with:
+          name: arith-carry-donor
+          path: models/arith-donor/
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: remake carry corpus (deterministic, byte-identical)
+        run: |
+          python3 halt-r/make-arith-carry.py --out /tmp/arith --W 8
+          wc -c /tmp/arith/arith-full.txt
+      - name: bench arith-carry capability
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: |
+          FLAGS="--W 8 --P 8000 --trials 100 --H 256 --no-gen --split 1 --hedge 1"
+          if [ "${{ matrix.arm }}" = interp ]; then
+            FLAGS="$FLAGS --proj sup --mix none"
+          elif [ "${{ matrix.arm }}" = gpt ]; then
+            FLAGS="$FLAGS --proj sup --mix gpt --gptq models/arith-donor/q100-gpt-arith-carry-test.json"
+          else
+            FLAGS="$FLAGS --proj graft5 --anchors 256 --graftgguf models/arith-donor/tinygpt-arith-carry.gguf --mix none"
+          fi
+          node halt-r/lm-shakespeare.mjs --data /tmp/arith/arith-full.txt --out out/arith-carry-${{ matrix.arm }} --tag arith-carry $FLAGS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arith-carry-${{ matrix.arm }}
+          path: out/arith-carry-${{ matrix.arm }}/
+          retention-days: 30
+  collect:
+    name: collect arith-carry verdict
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arith-carry-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: arith-carry verdict (data shot, not size shot)
+        run: |
+          node - <<'EOF' | tee /tmp/arith-carry.md
+          const fs = require('node:fs'), path = require('node:path');
+          const mcP = (b, c) => { const n = b + c; if (!n) return 1; const lo = Math.min(b, c);
+            let pk = Math.pow(0.5, n), tail = pk;
+            for (let k = 1; k <= lo; k++){ pk = pk * (n - k + 1) / k; tail += pk; }
+            return Math.min(1, 2 * tail); };
+          const pair = (s1, s2) => { let b = 0, c = 0;
+            for (let i = 0; i < Math.min(s1.length, s2.length); i++){ const a = s1[i], d = s2[i];
+              if (a === 'x' || d === 'x') continue;
+              if (a === '1' && d === '0') b++; if (a === '0' && d === '1') c++; }
+            return {b, c, p: mcP(b, c)}; };
+          const agree = (s1, s2) => { let e = 0, n = 0;
+            for (let i = 0; i < Math.min(s1.length, s2.length); i++){ const a = s1[i], d = s2[i];
+              if (a === 'x' || d === 'x') continue; n++; if (a === d) e++; }
+            return n ? e / n : 0; };
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) w(p); else if (e.name === 'metrics.json') files.push(p); } };
+          const w = walk;
+          walk('models');
+          const runs = files.map(f => { const m = JSON.parse(fs.readFileSync(f, 'utf8')); m._art = f; return m; });
+          const inter = runs.find(r => r._art.includes('arith-carry-interp'));
+          const gpt = runs.find(r => r._art.includes('arith-carry-gpt'));
+          const gr5 = runs.find(r => r._art.includes('arith-carry-graft5'));
+          if (!inter || !gpt || !gr5) { console.log('FAIL missing bench arms'); process.exit(1); }
+          const glob = name => { const out = []; const ww = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) ww(p); else if (e.name === name) out.push(p); } }; ww('models'); return out; };
+          const qf = glob('q100-gpt-arith-carry-test.json')[0];
+          const af = glob('donor-alone.json')[0];
+          const sf = glob('arith-spec.json')[0];
+          if (!qf || !af || !sf) { console.log('FAIL missing donor files'); process.exit(1); }
+          const q = JSON.parse(fs.readFileSync(qf, 'utf8'));
+          const alone = JSON.parse(fs.readFileSync(af, 'utf8'));
+          const spec = JSON.parse(fs.readFileSync(sf, 'utf8'));
+          const dHit = s => q.streams[s].queries.map(qq => { let bi = 0; for (let c = 1; c < qq.probs.length; c++) if (qq.probs[c] > qq.probs[bi]) bi = c; return bi === qq.tn ? '1' : '0'; }).join('');
+          const dH = dHit('2001');
+          const dA = alone.donorAlone['2001'].acc, dP = alone.donorAlone['2001'].ppl;
+          const pmBG = pair(gpt.repHitG, inter.repHitI);
+          const agBD = agree(gpt.repHitG, dH);
+          const d = inter.interpPpl - gpt.gptMixPpl;
+          const pmG5 = pair(gr5.repHitI, inter.repHitI);
+          const d5 = inter.interpPpl - gr5.interpPpl;
+          fs.writeFileSync('/tmp/arith-carry.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'arith-carry', spec: {matchFree: spec.matchFree, V: spec.V, trainRange: spec.trainRange, testRange: spec.testRange}, donorAlone2001: {acc: dA, ppl: dP}, interp: {acc: inter.interpAcc, ppl: inter.interpPpl, lam: inter.interpLambda}, blend: {acc: gpt.gptMixAcc, ppl: gpt.gptMixPpl, lam: gpt.gptMixLamSel, cover: gpt.gptCover, d, mcP: pmBG.p}, agreeBlendDonor: agBD, graft5: {acc: gr5.interpAcc, ppl: gr5.interpPpl, lam: gr5.interpLambda, d: d5, mcP: pmG5.p}}, null, 1));
+          let md = '# ARITH-CARRY: carry-rich data shot (measured, CI)\nTrain 0-74, test 75-99, boundary exact, match-free ' + spec.matchFree.toFixed(4) + '.\n\n| pole | acc/ppl | lam* |\n|---|---|---|\n| interp | ' + inter.interpAcc.toFixed(3) + '/' + inter.interpPpl.toFixed(2) + ' | ' + inter.interpLambda + ' |\n| donor | ' + dA.toFixed(3) + '/' + dP.toFixed(2) + ' | — |\n| blend | ' + gpt.gptMixAcc.toFixed(3) + '/' + gpt.gptMixPpl.toFixed(2) + ' | ' + gpt.gptMixLamSel + ' |\n| graft5 | ' + gr5.interpAcc.toFixed(3) + '/' + gr5.interpPpl.toFixed(2) + ' | ' + gr5.interpLambda + ' |\nblend-vs-interp b/c=' + pmBG.b + '/' + pmBG.c + ' p=' + pmBG.p.toFixed(3) + ' d=' + d.toFixed(2) + ' agree=' + agBD.toFixed(3) + '.\n';
+          process.stdout.write(md);
+          EOF
+          cp /tmp/arith-carry.json halt-r/arith-carry.json
+          cp /tmp/arith-carry.md halt-r/arith-carry.md
+          cat halt-r/arith-carry.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit arith-carry back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/arith-carry.json halt-r/arith-carry.json
+            cp /tmp/arith-carry.md halt-r/arith-carry.md
+            for f in q100-gpt-arith-carry-test.json donor-alone.json arith-spec.json tinygpt-arith-carry.gguf vocab.json ref-arith-carry.json; do
+              src=$(find models -name "$f" | head -1)
+              if [ -n "$src" ]; then
+                case "$f" in
+                  vocab.json) cp "$src" halt-r/vocab-arith-carry.json;;
+                  donor-alone.json) cp "$src" halt-r/donor-alone-arith-carry.json;;
+                  ref-arith-carry.json) cp "$src" halt-r/ref-arith-carry.json;;
+                  *) cp "$src" halt-r/"$f";;
+                esac
+              fi
+            done
+            git add halt-r/arith-carry.json halt-r/arith-carry.md halt-r/q100-gpt-arith-carry-test.json halt-r/donor-alone-arith-carry.json halt-r/arith-spec-carry.json halt-r/tinygpt-arith-carry.gguf halt-r/vocab-arith-carry.json halt-r/ref-arith-carry.json
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: arith-carry verdict $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
