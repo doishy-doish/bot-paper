@@ -3,7 +3,6 @@ on:
   workflow_dispatch: {}
   push:
     paths:
-      - 'halt-r/lm-shakespeare.mjs'
       - '.github/workflows/halt-r-h8.yml'
 permissions:
   contents: write
