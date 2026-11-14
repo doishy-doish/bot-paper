@@ -9,7 +9,7 @@
 #        --queries halt-r/exp1-queries.json --slice 0 --nslice 2 --out out/mswitch
 import argparse, json, os, re, subprocess
 
-N_CAP = 150
+N_CAP = 300
 
 def run(cmd, timeout=900):
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
