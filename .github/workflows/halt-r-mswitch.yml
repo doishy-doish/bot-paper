@@ -38,7 +38,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p out/mswitch
-          python3 halt-r/mswitch-eval.py --bin /tmp/llama.cpp/build --modelA /tmp/qwen25.gguf --modelB /tmp/qwen3.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 2 --out out/mswitch 2>&1 | tee out/mswitch/slice-${{ matrix.slice }}.log
+          python3 halt-r/mswitch-eval.py --bin /tmp/llama.cpp/build/bin --modelA /tmp/qwen25.gguf --modelB /tmp/qwen3.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 2 --out out/mswitch 2>&1 | tee out/mswitch/slice-${{ matrix.slice }}.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
