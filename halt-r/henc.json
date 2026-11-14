@@ -1,5 +1,5 @@
 {
- "date": "2026-11-13",
+ "date": "2026-11-14",
  "task": "henc-trunk",
  "runs": [
   {
@@ -36,9 +36,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 2618,
-   "evalMs": 14837,
-   "maxRssMB": 113.8,
+   "buildMs": 51713,
+   "evalMs": 14841,
+   "maxRssMB": 122.6,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 4857.9,
@@ -69,6 +69,7 @@
    "tok": "char",
    "bpeMerges": 0,
    "bpeMeanLen": 0,
+   "pool": "off",
    "encLossFirst": 4.873745308659202,
    "encLossLast": 4.524447597089899,
    "costClass": "linear-O(P·D)",
@@ -140,7 +141,15 @@
    "h6AUC": 0,
    "fsq": 0,
    "fsqCodes": 0,
-   "fsqReuse": 0
+   "fsqReuse": 0,
+   "f2a": 0,
+   "f2aLamSel": -1,
+   "f2aAccSel": 0,
+   "f2aPplSel": 0,
+   "f2aAcc": 0,
+   "f2aPpl": 0,
+   "f2aAgree": -1,
+   "repHitF": ""
   },
   {
    "task": "nextchar-heldout",
@@ -176,9 +185,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 193,
-   "evalMs": 12746,
-   "maxRssMB": 102.3,
+   "buildMs": 395,
+   "evalMs": 12762,
+   "maxRssMB": 96.3,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 4034.6,
@@ -209,6 +218,7 @@
    "tok": "char",
    "bpeMerges": 0,
    "bpeMeanLen": 0,
+   "pool": "off",
    "encLossFirst": 0,
    "encLossLast": 0,
    "costClass": "linear-O(P·D)",
@@ -280,7 +290,15 @@
    "h6AUC": 0,
    "fsq": 0,
    "fsqCodes": 0,
-   "fsqReuse": 0
+   "fsqReuse": 0,
+   "f2a": 0,
+   "f2aLamSel": -1,
+   "f2aAccSel": 0,
+   "f2aPplSel": 0,
+   "f2aAcc": 0,
+   "f2aPpl": 0,
+   "f2aAgree": -1,
+   "repHitF": ""
   },
   {
    "task": "nextchar-heldout",
@@ -316,9 +334,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 2388,
-   "evalMs": 29592,
-   "maxRssMB": 133.3,
+   "buildMs": 38179,
+   "evalMs": 25880,
+   "maxRssMB": 125.1,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 11862,
@@ -349,6 +367,7 @@
    "tok": "char",
    "bpeMerges": 0,
    "bpeMeanLen": 0,
+   "pool": "off",
    "encLossFirst": 4.961482564969444,
    "encLossLast": 4.749055290243661,
    "costClass": "linear-O(P·D)",
@@ -420,7 +439,15 @@
    "h6AUC": 0,
    "fsq": 0,
    "fsqCodes": 0,
-   "fsqReuse": 0
+   "fsqReuse": 0,
+   "f2a": 0,
+   "f2aLamSel": -1,
+   "f2aAccSel": 0,
+   "f2aPplSel": 0,
+   "f2aAcc": 0,
+   "f2aPpl": 0,
+   "f2aAgree": -1,
+   "repHitF": ""
   },
   {
    "task": "nextchar-heldout",
@@ -456,9 +483,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 117,
-   "evalMs": 19793,
-   "maxRssMB": 122.9,
+   "buildMs": 189,
+   "evalMs": 19762,
+   "maxRssMB": 123.7,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 8667.1,
@@ -489,6 +516,7 @@
    "tok": "char",
    "bpeMerges": 0,
    "bpeMeanLen": 0,
+   "pool": "off",
    "encLossFirst": 0,
    "encLossLast": 0,
    "costClass": "linear-O(P·D)",
@@ -560,7 +588,15 @@
    "h6AUC": 0,
    "fsq": 0,
    "fsqCodes": 0,
-   "fsqReuse": 0
+   "fsqReuse": 0,
+   "f2a": 0,
+   "f2aLamSel": -1,
+   "f2aAccSel": 0,
+   "f2aPplSel": 0,
+   "f2aAcc": 0,
+   "f2aPpl": 0,
+   "f2aAgree": -1,
+   "repHitF": ""
   },
   {
    "task": "nextchar-heldout",
@@ -596,9 +632,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 2639,
-   "evalMs": 33096,
-   "maxRssMB": 166.7,
+   "buildMs": 40385,
+   "evalMs": 28838,
+   "maxRssMB": 156.9,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 13369.3,
@@ -629,6 +665,7 @@
    "tok": "char",
    "bpeMerges": 0,
    "bpeMeanLen": 0,
+   "pool": "off",
    "encLossFirst": 4.897160463045499,
    "encLossLast": 4.563255152719298,
    "costClass": "linear-O(P·D)",
@@ -700,7 +737,15 @@
    "h6AUC": 0,
    "fsq": 0,
    "fsqCodes": 0,
-   "fsqReuse": 0
+   "fsqReuse": 0,
+   "f2a": 0,
+   "f2aLamSel": -1,
+   "f2aAccSel": 0,
+   "f2aPplSel": 0,
+   "f2aAcc": 0,
+   "f2aPpl": 0,
+   "f2aAgree": -1,
+   "repHitF": ""
   },
   {
    "task": "nextchar-heldout",
@@ -736,9 +781,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 143,
-   "evalMs": 18059,
-   "maxRssMB": 144.4,
+   "buildMs": 342,
+   "evalMs": 23343,
+   "maxRssMB": 156.1,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 10891.3,
@@ -769,6 +814,7 @@
    "tok": "char",
    "bpeMerges": 0,
    "bpeMeanLen": 0,
+   "pool": "off",
    "encLossFirst": 0,
    "encLossLast": 0,
    "costClass": "linear-O(P·D)",
@@ -840,7 +886,15 @@
    "h6AUC": 0,
    "fsq": 0,
    "fsqCodes": 0,
-   "fsqReuse": 0
+   "fsqReuse": 0,
+   "f2a": 0,
+   "f2aLamSel": -1,
+   "f2aAccSel": 0,
+   "f2aPplSel": 0,
+   "f2aAcc": 0,
+   "f2aPpl": 0,
+   "f2aAgree": -1,
+   "repHitF": ""
   },
   {
    "task": "nextchar-heldout",
@@ -876,9 +930,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 1971,
-   "evalMs": 20814,
-   "maxRssMB": 164.5,
+   "buildMs": 25153,
+   "evalMs": 15477,
+   "maxRssMB": 146.4,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 9400.3,
@@ -909,6 +963,7 @@
    "tok": "char",
    "bpeMerges": 0,
    "bpeMeanLen": 0,
+   "pool": "off",
    "encLossFirst": 4.971290931735385,
    "encLossLast": 4.600431316215621,
    "costClass": "linear-O(P·D)",
@@ -980,7 +1035,15 @@
    "h6AUC": 0,
    "fsq": 0,
    "fsqCodes": 0,
-   "fsqReuse": 0
+   "fsqReuse": 0,
+   "f2a": 0,
+   "f2aLamSel": -1,
+   "f2aAccSel": 0,
+   "f2aPplSel": 0,
+   "f2aAcc": 0,
+   "f2aPpl": 0,
+   "f2aAgree": -1,
+   "repHitF": ""
   },
   {
    "task": "nextchar-heldout",
@@ -1016,9 +1079,9 @@
     "rep4": 0,
     "wordValid": 0
    },
-   "buildMs": 120,
-   "evalMs": 10208,
-   "maxRssMB": 142.8,
+   "buildMs": 207,
+   "evalMs": 10177,
+   "maxRssMB": 150.4,
    "encBytes": 2741542,
    "evalScope": "heldout-val",
    "evalMflops": 3780.6,
@@ -1049,6 +1112,7 @@
    "tok": "char",
    "bpeMerges": 0,
    "bpeMeanLen": 0,
+   "pool": "off",
    "encLossFirst": 0,
    "encLossLast": 0,
    "costClass": "linear-O(P·D)",
@@ -1120,7 +1184,15 @@
    "h6AUC": 0,
    "fsq": 0,
    "fsqCodes": 0,
-   "fsqReuse": 0
+   "fsqReuse": 0,
+   "f2a": 0,
+   "f2aLamSel": -1,
+   "f2aAccSel": 0,
+   "f2aPplSel": 0,
+   "f2aAcc": 0,
+   "f2aPpl": 0,
+   "f2aAgree": -1,
+   "repHitF": ""
   }
  ]
 }
