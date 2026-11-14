@@ -1,6 +1,11 @@
 name: halt-r-mswitch
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      cap:
+        description: 'sample token cap (-n); 300 default, 150 for the cap control'
+        required: false
+        default: '300'
   push:
     paths:
       - 'halt-r/mswitch-eval.py'
@@ -8,11 +13,29 @@ on:
       - '.github/workflows/halt-r-mswitch.yml'
 permissions:
   contents: write
+env:
+  LLAMA_BIN: /tmp/llama.cpp/build/bin
 jobs:
+  smoke:
+    name: static smoke (syntax, flags, pins — seconds, no build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: py_compile + argparse wiring
+        run: |
+          python3 -m py_compile halt-r/mswitch-eval.py
+          python3 halt-r/mswitch-eval.py --help
+      - name: queries JSON valid + self-pin check
+        run: |
+          python3 -c "import json; qs=json.load(open('halt-r/exp1-queries.json')); assert len(qs)>=20, len(qs); print('queries:', len(qs))"
+          grep -q "qwen2.5-0.5b-instruct-q4_k_m" .github/workflows/halt-r-mswitch.yml
+          grep -q "Qwen3-0.6B" .github/workflows/halt-r-mswitch.yml
   sample:
     name: mswitch sampling (slice ${{ matrix.slice }}/2)
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    needs: [smoke]
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -29,6 +52,9 @@ jobs:
           git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/llama.cpp
           cmake -S /tmp/llama.cpp -B /tmp/llama.cpp/build -DCMAKE_BUILD_TYPE=Release
           cmake --build /tmp/llama.cpp/build --config Release -j --target llama-cli
+      - name: pre-flight binary assert (single config source)
+        run: |
+          test -x "$LLAMA_BIN/llama-cli" || { echo "FAIL no llama-cli at $LLAMA_BIN"; exit 1; }
       - name: fetch donors
         run: |
           curl -sSL https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf -o /tmp/qwen25.gguf
@@ -38,7 +64,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p out/mswitch
-          python3 halt-r/mswitch-eval.py --bin /tmp/llama.cpp/build/bin --modelA /tmp/qwen25.gguf --modelB /tmp/qwen3.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 2 --out out/mswitch 2>&1 | tee out/mswitch/slice-${{ matrix.slice }}.log
+          python3 halt-r/mswitch-eval.py --bin "$LLAMA_BIN" --modelA /tmp/qwen25.gguf --modelB /tmp/qwen3.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 2 --ncap ${{ inputs.cap }} --out out/mswitch 2>&1 | tee out/mswitch/slice-${{ matrix.slice }}.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -66,8 +92,10 @@ jobs:
           rows.sort(key=lambda r: r['id'])
           n = len(rows)
           excl = sum(r['excluded'] for r in rows)
+          sch = sum(r.get('excl_schema', 0) for r in rows)
+          cph = sum(r.get('excl_cap', 0) for r in rows)
           if excl > 0:
-              md = '# ModelSwitch: VOID (harness gate)\n%d completions excluded. Run is void; refire with bigger cap.\n' % excl
+              md = '# ModelSwitch: VOID (harness gate)\n%d completions excluded (schema-fail %d, cap-hit %d). Run is void.\n' % (excl, sch, cph)
               json.dump({'void': True, 'excluded': excl, 'rows': rows}, open('/tmp/mswitch.json', 'w'), indent=1)
               print(md)
           else:

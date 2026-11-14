@@ -16,24 +16,33 @@ N_CAP = 300
 
 def run(cmd, timeout=900):
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-    return p.returncode, (p.stdout or '') + (p.stderr or '')
+    return p.returncode, (p.stdout or ''), (p.stderr or '')
 
-def gen(cli, model, prompt, temp, seed, n=N_CAP, c=2048):
-    rc, out = run([cli, '-m', model, '-p', prompt, '-n', str(n),
+def gen(cli, model, prompt, temp, seed, n=None, c=2048):
+    n = N_CAP if n is None else n
+    rc, out, _ = run([cli, '-m', model, '-p', prompt, '-n', str(n),
                    '-c', str(c), '--temp', str(temp), '--seed', str(seed),
                    '-t', '4', '--no-display-prompt'])
     assert rc == 0, 'FAIL llama-cli rc=%d' % rc
     return out
 
-def grade(out):
+def grade(out, n):
+    # D2a (2026-11-14): grade STDOUT ONLY — stderr (llama-cli load/timing logs) is
+    # harness noise, never donor content (candidate cause of gen-4's uniform schema
+    # wall; the probe discriminates). Truncation (token limit hit) voids regardless
+    # of shape — the anti-poison rule: a cut-off digit is never a vote. Otherwise
+    # loose last-int (format-agnostic): right-but-chatty counts; intermediate-digit
+    # scatter is left to the vote.
     toks = out.split()
     lines = [l.strip() for l in out.strip().split('\n') if l.strip()]
-    schema_ok = bool(lines) and re.fullmatch(r'-?\d{1,6}', lines[-1]) is not None
-    cap_hit = len(toks) >= N_CAP - 5
-    pred = int(lines[-1]) if schema_ok else None
-    bad = (not schema_ok) or cap_hit
-    why = 'both' if ((not schema_ok) and cap_hit) else 'cap' if cap_hit else 'schema' if not schema_ok else 'ok'
-    return pred, bad, why
+    strict = bool(lines) and re.fullmatch(r'-?\d{1,6}', lines[-1]) is not None
+    ints = re.findall(r'(?<!\d)-?\d{1,9}(?!\d)', out)
+    loose = int(ints[-1]) if ints else None
+    if len(toks) >= n - 5:
+        return None, True, 'cap', False
+    if loose is None:
+        return None, True, 'schema', False
+    return loose, False, 'ok', (not strict)
 
 def main():
     ap = argparse.ArgumentParser()
@@ -43,8 +52,11 @@ def main():
     ap.add_argument('--slice', type=int, required=True)
     ap.add_argument('--nslice', type=int, required=True)
     ap.add_argument('--k', type=int, default=8)
+    ap.add_argument('--ncap', type=int, default=300)
     ap.add_argument('--out', required=True)
     a = ap.parse_args()
+    global N_CAP
+    N_CAP = a.ncap
     os.makedirs(a.out, exist_ok=True)
     qs = json.load(open(a.queries))
     mine = [q for i, q in enumerate(qs) if i % a.nslice == a.slice]
@@ -53,10 +65,10 @@ def main():
     assert os.path.isfile(cli), 'FAIL no llama-cli'
     rows = []
     for q in mine:
-        texts, preds, excl, esch, ecap = [], [], 0, 0, 0
+        texts, preds, excl, esch, ecap, loose_n = [], [], 0, 0, 0, 0
         for s in range(a.k):
             out = gen(cli, a.model, q['prompt'], 0.7, s)
-            pred, bad, why = grade(out)
+            pred, bad, why, loo = grade(out, N_CAP)
             texts.append(out[-2000:])
             if bad:
                 excl += 1
@@ -67,6 +79,7 @@ def main():
                 preds.append(None)
             else:
                 preds.append(pred)
+                loose_n += 1 if loo else 0
         valid = [p for p in preds if p is not None]
         counts = {}
         for p in valid:
@@ -84,8 +97,8 @@ def main():
         if len(vfull.split()) > 6000:
             print('WARN verifier prompt %d toks, truncating' % len(vfull.split()), flush=True)
             vfull = vfull[:24000]
-        vout = gen(cli, a.model, vfull + vprompt, 0.0, 4242, n=300, c=8192)
-        vpred, vbad, vwhy = grade(vout)
+        vout = gen(cli, a.model, vfull + vprompt, 0.0, 4242, n=N_CAP, c=8192)
+        vpred, vbad, vwhy, _ = grade(vout, N_CAP)
         if vbad:
             if vwhy in ('schema', 'both'):
                 esch += 1
@@ -102,7 +115,10 @@ def main():
             if preds[m - 1] is not None:
                 run_counts[preds[m - 1]] = run_counts.get(preds[m - 1], 0) + 1
             srt = sorted(run_counts.values(), reverse=True)
-            mg = srt[0] - (srt[1] if len(srt) > 1 else 0)
+            # GUARD (void-not-fallback, locked 2026-11-14): zero valid completions so far
+            # (all excluded) leaves srt empty — margin 0, keep scanning. The row voids
+            # downstream on k_valid==0 with counted exclusions; the run voids in collect.
+            mg = (srt[0] - (srt[1] if len(srt) > 1 else 0)) if srt else 0
             if mg >= 2:
                 stop = m
                 break
@@ -115,7 +131,8 @@ def main():
                      'abstained': abstain, 'stop': stop,
                      'stopmaj_ok': (stopmaj == q['answer']) if stopmaj is not None else False,
                      'k_valid': len(valid), 'excluded': excl + (1 if vbad else 0),
-                     'excl_schema': esch, 'excl_cap': ecap})
+                     'excl_schema': esch, 'excl_cap': ecap,
+                     'loose_only': loose_n})
         print('exp1b %s single=%s mv8=%s oracle=%s verifier_ok=%s abstained=%s stop=%d k_valid=%d/%d' % (
             q['id'], single, mv8, oracle, rows[-1]['verifier_ok'], abstain, stop, len(valid), a.k), flush=True)
     json.dump({'slice': a.slice, 'k': a.k, 'rows': rows,

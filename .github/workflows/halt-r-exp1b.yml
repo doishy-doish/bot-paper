@@ -1,6 +1,11 @@
 name: halt-r-exp1b
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      cap:
+        description: 'sample token cap (-n); 300 default, 150 for the cap control'
+        required: false
+        default: '300'
   push:
     paths:
       - 'halt-r/exp1b-vote.py'
@@ -8,11 +13,28 @@ on:
       - '.github/workflows/halt-r-exp1b.yml'
 permissions:
   contents: write
+env:
+  LLAMA_BIN: /tmp/llama.cpp/build/bin
 jobs:
+  smoke:
+    name: static smoke (syntax, flags, pins — seconds, no build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: py_compile + argparse wiring
+        run: |
+          python3 -m py_compile halt-r/exp1b-vote.py
+          python3 halt-r/exp1b-vote.py --help
+      - name: queries JSON valid + self-pin check
+        run: |
+          python3 -c "import json; qs=json.load(open('halt-r/exp1-queries.json')); assert len(qs)>=20, len(qs); print('queries:', len(qs))"
+          grep -q "qwen2.5-0.5b-instruct-q4_k_m" .github/workflows/halt-r-exp1b.yml
   sample:
     name: exp1b sampling+verify (slice ${{ matrix.slice }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    needs: [smoke]
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -29,6 +51,9 @@ jobs:
           git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/llama.cpp
           cmake -S /tmp/llama.cpp -B /tmp/llama.cpp/build -DCMAKE_BUILD_TYPE=Release
           cmake --build /tmp/llama.cpp/build --config Release -j --target llama-cli
+      - name: pre-flight binary assert (single config source)
+        run: |
+          test -x "$LLAMA_BIN/llama-cli" || { echo "FAIL no llama-cli at $LLAMA_BIN"; exit 1; }
       - name: fetch donor
         run: |
           curl -sSL https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf -o /tmp/qwen.gguf
@@ -37,7 +62,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p out/exp1b
-          python3 halt-r/exp1b-vote.py --bin /tmp/llama.cpp/build/bin --model /tmp/qwen.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 4 --k 8 --out out/exp1b 2>&1 | tee out/exp1b/slice-${{ matrix.slice }}.log
+          python3 halt-r/exp1b-vote.py --bin "$LLAMA_BIN" --model /tmp/qwen.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 4 --k 8 --ncap ${{ inputs.cap }} --out out/exp1b 2>&1 | tee out/exp1b/slice-${{ matrix.slice }}.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -65,6 +90,8 @@ jobs:
           rows.sort(key=lambda r: r['id'])
           n = len(rows)
           excl = sum(r['excluded'] for r in rows)
+          sch = sum(r.get('excl_schema', 0) for r in rows)
+          cph = sum(r.get('excl_cap', 0) for r in rows)
           def mcP(b, c):
               from math import comb
               tot = b + c
@@ -74,7 +101,7 @@ jobs:
               tail = sum(comb(tot, k) for k in range(lo + 1)) / 2.0 ** tot
               return min(1.0, 2 * tail)
           if excl > 0:
-              md = '# Exp1b: VOID (harness gate)\n%d completions excluded (schema-fail or cap-hit). Run is void; refire with bigger cap. No gate evaluated.\n' % excl
+              md = '# Exp1b: VOID (harness gate)\n%d completions excluded (schema-fail %d, cap-hit %d). Run is void. No gate evaluated.\n' % (excl, sch, cph)
               json.dump({'void': True, 'excluded': excl, 'rows': rows}, open('/tmp/exp1b.json', 'w'), indent=1)
               print(md)
           else:

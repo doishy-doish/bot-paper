@@ -5,7 +5,7 @@
 # Triage rule (pre-registered, no tuning): DIRECT iff margin>=3 AND greedy==MV8,
 # else VERIFY-route. Metrics: directFrac, directAcc (MV8 on direct items), mv8.
 # PASS iff directFrac>=0.5 AND directAcc>=mv8-0.05 (halve invokes, no accuracy loss).
-# Usage: python3 halt-r/triage-eval.py --bin /tmp/llama.cpp/build --model /tmp/qwen.gguf
+# Usage: python3 halt-r/triage-eval.py --bin "$LLAMA_BIN" --model /tmp/qwen.gguf
 #        --queries halt-r/exp1-queries.json --slice 0 --nslice 4 --k 8 --out out/triage
 import argparse, json, os, re, subprocess
 
@@ -13,21 +13,32 @@ N_CAP = 300
 
 def run(cmd, timeout=900):
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-    return p.returncode, (p.stdout or '') + (p.stderr or '')
+    return p.returncode, (p.stdout or ''), (p.stderr or '')
+
+def grade_out(out, n):
+    # D2a (2026-11-14): grade STDOUT ONLY — stderr (llama-cli load/timing logs) is
+    # harness noise, never donor content (candidate cause of gen-4's uniform schema
+    # wall; the probe discriminates). Truncation (token limit hit) voids regardless
+    # of shape — the anti-poison rule: a cut-off digit is never a vote. Otherwise
+    # loose last-int (format-agnostic): right-but-chatty counts; intermediate-digit
+    # scatter is left to the vote.
+    toks = out.split()
+    lines = [l.strip() for l in out.strip().split('\n') if l.strip()]
+    strict = bool(lines) and re.fullmatch(r'-?\d{1,6}', lines[-1]) is not None
+    ints = re.findall(r'(?<!\d)-?\d{1,9}(?!\d)', out)
+    loose = int(ints[-1]) if ints else None
+    if len(toks) >= n - 5:
+        return None, True, 'cap', False
+    if loose is None:
+        return None, True, 'schema', False
+    return loose, False, 'ok', (not strict)
 
 def sample(cli, model, prompt, temp, seed):
-    rc, out = run([cli, '-m', model, '-p', prompt, '-n', str(N_CAP),
+    rc, out, _ = run([cli, '-m', model, '-p', prompt, '-n', str(N_CAP),
                    '-c', '2048', '--temp', str(temp), '--seed', str(seed),
                    '-t', '4', '--no-display-prompt'])
     assert rc == 0, 'FAIL llama-cli rc=%d' % rc
-    toks = out.split()
-    lines = [l.strip() for l in out.strip().split('\n') if l.strip()]
-    schema_ok = bool(lines) and re.fullmatch(r'-?\d{1,6}', lines[-1]) is not None
-    cap_hit = len(toks) >= N_CAP - 5
-    pred = int(lines[-1]) if schema_ok else None
-    bad = (not schema_ok) or cap_hit
-    why = 'both' if ((not schema_ok) and cap_hit) else 'cap' if cap_hit else 'schema' if not schema_ok else 'ok'
-    return pred, bad, why
+    return grade_out(out, N_CAP)
 
 def main():
     ap = argparse.ArgumentParser()
@@ -37,8 +48,11 @@ def main():
     ap.add_argument('--slice', type=int, required=True)
     ap.add_argument('--nslice', type=int, required=True)
     ap.add_argument('--k', type=int, default=8)
+    ap.add_argument('--ncap', type=int, default=300)
     ap.add_argument('--out', required=True)
     a = ap.parse_args()
+    global N_CAP
+    N_CAP = a.ncap
     os.makedirs(a.out, exist_ok=True)
     qs = json.load(open(a.queries))
     mine = [q for i, q in enumerate(qs) if i % a.nslice == a.slice]
@@ -47,9 +61,9 @@ def main():
     assert os.path.isfile(cli), 'FAIL no llama-cli'
     rows = []
     for q in mine:
-        preds, excl, esch, ecap = [], 0, 0, 0
+        preds, excl, esch, ecap, loose_n = [], 0, 0, 0, 0
         for s in range(a.k):
-            pred, bad, why = sample(cli, a.model, q['prompt'], 0.7, s)
+            pred, bad, why, loo = sample(cli, a.model, q['prompt'], 0.7, s)
             if bad:
                 excl += 1
                 if why in ('schema', 'both'):
@@ -58,7 +72,8 @@ def main():
                     ecap += 1
             else:
                 preds.append(pred)
-        gpred, gbad, gwhy = sample(cli, a.model, q['prompt'], 0.0, 999)
+                loose_n += 1 if loo else 0
+        gpred, gbad, gwhy, _ = sample(cli, a.model, q['prompt'], 0.0, 999)
         if gbad:
             excl += 1
             if gwhy in ('schema', 'both'):
@@ -76,7 +91,8 @@ def main():
         rows.append({'id': q['id'], 'answer': q['answer'], 'mv8': mv8,
                      'margin': margin, 'greedy_agrees': greedy_agrees,
                      'direct': direct, 'k_valid': len(preds), 'excluded': excl,
-                     'excl_schema': esch, 'excl_cap': ecap})
+                     'excl_schema': esch, 'excl_cap': ecap,
+                     'loose_only': loose_n})
         print('triage %s mv8=%s margin=%d greedy_agrees=%s direct=%s k_valid=%d/%d' % (
             q['id'], mv8, margin, greedy_agrees, direct, len(preds), a.k), flush=True)
     json.dump({'slice': a.slice, 'k': a.k, 'rows': rows,
