@@ -1,17 +1,17 @@
 # exp1-vote.py: matched-K sampling for verifier-vs-majority + headroom gate (stdlib only).
-# One matrix slice: runs llama-cli K times per query (temp 0.7, distinct seeds),
-# grades by last-integer rule, writes slice JSON. No torch, no numpy, no training.
+# HARNESS GATE (locked 2026-11-14): no scored completion may be truncated. Schema: the
+# last non-empty line must be a bare integer (<=6 digits). Cap proxy: >=145 whitespace
+# tokens with -n 150 means the cap likely cut the answer. Violations are EXCLUDED from
+# votes, counted, and reported. Collect voids the run if excluded total > 0.
 # Usage: python3 halt-r/exp1-vote.py --bin /tmp/llama.cpp/build/bin --model /tmp/qwen.gguf
 #        --queries halt-r/exp1-queries.json --slice 0 --nslice 4 --k 8 --out out/exp1
 import argparse, json, os, re, subprocess
 
-def run(cmd, timeout=600):
+N_CAP = 150
+
+def run(cmd, timeout=900):
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     return p.returncode, (p.stdout or '') + (p.stderr or '')
-
-def last_int(text):
-    ms = re.findall(r'-?\d+', text)
-    return int(ms[-1]) if ms else None
 
 def main():
     ap = argparse.ArgumentParser()
@@ -31,33 +31,34 @@ def main():
     assert os.path.isfile(cli), 'FAIL no llama-cli'
     rows = []
     for q in mine:
-        hits = []
+        samples = []
         for s in range(a.k):
-            rc, out = run([cli, '-m', a.model, '-p', q['prompt'], '-n', '150',
+            rc, out = run([cli, '-m', a.model, '-p', q['prompt'], '-n', str(N_CAP),
                            '-c', '2048', '--temp', '0.7', '--seed', str(s),
                            '-t', '4', '--no-display-prompt'])
-            pred = last_int(out)
-            hits.append({'seed': s, 'rc': rc, 'pred': pred,
-                         'ok': (pred == q['answer'])})
             assert rc == 0, 'FAIL llama-cli rc=%d' % rc
-        votes = {}
-        for h in hits[:4]:
-            if h['pred'] is not None:
-                votes[h['pred']] = votes.get(h['pred'], 0) + 1
-        mv4 = max(votes, key=votes.get) if votes else None
-        votes = {}
-        for h in hits:
-            if h['pred'] is not None:
-                votes[h['pred']] = votes.get(h['pred'], 0) + 1
-        mv8 = max(votes, key=votes.get) if votes else None
-        rows.append({'id': q['id'], 'answer': q['answer'],
-                     'single': hits[0]['ok'], 'mv4': (mv4 == q['answer']),
-                     'mv8': (mv8 == q['answer']),
-                     'oracle': any(h['ok'] for h in hits),
-                     'hits': [h['pred'] for h in hits]})
-        print('exp1 %s single=%s mv4=%s mv8=%s oracle=%s preds=%s' % (
-            q['id'], rows[-1]['single'], rows[-1]['mv4'],
-            rows[-1]['mv8'], rows[-1]['oracle'], rows[-1]['hits']), flush=True)
+            toks = out.split()
+            lines = [l.strip() for l in out.strip().split('\n') if l.strip()]
+            schema_ok = bool(lines) and re.fullmatch(r'-?\d{1,6}', lines[-1]) is not None
+            cap_hit = len(toks) >= N_CAP - 5
+            excluded = (not schema_ok) or cap_hit
+            pred = int(lines[-1]) if schema_ok else None
+            samples.append({'seed': s, 'pred': pred, 'excluded': excluded,
+                            'why': ('schema' if not schema_ok else '') +
+                                   ('+cap' if (not schema_ok and cap_hit) else ('cap' if cap_hit else ''))})
+        valid = [h for h in samples if not h['excluded']]
+        preds = [h['pred'] for h in valid]
+        single = (preds[0] == q['answer']) if preds else False
+        v4 = preds[:4]
+        mv4 = (max(set(v4), key=v4.count) == q['answer']) if v4 else False
+        mv8 = (max(set(preds), key=preds.count) == q['answer']) if preds else False
+        oracle = any(p == q['answer'] for p in preds)
+        rows.append({'id': q['id'], 'answer': q['answer'], 'single': single,
+                     'mv4': mv4, 'mv8': mv8, 'oracle': oracle,
+                     'k_valid': len(valid), 'excluded': len(samples) - len(valid),
+                     'preds': [(h['pred'] if not h['excluded'] else 'X') for h in samples]})
+        print('exp1 %s single=%s mv4=%s mv8=%s oracle=%s k_valid=%d/%d' % (
+            q['id'], single, mv4, mv8, oracle, len(valid), len(samples)), flush=True)
     json.dump({'slice': a.slice, 'k': a.k, 'rows': rows},
               open('%s/exp1-slice-%d.json' % (a.out, a.slice), 'w'), indent=1)
     print('exp1 slice %d done (%d queries)' % (a.slice, len(rows)), flush=True)
