@@ -1,0 +1,107 @@
+name: halt-r-mswitch
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/mswitch-eval.py'
+      - 'halt-r/exp1-queries.json'
+      - '.github/workflows/halt-r-mswitch.yml'
+permissions:
+  contents: write
+jobs:
+  sample:
+    name: mswitch sampling (slice ${{ matrix.slice }}/2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        slice: [0, 1]
+    steps:
+      - uses: actions/checkout@v4
+      - name: install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake build-essential curl python3
+      - name: build llama-cli
+        run: |
+          git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/llama.cpp
+          cmake -S /tmp/llama.cpp -B /tmp/llama.cpp/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/llama.cpp/build --config Release -j --target llama-cli
+      - name: fetch donors
+        run: |
+          curl -sSL https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf -o /tmp/qwen25.gguf
+          curl -sSL https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf -o /tmp/qwen3.gguf
+          wc -c /tmp/qwen25.gguf /tmp/qwen3.gguf
+      - name: sample slice
+        run: |
+          set -o pipefail
+          mkdir -p out/mswitch
+          python3 halt-r/mswitch-eval.py --bin /tmp/llama.cpp/build --modelA /tmp/qwen25.gguf --modelB /tmp/qwen3.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 2 --out out/mswitch 2>&1 | tee out/mswitch/slice-${{ matrix.slice }}.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mswitch-slice-${{ matrix.slice }}
+          path: out/mswitch/
+          retention-days: 30
+  collect:
+    name: merge + mswitch verdict
+    needs: sample
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mswitch-slice-*
+          path: slices/
+      - name: mswitch verdict (cross-donor diagnostic kill-row 5)
+        run: |
+          python3 - <<'EOF' | tee /tmp/mswitch.md
+          import json, glob
+          rows = []
+          for f in sorted(glob.glob('slices/*/mswitch-slice-*.json')):
+              rows += json.load(open(f))['rows']
+          rows.sort(key=lambda r: r['id'])
+          n = len(rows)
+          excl = sum(r['excluded'] for r in rows)
+          if excl > 0:
+              md = '# ModelSwitch: VOID (harness gate)\n%d completions excluded. Run is void; refire with bigger cap.\n' % excl
+              json.dump({'void': True, 'excluded': excl, 'rows': rows}, open('/tmp/mswitch.json', 'w'), indent=1)
+              print(md)
+          else:
+              a = sum(1 for r in rows if r['a_ok']) / n
+              b = sum(1 for r in rows if r['b_ok']) / n
+              bothwrong = [r for r in rows if (not r['a_ok']) and (not r['b_ok'])]
+              agreewrong = sum(1 for r in bothwrong if r['same_wrong']) / len(bothwrong) if bothwrong else 0
+              fixable = sum(1 for r in rows if r['fixable']) / n
+              passed = (fixable >= 0.15) and (agreewrong < 0.8)
+              md = '# ModelSwitch: cross-donor diagnostic (measured, CI)\nQwen2.5-0.5B Q4_K_M vs Qwen3-0.6B Q8_0, 20 queries, greedy+K4 each.\n\n'
+              md += '| metric | value |\n|---|---|\n| accA (2.5-0.5B) | %.3f |\n| accB (3-0.6B) | %.3f |\n| agreeWrong (same wrong / both wrong) | %.3f |\n| fixable (exactly one right) | %.3f |\n\n' % (a, b, agreewrong, fixable)
+              md += 'PASS (build cross-donor vote)' if passed else 'KILL (shared failure modes; vote adds nothing)'
+              md += ' — pre-reg: pass iff fixable>=0.15 AND agreeWrong<0.8.\n'
+              json.dump({'void': False, 'n': n, 'accA': a, 'accB': b,
+                         'agreeWrong': agreewrong, 'fixable': fixable,
+                         'passed': passed, 'rows': rows},
+                        open('/tmp/mswitch.json', 'w'), indent=1)
+              print(md)
+          EOF
+          cp /tmp/mswitch.json halt-r/mswitch.json
+          cp /tmp/mswitch.md halt-r/mswitch.md
+          cat halt-r/mswitch.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit mswitch back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/mswitch.json halt-r/mswitch.json
+            cp /tmp/mswitch.md halt-r/mswitch.md
+            git add halt-r/mswitch.json halt-r/mswitch.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: mswitch verdict $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
