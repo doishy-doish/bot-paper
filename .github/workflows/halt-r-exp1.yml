@@ -67,17 +67,27 @@ jobs:
               rows += json.load(open(f))['rows']
           rows.sort(key=lambda r: r['id'])
           n = len(rows)
-          def rate(k): return sum(1 for r in rows if r[k]) / n
-          s, m4, m8, o = rate('single'), rate('mv4'), rate('mv8'), rate('oracle')
-          headroom = o - m8
-          gate = 'PROCEED to verifier-selection' if headroom >= 0.10 else 'KILL verifier-selection at scout (headroom < 0.10)'
-          json.dump({'n': n, 'single': s, 'mv4': m4, 'mv8': m8, 'oracle': o,
-                     'headroom': headroom, 'gate': gate, 'rows': rows},
-                    open('out-samples.json', 'w'), indent=1)
-          md = '# Exp1: verifier-vs-majority headroom (measured, CI)\nDonor Qwen2.5-0.5B Q4_K_M, 20 short-answer prompts, K=8 at temp 0.7, last-integer grading.\n\n| metric | acc |\n|---|---|\n| single | %.3f |\n| majority-4 | %.3f |\n| majority-8 | %.3f |\n| oracle | %.3f |\n| headroom (oracle - mv8) | %.3f |\n\nGATE: %s\n' % (s, m4, m8, o, headroom, gate)
-          open('out-md.md', 'w').write(md)
-          print('n=%d single=%.3f mv4=%.3f mv8=%.3f oracle=%.3f headroom=%.3f' % (n, s, m4, m8, o, headroom))
-          print(gate)
+          excl = sum(r.get('excluded', 0) for r in rows)
+          if excl > 0:
+              md = '# Exp1: VOID (harness gate)\n%d completions excluded (schema-fail or cap-hit). Run is void; refire with bigger cap. No gate evaluated.\n' % excl
+              json.dump({'void': True, 'excluded': excl, 'rows': rows}, open('out-samples.json', 'w'), indent=1)
+              open('out-md.md', 'w').write(md)
+              print('VOID excluded=%d' % excl)
+          else:
+              def rate(k): return sum(1 for r in rows if r[k]) / n
+              s, m4, m8, o = rate('single'), rate('mv4'), rate('mv8'), rate('oracle')
+              headroom = o - m8
+              backfire = sum(1 for r in rows if (not r['mv8']) and r['single'])
+              deltas = [{'id': r['id'], 'mv8_minus_single': int(r['mv8']) - int(r['single'])} for r in rows]
+              gate = 'PROCEED to verifier-selection (exp1b with abstain option)' if headroom >= 0.10 else 'KILL verifier-selection at scout (headroom < 0.10)'
+              json.dump({'void': False, 'n': n, 'single': s, 'mv4': m4, 'mv8': m8,
+                         'oracle': o, 'headroom': headroom, 'backfire': backfire,
+                         'deltas': deltas, 'gate': gate, 'rows': rows},
+                        open('out-samples.json', 'w'), indent=1)
+              md = '# Exp1: verifier-vs-majority headroom (measured, CI)\nDonor Qwen2.5-0.5B Q4_K_M, 20 short-answer prompts, K=8 at temp 0.7, last-integer grading, harness gate clean (0 excluded).\n\n| metric | acc |\n|---|---|\n| single | %.3f |\n| majority-4 | %.3f |\n| majority-8 | %.3f |\n| oracle | %.3f |\n| headroom (oracle - mv8) | %.3f |\n| backfire (mv8 wrong, single right) | %d |\n\nPRE-REGISTERED GATE: %s\n' % (s, m4, m8, o, headroom, backfire, gate)
+              open('out-md.md', 'w').write(md)
+              print('n=%d single=%.3f mv4=%.3f mv8=%.3f oracle=%.3f headroom=%.3f backfire=%d' % (n, s, m4, m8, o, headroom, backfire))
+              print(gate)
           EOF
       - name: scramble samples + commit back
         env:
