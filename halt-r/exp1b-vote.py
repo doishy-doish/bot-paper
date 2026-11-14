@@ -18,9 +18,9 @@ def run(cmd, timeout=900):
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     return p.returncode, (p.stdout or '') + (p.stderr or '')
 
-def gen(cli, model, prompt, temp, seed):
-    rc, out = run([cli, '-m', model, '-p', prompt, '-n', str(N_CAP),
-                   '-c', '2048', '--temp', str(temp), '--seed', str(seed),
+def gen(cli, model, prompt, temp, seed, n=N_CAP, c=2048):
+    rc, out = run([cli, '-m', model, '-p', prompt, '-n', str(n),
+                   '-c', str(c), '--temp', str(temp), '--seed', str(seed),
                    '-t', '4', '--no-display-prompt'])
     assert rc == 0, 'FAIL llama-cli rc=%d' % rc
     return out
@@ -31,7 +31,9 @@ def grade(out):
     schema_ok = bool(lines) and re.fullmatch(r'-?\d{1,6}', lines[-1]) is not None
     cap_hit = len(toks) >= N_CAP - 5
     pred = int(lines[-1]) if schema_ok else None
-    return pred, (not schema_ok) or cap_hit
+    bad = (not schema_ok) or cap_hit
+    why = 'both' if ((not schema_ok) and cap_hit) else 'cap' if cap_hit else 'schema' if not schema_ok else 'ok'
+    return pred, bad, why
 
 def main():
     ap = argparse.ArgumentParser()
@@ -51,13 +53,17 @@ def main():
     assert os.path.isfile(cli), 'FAIL no llama-cli'
     rows = []
     for q in mine:
-        texts, preds, excl = [], [], 0
+        texts, preds, excl, esch, ecap = [], [], 0, 0, 0
         for s in range(a.k):
             out = gen(cli, a.model, q['prompt'], 0.7, s)
-            pred, bad = grade(out)
+            pred, bad, why = grade(out)
             texts.append(out[-2000:])
             if bad:
                 excl += 1
+                if why in ('schema', 'both'):
+                    esch += 1
+                if why in ('cap', 'both'):
+                    ecap += 1
                 preds.append(None)
             else:
                 preds.append(pred)
@@ -73,9 +79,18 @@ def main():
         vprompt = q['prompt'] + '\nThe 8 attempts above disagree. Give the correct answer. End your response with the final number on its own line.'
         vfull = 'Question: ' + q['prompt'] + '\n'
         for s in range(a.k):
-            vfull += 'Attempt %d: %s\n' % (s, texts[s] if preds[s] is not None else '[excluded]')
-        vout = gen(cli, a.model, vfull + vprompt, 0.0, 4242)
-        vpred, vbad = grade(vout)
+            ex = texts[s][-600:] if preds[s] is not None else '[excluded]'
+            vfull += 'Attempt %d: %s\n' % (s, ex)
+        if len(vfull.split()) > 6000:
+            print('WARN verifier prompt %d toks, truncating' % len(vfull.split()), flush=True)
+            vfull = vfull[:24000]
+        vout = gen(cli, a.model, vfull + vprompt, 0.0, 4242, n=300, c=8192)
+        vpred, vbad, vwhy = grade(vout)
+        if vbad:
+            if vwhy in ('schema', 'both'):
+                esch += 1
+            if vwhy in ('cap', 'both'):
+                ecap += 1
         abstain = (margin == 0) or vbad
         if abstain:
             vpick = top[0][0] if top else None
@@ -99,10 +114,15 @@ def main():
                      'verifier_ok': (vpick == q['answer']) if vpick is not None else False,
                      'abstained': abstain, 'stop': stop,
                      'stopmaj_ok': (stopmaj == q['answer']) if stopmaj is not None else False,
-                     'k_valid': len(valid), 'excluded': excl + (1 if vbad else 0)})
+                     'k_valid': len(valid), 'excluded': excl + (1 if vbad else 0),
+                     'excl_schema': esch, 'excl_cap': ecap})
         print('exp1b %s single=%s mv8=%s oracle=%s verifier_ok=%s abstained=%s stop=%d k_valid=%d/%d' % (
             q['id'], single, mv8, oracle, rows[-1]['verifier_ok'], abstain, stop, len(valid), a.k), flush=True)
-    json.dump({'slice': a.slice, 'k': a.k, 'rows': rows},
+    json.dump({'slice': a.slice, 'k': a.k, 'rows': rows,
+               'why': {'schema': sum(r['excl_schema'] for r in rows),
+                       'cap': sum(r['excl_cap'] for r in rows)}},
               open('%s/exp1b-slice-%d.json' % (a.out, a.slice), 'w'), indent=1)
+    print('WHY schema=%d cap=%d' % (
+        sum(r['excl_schema'] for r in rows), sum(r['excl_cap'] for r in rows)), flush=True)
 
 main()
