@@ -1,0 +1,106 @@
+name: halt-r-graft5k16
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/halt-r-graft5k16.yml'
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: graft5k16 ts W16 ${{ matrix.proj }} K${{ matrix.ak }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        proj: [raw, graft5]
+        ak: [512, 256, 128, 64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fetch corpus (public TinyStories head)
+        run: |
+          curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          wc -c /tmp/corpus.txt
+      - name: bench K-sweep (anchor count vs win)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/graft5k16-ts-W16-${{ matrix.proj }}-K${{ matrix.ak }} --tag ts --W 16 --P 8000 --trials 100 --proj ${{ matrix.proj }} --H 256 --anchors ${{ matrix.ak }} --graftgguf halt-r/tinygpt-ts.gguf --no-gen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: graft5k16-ts-W16-${{ matrix.proj }}-K${{ matrix.ak }}
+          path: out/graft5k16-ts-W16-${{ matrix.proj }}-K${{ matrix.ak }}/
+          retention-days: 30
+  collect:
+    name: collect K-sweep verdict
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: graft5k16-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: K-sweep verdict (minimal equation)
+        run: |
+          node - <<'EOF' | tee /tmp/graft5k16.md
+          const fs = require('node:fs'), path = require('node:path');
+          const mcP = (b, c) => { const n = b + c; if (!n) return 1; const lo = Math.min(b, c);
+            let pk = Math.pow(0.5, n), tail = pk;
+            for (let k = 1; k <= lo; k++){ pk = pk * (n - k + 1) / k; tail += pk; }
+            return Math.min(1, 2 * tail); };
+          const pair = (s1, s2) => { let b = 0, c = 0;
+            for (let i = 0; i < Math.min(s1.length, s2.length); i++){ const a = s1[i], d = s2[i];
+              if (a === 'x' || d === 'x') continue;
+              if (a === '1' && d === '0') b++; if (a === '0' && d === '1') c++; }
+            return {b, c, p: mcP(b, c)}; };
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          walk('models');
+          const runs = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+          runs.sort((a, b) => (a.proj < b.proj ? -1 : 1) || (a.graftE || 0) - (b.graftE || 0));
+          fs.writeFileSync('/tmp/graft5k16.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'graft5k16 Sweep', preReg: 'ts W16 (the wall config). For each K in 512/256/128/64: graft5 wins iff lam*>0 AND d>0.2ppl vs same-workflow raw AND McNemar p<0.05. FIND: minimal K keeping the win (tests the 594-bit floor directly; smaller equation wins).', runs}, null, 1));
+          let md = '# GRAFT5K16: anchor-count sweep on the won config (measured, CI)\nts W16, P=8000, char, no-gen, T100. Question: how small can the equation get before the win dies?\n\n| proj | K (graftE) | interp acc/ppl (lam*) |\n|---|---|---|\n';
+          for (const r of runs) md += '| ' + r.proj + ' | ' + (r.graftE || r.D) + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + ' (' + r.interpLambda + ') |\n';
+          const o = runs.find(r => r.proj === 'raw');
+          const held = [];
+          for (const K of [512, 256, 128, 64]) {
+            const g = runs.find(r => r.proj === 'graft5' && (r.graftE || r.D) === K);
+            if (!o || !g) continue;
+            const d = o.interpPpl - g.interpPpl;
+            const pm = pair(g.repHitI || '', o.repHitI || '');
+            const wins = g.interpLambda > 0 && d > 0.2 && pm.p < 0.05;
+            if (wins) held.push(K);
+            md += '\nK=' + K + ': raw ' + o.interpPpl.toFixed(2) + ' vs graft5 ' + g.interpPpl.toFixed(2) + ' d=' + d.toFixed(2) + ' b/c=' + pm.b + '/' + pm.c + ' p=' + pm.p.toFixed(3) + ' → ' + (wins ? 'HOLDS' : 'falls') + '.\n';
+          }
+          md += '\nFIND: minimal K keeping the win = ' + (held.length ? Math.min(...held) : 'NONE (win dies below 512 — capacity was load-bearing)') + '.\n';
+          process.stdout.write(md);
+          EOF
+          cp /tmp/graft5k16.json halt-r/graft5k16.json
+          cp /tmp/graft5k16.md halt-r/graft5k16.md
+          cat halt-r/graft5k16.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit K-sweep back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/graft5k16.json halt-r/graft5k16.json
+            cp /tmp/graft5k16.md halt-r/graft5k16.md
+            git add halt-r/graft5k16.json halt-r/graft5k16.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: graft5k16 verdict $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1

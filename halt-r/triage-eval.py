@@ -15,17 +15,42 @@ def run(cmd, timeout=900):
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     return p.returncode, (p.stdout or ''), (p.stderr or '')
 
+def extract_span(out):
+    # CHROME-FIX (2026-11-14, probe-verified): llama-cli conversation UI
+    # (auto-enabled by chat template) prints banner/echo/timing/Exiting... on
+    # stdout. Donor span = after the first '> ' echo, up to the timing line,
+    # '>', or 'Exiting...'. Fallback: trimmed whole stdout (clean-output safe:
+    # a future -no-cnv flag that removes the chrome must not void everything).
+    lines = out.split('\n')
+    start = -1
+    for i, l in enumerate(lines):
+        if l.startswith('> '):
+            start = i
+            break
+    if start >= 0:
+        end = len(lines)
+        for j in range(start + 1, len(lines)):
+            lj = lines[j]
+            if lj.startswith('[ Prompt:') or lj == '>' or lj == 'Exiting...' or 't/s' in lj:
+                end = j
+                break
+        span = '\n'.join(lines[start + 1:end]).strip()
+        if span:
+            return span
+    return out.strip()
+
 def grade_out(out, n):
-    # D2a (2026-11-14): grade STDOUT ONLY — stderr (llama-cli load/timing logs) is
-    # harness noise, never donor content (candidate cause of gen-4's uniform schema
-    # wall; the probe discriminates). Truncation (token limit hit) voids regardless
-    # of shape — the anti-poison rule: a cut-off digit is never a vote. Otherwise
-    # loose last-int (format-agnostic): right-but-chatty counts; intermediate-digit
-    # scatter is left to the vote.
+    # D2a (2026-11-14) + CHROME-FIX (probe-verified same day): grade the donor
+    # span — extract_span cuts the llama-cli conversation chrome (banner/echo/
+    # timing/Exiting...); fallback keeps clean-stdout safe. Cap proxy stays on
+    # whole stdout (generation + chrome; probe: 0 truncations at n=300).
+    # Truncation voids regardless (anti-poison); otherwise loose last-int on
+    # the span (right-but-chatty counts; intermediate-digit scatter to the vote).
+    span = extract_span(out)
     toks = out.split()
-    lines = [l.strip() for l in out.strip().split('\n') if l.strip()]
+    lines = [l.strip() for l in span.split('\n') if l.strip()]
     strict = bool(lines) and re.fullmatch(r'-?\d{1,6}', lines[-1]) is not None
-    ints = re.findall(r'(?<!\d)-?\d{1,9}(?!\d)', out)
+    ints = re.findall(r'(?<!\d)-?\d{1,9}(?!\d)', span)
     loose = int(ints[-1]) if ints else None
     if len(toks) >= n - 5:
         return None, True, 'cap', False
