@@ -8,7 +8,7 @@
 # Usage: python3 halt-r/tier0-eval.py --bin ... --model ... --queries ... --slice 0 --nslice 4 --out out/tier0
 import argparse, json, os, re, subprocess
 
-N_CAP = 150
+N_CAP = 300
 
 def run(cmd, timeout=900):
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
