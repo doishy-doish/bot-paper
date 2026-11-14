@@ -25,7 +25,9 @@ def sample(cli, model, prompt, temp, seed):
     schema_ok = bool(lines) and re.fullmatch(r'-?\d{1,6}', lines[-1]) is not None
     cap_hit = len(toks) >= N_CAP - 5
     pred = int(lines[-1]) if schema_ok else None
-    return pred, (not schema_ok) or cap_hit
+    bad = (not schema_ok) or cap_hit
+    why = 'both' if ((not schema_ok) and cap_hit) else 'cap' if cap_hit else 'schema' if not schema_ok else 'ok'
+    return pred, bad, why
 
 def main():
     ap = argparse.ArgumentParser()
@@ -45,16 +47,24 @@ def main():
     assert os.path.isfile(cli), 'FAIL no llama-cli'
     rows = []
     for q in mine:
-        preds, excl = [], 0
+        preds, excl, esch, ecap = [], 0, 0, 0
         for s in range(a.k):
-            pred, bad = sample(cli, a.model, q['prompt'], 0.7, s)
+            pred, bad, why = sample(cli, a.model, q['prompt'], 0.7, s)
             if bad:
                 excl += 1
+                if why in ('schema', 'both'):
+                    esch += 1
+                if why in ('cap', 'both'):
+                    ecap += 1
             else:
                 preds.append(pred)
-        gpred, gbad = sample(cli, a.model, q['prompt'], 0.0, 999)
+        gpred, gbad, gwhy = sample(cli, a.model, q['prompt'], 0.0, 999)
         if gbad:
             excl += 1
+            if gwhy in ('schema', 'both'):
+                esch += 1
+            if gwhy in ('cap', 'both'):
+                ecap += 1
         counts = {}
         for p in preds:
             counts[p] = counts.get(p, 0) + 1
@@ -65,10 +75,15 @@ def main():
         direct = (margin >= 3) and greedy_agrees
         rows.append({'id': q['id'], 'answer': q['answer'], 'mv8': mv8,
                      'margin': margin, 'greedy_agrees': greedy_agrees,
-                     'direct': direct, 'k_valid': len(preds), 'excluded': excl})
+                     'direct': direct, 'k_valid': len(preds), 'excluded': excl,
+                     'excl_schema': esch, 'excl_cap': ecap})
         print('triage %s mv8=%s margin=%d greedy_agrees=%s direct=%s k_valid=%d/%d' % (
             q['id'], mv8, margin, greedy_agrees, direct, len(preds), a.k), flush=True)
-    json.dump({'slice': a.slice, 'k': a.k, 'rows': rows},
+    json.dump({'slice': a.slice, 'k': a.k, 'rows': rows,
+               'why': {'schema': sum(r['excl_schema'] for r in rows),
+                       'cap': sum(r['excl_cap'] for r in rows)}},
               open('%s/triage-slice-%d.json' % (a.out, a.slice), 'w'), indent=1)
+    print('WHY schema=%d cap=%d' % (
+        sum(r['excl_schema'] for r in rows), sum(r['excl_cap'] for r in rows)), flush=True)
 
 main()
