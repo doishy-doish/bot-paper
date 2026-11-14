@@ -1,0 +1,61 @@
+name: halt-r-delegation-baseline
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/delegation-eval.py'
+      - '.github/workflows/halt-r-delegation-baseline.yml'
+permissions:
+  contents: write
+jobs:
+  donor:
+    name: frozen donor alone baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake build-essential curl python3
+      - name: build llama.cpp tools (llama-cli + llama-perplexity)
+        run: |
+          git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/llama.cpp
+          cmake -S /tmp/llama.cpp -B /tmp/llama.cpp/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/llama.cpp/build --config Release -j --target llama-cli llama-perplexity
+          ls -la /tmp/llama.cpp/build/bin | head -20
+      - name: fetch donor + corpora
+        run: |
+          curl -sSL https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf -o /tmp/qwen.gguf
+          ls -la /tmp/qwen.gguf
+          curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/ts.txt
+          curl -sSL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/shakes.txt
+          wc -c /tmp/qwen.gguf /tmp/ts.txt /tmp/shakes.txt
+      - name: donor-alone baseline
+        run: |
+          set -o pipefail
+          mkdir -p out/delegation
+          python3 halt-r/delegation-eval.py --bin /tmp/llama.cpp/build/bin --model /tmp/qwen.gguf --ts /tmp/ts.txt --shakes /tmp/shakes.txt --out out/delegation 2>&1 | tee out/delegation/delegation-log.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: delegation-baseline
+          path: out/delegation/
+          retention-days: 30
+      - name: commit baseline back
+        if: always()
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            if test -f out/delegation/delegation-baseline.json; then cp out/delegation/delegation-baseline.json halt-r/delegation-baseline.json; fi
+            if test -f out/delegation/delegation-baseline.md; then cp out/delegation/delegation-baseline.md halt-r/delegation-baseline.md; fi
+            if test -f out/delegation/delegation-log.txt; then cp out/delegation/delegation-log.txt halt-r/delegation-log.md; fi
+            git add halt-r/delegation-baseline.json halt-r/delegation-baseline.md halt-r/delegation-log.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: delegation donor-alone baseline $(date -u +%F)" && git push origin main && exit 0
+            sleep 10
+          done
+          exit 1
