@@ -37,7 +37,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p out/exp1b
-          python3 halt-r/exp1b-vote.py --bin /tmp/llama.cpp/build --model /tmp/qwen.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 4 --k 8 --out out/exp1b 2>&1 | tee out/exp1b/slice-${{ matrix.slice }}.log
+          python3 halt-r/exp1b-vote.py --bin /tmp/llama.cpp/build/bin --model /tmp/qwen.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 4 --k 8 --out out/exp1b 2>&1 | tee out/exp1b/slice-${{ matrix.slice }}.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
