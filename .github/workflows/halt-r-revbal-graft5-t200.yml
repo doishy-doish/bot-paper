@@ -1,0 +1,151 @@
+name: halt-r-revbal-graft5-t200
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/halt-r-revbal-graft5-t200.yml'
+permissions:
+  contents: write
+jobs:
+  train:
+    name: arith-revbal donor (rev+balanced, frozen after train)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: install torch CPU
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install numpy
+      - name: make reversed-balanced corpus (dataset bug fixed first)
+        run: |
+          python3 halt-r/make-arith-revbal.py --out /tmp/arith --W 16
+          wc -c /tmp/arith/arith-full.txt
+      - name: train revbal donor (CPU, 1M-cell)
+        run: python3 halt-r/train-tiny-lm.py --data /tmp/arith/arith-train.txt --out out/donor --tag arith-revbal --block 32 --iters 20000 --n-embd 128 --n-head 4 --n-layer 4
+      - name: export donor GGUF (transplant key source)
+        run: python3 halt-r/export-gguf.py --pt out/donor/tiny.pt --vocab out/donor/vocab.json --ref out/donor/ref-arith-revbal.json --out out/donor/tinygpt-arith-revbal.gguf
+      - name: emit test-range donor dists (bench-joinable, W-matched)
+        run: python3 halt-r/emit-q100.py --pt out/donor/tiny.pt --vocab out/donor/vocab.json --data /tmp/arith/arith-full.txt --W 16 --trials 100 --tag arith-revbal-test --out out/donor
+      - name: stage corpus spec alongside donor
+        run: cp /tmp/arith/arith-spec.json out/donor/arith-spec.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arith-revbal-donor
+          path: out/donor/
+          retention-days: 30
+  bench:
+    name: revbal-graft5-t200 ${{ matrix.arm }} (W16, T200 queries)
+    needs: train
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        arm: [interp, graft5]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@v4
+        with:
+          name: arith-revbal-donor
+          path: models/arith-donor/
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: remake revbal corpus (deterministic, byte-identical)
+        run: |
+          python3 halt-r/make-arith-revbal.py --out /tmp/arith --W 16
+          wc -c /tmp/arith/arith-full.txt
+      - name: bench revbal ownership leg (T200 = 200 distinct queries)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: |
+          FLAGS="--W 16 --P 8000 --trials 200 --H 256 --no-gen --split 1 --hedge 1"
+          if [ "${{ matrix.arm }}" = interp ]; then
+            FLAGS="$FLAGS --proj sup --mix none"
+          else
+            FLAGS="$FLAGS --proj graft5 --anchors 256 --graftgguf models/arith-donor/tinygpt-arith-revbal.gguf --mix none"
+          fi
+          node halt-r/lm-shakespeare.mjs --data /tmp/arith/arith-full.txt --out out/revbal-t200-${{ matrix.arm }} --tag arith-revbal $FLAGS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: revbal-t200-${{ matrix.arm }}
+          path: out/revbal-t200-${{ matrix.arm }}/
+          retention-days: 30
+  collect:
+    name: collect revbal-graft5 T200 verdict
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: revbal-t200-*
+          path: models/
+      - uses: actions/download-artifact@v4
+        with:
+          name: arith-revbal-donor
+          path: donor/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: revbal-graft5 T200 verdict (powered replicate)
+        run: |
+          node - <<'EOF' | tee /tmp/revbal-graft5-t200.md
+          const fs = require('node:fs'), path = require('node:path');
+          const mcP = (b, c) => { const n = b + c; if (!n) return 1; const lo = Math.min(b, c);
+            let pk = Math.pow(0.5, n), tail = pk;
+            for (let k = 1; k <= lo; k++){ pk = pk * (n - k + 1) / k; tail += pk; }
+            return Math.min(1, 2 * tail); };
+          const pair = (s1, s2) => { let b = 0, c = 0;
+            for (let i = 0; i < Math.min(s1.length, s2.length); i++){ const a = s1[i], d = s2[i];
+              if (a === 'x' || d === 'x') continue;
+              if (a === '1' && d === '0') b++; if (a === '0' && d === '1') c++; }
+              return {b, c, p: mcP(b, c)}; };
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          walk('models');
+          const runs = files.map(f => { const m = JSON.parse(fs.readFileSync(f, 'utf8')); m._art = f; return m; });
+          const inter = runs.find(r => r._art.includes('revbal-t200-interp'));
+          const gr5 = runs.find(r => r._art.includes('revbal-t200-graft5'));
+          if (!inter || !gr5) { console.log('FAIL missing bench arms'); process.exit(1); }
+          const pmG5 = pair(gr5.repHitI || '', inter.repHitI || '');
+          const d5 = inter.interpPpl - gr5.interpPpl;
+          const wins = gr5.interpLambda > 0 && d5 > 0.2 && pmG5.p < 0.05;
+          let donorLine = 'donor-alone: not staged this run (reference n=100: acc 0.690 ppl 2.23).';
+          try {
+            const qf = 'donor/q100-gpt-arith-revbal-test.json', af = 'donor/donor-alone.json', sf = 'donor/arith-spec.json';
+            const q = JSON.parse(fs.readFileSync(qf, 'utf8'));
+            const alone = JSON.parse(fs.readFileSync(af, 'utf8'));
+            const spec = JSON.parse(fs.readFileSync(sf, 'utf8'));
+            donorLine = 'donor-alone acc=' + alone.donorAlone['2001'].acc.toFixed(3) + ' ppl=' + alone.donorAlone['2001'].ppl.toFixed(2) + ' matchFree=' + spec.matchFree.toFixed(4) + '.';
+          } catch (e) { donorLine += ' (' + e.message.slice(0, 80) + ')'; }
+          fs.writeFileSync('/tmp/revbal-graft5-t200.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'revbal-graft5-t200', preReg: 'scratch/papers/revbal-graft5-t200-prereg-2026-11-14.md: T200 = 200 distinct queries, arith-revbal corpus. graft5 wins iff lam*>0 AND d>0.2ppl vs interp AND McNemar p<0.05.', interp: {acc: inter.interpAcc, ppl: inter.interpPpl, lam: inter.interpLambda, trials: inter.trials}, graft5: {acc: gr5.interpAcc, ppl: gr5.interpPpl, lam: gr5.interpLambda, trials: gr5.trials}, d: d5, mcNemar: pmG5}, null, 1));
+          let md = '# REVBAL-GRAFT5 T200: powered replicate of the ownership lean (measured, CI)\nArith-revbal corpus (reversed+balanced, W16), 200 distinct queries, same SEED streams as n=100. ' + donorLine + '\n\n| arm | acc/ppl (lam*) | trials |\n|---|---|---|\n| interp | ' + inter.interpAcc.toFixed(3) + '/' + inter.interpPpl.toFixed(2) + ' (' + inter.interpLambda + ') | ' + inter.trials + ' |\n| graft5 | ' + gr5.interpAcc.toFixed(3) + '/' + gr5.interpPpl.toFixed(2) + ' (' + gr5.interpLambda + ') | ' + gr5.trials + ' |\n\ngraft5-vs-interp d=' + d5.toFixed(2) + ' McNemar b/c=' + pmG5.b + '/' + pmG5.c + ' p=' + pmG5.p.toFixed(4) + (pmG5.p < 0.05 ? ' SIGNIFICANT.' : '.') + ' ' + (wins ? 'VERDICT: WIN REPLICATES (ownership leg holds where the donor groks; gluttony rerun next).' : gr5.interpLambda === 0 ? 'VERDICT: WALL STANDS at T200 (graft adds nothing).' : 'VERDICT: NULL at T200 (sub-bar lean was noise; ownership leg closes on arith-revbal).') + '\n';
+          process.stdout.write(md);
+          EOF
+          cp /tmp/revbal-graft5-t200.json halt-r/revbal-graft5-t200.json
+          cp /tmp/revbal-graft5-t200.md halt-r/revbal-graft5-t200.md
+          cat halt-r/revbal-graft5-t200.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit T200 back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/revbal-graft5-t200.json halt-r/revbal-graft5-t200.json
+            cp /tmp/revbal-graft5-t200.md halt-r/revbal-graft5-t200.md
+            git add halt-r/revbal-graft5-t200.json halt-r/revbal-graft5-t200.md .github/workflows/halt-r-revbal-graft5-t200.yml
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: revbal-graft5 T200 verdict $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
