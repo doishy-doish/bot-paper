@@ -37,7 +37,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p out/triage
-          python3 halt-r/triage-eval.py --bin /tmp/llama.cpp/build --model /tmp/qwen.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 4 --k 8 --out out/triage 2>&1 | tee out/triage/slice-${{ matrix.slice }}.log
+          python3 halt-r/triage-eval.py --bin /tmp/llama.cpp/build/bin --model /tmp/qwen.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 4 --k 8 --out out/triage 2>&1 | tee out/triage/slice-${{ matrix.slice }}.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
