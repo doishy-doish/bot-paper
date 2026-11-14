@@ -1,0 +1,104 @@
+name: halt-r-tier0
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/tier0-eval.py'
+      - 'halt-r/exp1-queries.json'
+      - '.github/workflows/halt-r-tier0.yml'
+permissions:
+  contents: write
+jobs:
+  sample:
+    name: tier0 sampling (slice ${{ matrix.slice }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        slice: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - name: install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake build-essential curl python3
+      - name: build llama-cli
+        run: |
+          git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/llama.cpp
+          cmake -S /tmp/llama.cpp -B /tmp/llama.cpp/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/llama.cpp/build --config Release -j --target llama-cli
+      - name: fetch donor
+        run: |
+          curl -sSL https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf -o /tmp/qwen.gguf
+          wc -c /tmp/qwen.gguf
+      - name: sample slice
+        run: |
+          set -o pipefail
+          mkdir -p out/tier0
+          python3 halt-r/tier0-eval.py --bin /tmp/llama.cpp/build --model /tmp/qwen.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 4 --out out/tier0 2>&1 | tee out/tier0/slice-${{ matrix.slice }}.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tier0-slice-${{ matrix.slice }}
+          path: out/tier0/
+          retention-days: 30
+  collect:
+    name: merge + tier0 verdict
+    needs: sample
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: tier0-slice-*
+          path: slices/
+      - name: tier0 verdict (draft-accept harness kill-row 4)
+        run: |
+          python3 - <<'EOF' | tee /tmp/tier0.md
+          import json, glob
+          rows = []
+          for f in sorted(glob.glob('slices/*/tier0-slice-*.json')):
+              rows += json.load(open(f))['rows']
+          rows.sort(key=lambda r: r['id'])
+          n = len(rows)
+          excl = sum(r['excluded'] for r in rows)
+          if excl > 0:
+              md = '# Tier0: VOID (harness gate)\n%d completions excluded. Run is void; refire with bigger cap.\n' % excl
+              json.dump({'void': True, 'excluded': excl, 'rows': rows}, open('/tmp/tier0.json', 'w'), indent=1)
+              print(md)
+          else:
+              acc_rate = sum(1 for r in rows if r['accept']) / n
+              t0 = sum(1 for r in rows if r['tier0_ok']) / n
+              m8 = sum(1 for r in rows if r['mv8_ok']) / n
+              draft = sum(1 for r in rows if r['draft_ok']) / n
+              kill = (acc_rate * 1.6 < 1) or (t0 < m8 - 0.05)
+              md = '# Tier0: draft-accept harness v0 (measured, CI)\nDonor-only, 20 queries, fixed cost 5 gens vs MV8 8 (speedup 1.6).\n\n'
+              md += '| metric | value |\n|---|---|\n| acceptRate | %.3f |\n| draftRate (greedy alone) | %.3f |\n| tier0acc | %.3f |\n| mv8 | %.3f |\n\n' % (acc_rate, draft, t0, m8)
+              md += 'KILL (accept*1.6<1 or accuracy loss; true specdec v1 stays parked)' if kill else 'PASS (reopens same-vocab draft/verify pair v1)'
+              md += ' — pre-reg: kill iff acceptRate*1.6<1 OR tier0acc<mv8-0.05.\n'
+              json.dump({'void': False, 'n': n, 'acceptRate': acc_rate, 'draftRate': draft,
+                         'tier0acc': t0, 'mv8': m8, 'killed': kill, 'rows': rows},
+                        open('/tmp/tier0.json', 'w'), indent=1)
+              print(md)
+          EOF
+          cp /tmp/tier0.json halt-r/tier0.json
+          cp /tmp/tier0.md halt-r/tier0.md
+          cat halt-r/tier0.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit tier0 back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/tier0.json halt-r/tier0.json
+            cp /tmp/tier0.md halt-r/tier0.md
+            git add halt-r/tier0.json halt-r/tier0.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: tier0 verdict $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
