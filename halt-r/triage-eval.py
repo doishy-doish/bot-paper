@@ -1,7 +1,7 @@
 # triage-eval.py: Tier G v2 triage signals, donor-side only (kill-row 2, no bench touch).
 # Per query: K temp-0.7 samples + 1 greedy temp-0 sample. Harness gate mirrors
 # exp1-vote.py (schema: last non-empty line bare int <=6 digits; cap proxy >=145
-# whitespace tokens at -n 150). Excluded samples drop from votes, counted.
+# whitespace tokens at -n 300). Excluded samples drop from votes, counted.
 # Triage rule (pre-registered, no tuning): DIRECT iff margin>=3 AND greedy==MV8,
 # else VERIFY-route. Metrics: directFrac, directAcc (MV8 on direct items), mv8.
 # PASS iff directFrac>=0.5 AND directAcc>=mv8-0.05 (halve invokes, no accuracy loss).
@@ -9,7 +9,7 @@
 #        --queries halt-r/exp1-queries.json --slice 0 --nslice 4 --k 8 --out out/triage
 import argparse, json, os, re, subprocess
 
-N_CAP = 150
+N_CAP = 300
 
 def run(cmd, timeout=900):
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
