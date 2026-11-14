@@ -25,7 +25,9 @@ def sample(cli, model, prompt, temp, seed):
     schema_ok = bool(lines) and re.fullmatch(r'-?\d{1,6}', lines[-1]) is not None
     cap_hit = len(toks) >= N_CAP - 5
     pred = int(lines[-1]) if schema_ok else None
-    return pred, (not schema_ok) or cap_hit
+    bad = (not schema_ok) or cap_hit
+    why = 'both' if ((not schema_ok) and cap_hit) else 'cap' if cap_hit else 'schema' if not schema_ok else 'ok'
+    return pred, bad, why
 
 def majority(preds):
     if not preds:
@@ -33,19 +35,27 @@ def majority(preds):
     return max(set(preds), key=preds.count)
 
 def donor_run(cli, model, prompt):
-    preds, excl = [], 0
-    g, gb = sample(cli, model, prompt, 0.0, 999)
+    preds, excl, esch, ecap = [], 0, 0, 0
+    g, gb, gw = sample(cli, model, prompt, 0.0, 999)
     if gb:
         excl += 1
+        if gw in ('schema', 'both'):
+            esch += 1
+        if gw in ('cap', 'both'):
+            ecap += 1
     else:
         preds.append(g)
     for s in range(4):
-        p, bad = sample(cli, model, prompt, 0.7, s)
+        p, bad, why = sample(cli, model, prompt, 0.7, s)
         if bad:
             excl += 1
+            if why in ('schema', 'both'):
+                esch += 1
+            if why in ('cap', 'both'):
+                ecap += 1
         else:
             preds.append(p)
-    return majority(preds), excl
+    return majority(preds), excl, esch, ecap
 
 def main():
     ap = argparse.ArgumentParser()
@@ -65,16 +75,21 @@ def main():
     assert os.path.isfile(cli), 'FAIL no llama-cli'
     rows = []
     for q in mine:
-        ma, ea = donor_run(cli, a.modelA, q['prompt'])
-        mb, eb = donor_run(cli, a.modelB, q['prompt'])
+        ma, ea, eas, eac = donor_run(cli, a.modelA, q['prompt'])
+        mb, eb, ebs, ebc = donor_run(cli, a.modelB, q['prompt'])
         oka = (ma == q['answer']) if ma is not None else False
         okb = (mb == q['answer']) if mb is not None else False
         rows.append({'id': q['id'], 'answer': q['answer'], 'a_ok': oka, 'b_ok': okb,
                      'same_wrong': (not oka) and (not okb) and (ma is not None) and (ma == mb),
-                     'fixable': oka != okb, 'excluded': ea + eb})
+                     'fixable': oka != okb, 'excluded': ea + eb,
+                     'excl_schema': eas + ebs, 'excl_cap': eac + ebc})
         print('mswitch %s a_ok=%s b_ok=%s same_wrong=%s fixable=%s excl=%d' % (
             q['id'], oka, okb, rows[-1]['same_wrong'], rows[-1]['fixable'], ea + eb), flush=True)
-    json.dump({'slice': a.slice, 'rows': rows},
+    json.dump({'slice': a.slice, 'rows': rows,
+               'why': {'schema': sum(r['excl_schema'] for r in rows),
+                       'cap': sum(r['excl_cap'] for r in rows)}},
               open('%s/mswitch-slice-%d.json' % (a.out, a.slice), 'w'), indent=1)
+    print('WHY schema=%d cap=%d' % (
+        sum(r['excl_schema'] for r in rows), sum(r['excl_cap'] for r in rows)), flush=True)
 
 main()
