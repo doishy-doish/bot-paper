@@ -1,0 +1,99 @@
+name: halt-r-exp1
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/exp1-vote.py'
+      - 'halt-r/exp1-queries.json'
+      - '.github/workflows/halt-r-exp1.yml'
+permissions:
+  contents: write
+jobs:
+  sample:
+    name: matched-K sampling (slice ${{ matrix.slice }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        slice: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - name: install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake build-essential curl python3
+      - name: build llama-cli
+        run: |
+          git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/llama.cpp
+          cmake -S /tmp/llama.cpp -B /tmp/llama.cpp/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/llama.cpp/build --config Release -j --target llama-cli
+      - name: fetch donor
+        run: |
+          curl -sSL https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf -o /tmp/qwen.gguf
+          wc -c /tmp/qwen.gguf
+      - name: sample slice
+        run: |
+          set -o pipefail
+          mkdir -p out/exp1
+          python3 halt-r/exp1-vote.py --bin /tmp/llama.cpp/build/bin --model /tmp/qwen.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 4 --k 8 --out out/exp1 2>&1 | tee out/exp1/slice-${{ matrix.slice }}.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exp1-slice-${{ matrix.slice }}
+          path: out/exp1/
+          retention-days: 30
+  collect:
+    name: merge + headroom gate
+    needs: sample
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: exp1-slice-*
+          path: slices/
+      - name: merge + verdict (counts only in logs)
+        run: |
+          python3 - <<'EOF'
+          import json, glob
+          rows = []
+          for f in sorted(glob.glob('slices/*/exp1-slice-*.json')):
+              rows += json.load(open(f))['rows']
+          rows.sort(key=lambda r: r['id'])
+          n = len(rows)
+          def rate(k): return sum(1 for r in rows if r[k]) / n
+          s, m4, m8, o = rate('single'), rate('mv4'), rate('mv8'), rate('oracle')
+          headroom = o - m8
+          gate = 'PROCEED to verifier-selection' if headroom >= 0.10 else 'KILL verifier-selection at scout (headroom < 0.10)'
+          json.dump({'n': n, 'single': s, 'mv4': m4, 'mv8': m8, 'oracle': o,
+                     'headroom': headroom, 'gate': gate, 'rows': rows},
+                    open('out-samples.json', 'w'), indent=1)
+          md = '# Exp1: verifier-vs-majority headroom (measured, CI)\nDonor Qwen2.5-0.5B Q4_K_M, 20 short-answer prompts, K=8 at temp 0.7, last-integer grading.\n\n| metric | acc |\n|---|---|\n| single | %.3f |\n| majority-4 | %.3f |\n| majority-8 | %.3f |\n| oracle | %.3f |\n| headroom (oracle - mv8) | %.3f |\n\nGATE: %s\n' % (s, m4, m8, o, headroom, gate)
+          open('out-md.md', 'w').write(md)
+          print('n=%d single=%.3f mv4=%.3f mv8=%.3f oracle=%.3f headroom=%.3f' % (n, s, m4, m8, o, headroom))
+          print(gate)
+          EOF
+      - name: scramble samples + commit back
+        env:
+          SCRAMBLE_KEY: ${{ secrets.SCRAMBLE }}
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp out-md.md halt-r/exp1.md
+            cp out-samples.json halt-r/exp1-samples.json
+            SCRAMBLE_KEY="$SCRAMBLE_KEY" node scripts/scramble.mjs encrypt halt-r/exp1-samples.json
+            git add halt-r/exp1.md halt-r/exp1-samples.json
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: exp1 headroom gate $(date -u +%F)" && git push origin main && exit 0
+            sleep 10
+          done
+          exit 1
