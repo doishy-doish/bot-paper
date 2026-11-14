@@ -1,0 +1,123 @@
+name: halt-r-exp1b
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/exp1b-vote.py'
+      - 'halt-r/exp1-queries.json'
+      - '.github/workflows/halt-r-exp1b.yml'
+permissions:
+  contents: write
+jobs:
+  sample:
+    name: exp1b sampling+verify (slice ${{ matrix.slice }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        slice: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - name: install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake build-essential curl python3
+      - name: build llama-cli
+        run: |
+          git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/llama.cpp
+          cmake -S /tmp/llama.cpp -B /tmp/llama.cpp/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/llama.cpp/build --config Release -j --target llama-cli
+      - name: fetch donor
+        run: |
+          curl -sSL https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf -o /tmp/qwen.gguf
+          wc -c /tmp/qwen.gguf
+      - name: sample slice
+        run: |
+          set -o pipefail
+          mkdir -p out/exp1b
+          python3 halt-r/exp1b-vote.py --bin /tmp/llama.cpp/build --model /tmp/qwen.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 4 --k 8 --out out/exp1b 2>&1 | tee out/exp1b/slice-${{ matrix.slice }}.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exp1b-slice-${{ matrix.slice }}
+          path: out/exp1b/
+          retention-days: 30
+  collect:
+    name: merge + verifier verdict (D1/D2 + adaptive sim)
+    needs: sample
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: exp1b-slice-*
+          path: slices/
+      - name: exp1b verdict (pre-reg gate replacement 2026-11-14)
+        run: |
+          python3 - <<'EOF' | tee /tmp/exp1b.md
+          import json, glob
+          rows = []
+          for f in sorted(glob.glob('slices/*/exp1b-slice-*.json')):
+              rows += json.load(open(f))['rows']
+          rows.sort(key=lambda r: r['id'])
+          n = len(rows)
+          excl = sum(r['excluded'] for r in rows)
+          def mcP(b, c):
+              from math import comb
+              tot = b + c
+              if tot == 0:
+                  return 1.0
+              lo = min(b, c)
+              tail = sum(comb(tot, k) for k in range(lo + 1)) / 2.0 ** tot
+              return min(1.0, 2 * tail)
+          if excl > 0:
+              md = '# Exp1b: VOID (harness gate)\n%d completions excluded (schema-fail or cap-hit). Run is void; refire with bigger cap. No gate evaluated.\n' % excl
+              json.dump({'void': True, 'excluded': excl, 'rows': rows}, open('/tmp/exp1b.json', 'w'), indent=1)
+              print(md)
+          else:
+              s = sum(1 for r in rows if r['single']) / n
+              m8 = sum(1 for r in rows if r['mv8']) / n
+              o = sum(1 for r in rows if r['oracle']) / n
+              v = sum(1 for r in rows if r['verifier_ok']) / n
+              room = o - m8
+              backfire = sum(1 for r in rows if (not r['mv8']) and r['single'])
+              ab = sum(1 for r in rows if r['abstained'])
+              b = sum(1 for r in rows if r['verifier_ok'] and not r['mv8'])
+              c = sum(1 for r in rows if (not r['verifier_ok']) and r['mv8'])
+              p = mcP(b, c)
+              meanstop = sum(r['stop'] for r in rows) / n
+              stopacc = sum(1 for r in rows if r['stopmaj_ok']) / n
+              d1 = 'ROOM (mv8 below oracle)' if m8 < o else 'NO ROOM (selector line dead)'
+              keep = (v > m8) and (p < 0.05)
+              md = '# Exp1b: verifier-vs-majority (measured, CI)\nDonor Qwen2.5-0.5B Q4_K_M, 20 queries, K=8 temp 0.7, last-integer grading, harness clean.\n\n'
+              md += '| metric | acc |\n|---|---|\n| single | %.3f |\n| majority-8 | %.3f |\n| oracle | %.3f |\n| verifier (abstain->MV8) | %.3f |\n| headroom (oracle - mv8, descriptive) | %.3f |\n| backfire (mv8 wrong, single right) | %d |\n| abstained | %d |\n| verifier-vs-mv8 b/c | %d/%d |\n| McNemar p | %.4f |\n| margin-2 meanStop / stopmaj-acc | %.2f / %.3f |\n\n' % (s, m8, o, v, room, backfire, ab, b, c, p, meanstop, stopacc)
+              md += 'D1: %s. D2: %s — pre-reg keep iff verifier top-1 beats MV8 same bench McNemar p<0.05.\n' % (d1, 'KEEP verifier-selection (invoke gate family opens)' if keep else 'selector stays vote-only')
+              json.dump({'void': False, 'n': n, 'single': s, 'mv8': m8, 'oracle': o,
+                         'verifier': v, 'headroom': room, 'backfire': backfire,
+                         'abstained': ab, 'b': b, 'c': c, 'p': p,
+                         'meanStop': meanstop, 'stopmajAcc': stopacc,
+                         'keep': keep, 'rows': rows},
+                        open('/tmp/exp1b.json', 'w'), indent=1)
+              print(md)
+          EOF
+          cp /tmp/exp1b.json halt-r/exp1b.json
+          cp /tmp/exp1b.md halt-r/exp1b.md
+          cat halt-r/exp1b.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit exp1b back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/exp1b.json halt-r/exp1b.json
+            cp /tmp/exp1b.md halt-r/exp1b.md
+            git add halt-r/exp1b.json halt-r/exp1b.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: exp1b verdict $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
