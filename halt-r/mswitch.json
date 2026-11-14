@@ -9,7 +9,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 3
   },
   {
    "id": "add02",
@@ -18,7 +20,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 1
   },
   {
    "id": "add03",
@@ -27,7 +31,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 3
   },
   {
    "id": "add04",
@@ -36,7 +42,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 3
   },
   {
    "id": "add05",
@@ -45,7 +53,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 5
   },
   {
    "id": "add06",
@@ -54,7 +64,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 4
   },
   {
    "id": "add07",
@@ -63,7 +75,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 2
   },
   {
    "id": "add08",
@@ -72,7 +86,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 5
   },
   {
    "id": "box01",
@@ -81,7 +97,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 2
   },
   {
    "id": "box02",
@@ -90,7 +108,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 5
   },
   {
    "id": "box03",
@@ -99,7 +119,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 5
   },
   {
    "id": "mix01",
@@ -108,7 +130,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 5
   },
   {
    "id": "mix02",
@@ -117,7 +141,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 4
   },
   {
    "id": "mix03",
@@ -126,7 +152,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 5
   },
   {
    "id": "mul01",
@@ -135,7 +163,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 2
   },
   {
    "id": "mul02",
@@ -144,7 +174,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 3
   },
   {
    "id": "mul03",
@@ -153,7 +185,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 3
   },
   {
    "id": "sub01",
@@ -162,7 +196,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 0
   },
   {
    "id": "sub02",
@@ -171,7 +207,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 1
   },
   {
    "id": "sub03",
@@ -180,7 +218,9 @@
    "b_ok": false,
    "same_wrong": false,
    "fixable": false,
-   "excluded": 10
+   "excluded": 10,
+   "excl_schema": 10,
+   "excl_cap": 0
   }
  ]
 }
