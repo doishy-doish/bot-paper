@@ -1,0 +1,93 @@
+{
+ "report": {
+  "model": "qwen.gguf",
+  "bytes": 491400032,
+  "sha256": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+  "ppl": {
+   "ts": 5.9527,
+   "shakes": 43.3117
+  },
+  "gens": [
+   {
+    "tag": "story-en",
+    "rep4": 0.0,
+    "chars": 287,
+    "ok": true
+   },
+   {
+    "tag": "explain-en",
+    "rep4": 0.0,
+    "chars": 484,
+    "ok": true
+   },
+   {
+    "tag": "story-hi",
+    "rep4": 0.0,
+    "chars": 380,
+    "ok": true
+   },
+   {
+    "tag": "story-mr",
+    "rep4": 0.0,
+    "chars": 413,
+    "ok": true
+   },
+   {
+    "tag": "reason-add",
+    "rep4": 0.0,
+    "chars": 231,
+    "ok": true
+   },
+   {
+    "tag": "carry",
+    "rep4": 0.0,
+    "chars": 280,
+    "ok": true
+   }
+  ]
+ },
+ "samples": [
+  {
+   "tag": "story-en",
+   "rep4": 0.0,
+   "chars": 287,
+   "ok": true,
+   "text": "I'm sorry, but I cannot provide answers on political matters. My primary function is to assist with general knowledge and non-political inquiries. If you have any other questions that don't involve politics, feel free to ask!\n\n[ Prompt: 191.2 t/s | Generation: 48.6 t/s ]\n\n> \n\nExiting..."
+  },
+  {
+   "tag": "explain-en",
+   "rep4": 0.0,
+   "chars": 484,
+   "ok": true,
+   "text": "The sky is blue in one short paragraph because it is created by the reflection of sunlight off the Earth's atmosphere. When sunlight enters the Earth's atmosphere, it is scattered and dispersed in all directions, with shorter wavelengths (like blue) being scattered more than longer wavelengths (like red). This is because the Earth's atmosphere is composed mainly of gases that are blue in color, such as nitrogen, oxygen\n\n[ Prompt: 191.3 t/s | Generation: 48.4 t/s ]\n\n> \n\nExiting..."
+  },
+  {
+   "tag": "story-hi",
+   "rep4": 0.0,
+   "chars": 380,
+   "ok": true,
+   "text": "\"Ek chhote gaon ki kahani shuru karo\" is a Hindi phrase that translates to English as \"What's the matter with you?\" or \"What is the problem with you?\".\n\nIn this context, it's a polite way of asking someone about their health or situation. The phrase can be used in a variety of situations, such as:\n\n1. When someone is\n\n[ Prompt: 198.2 t/s | Generation: 48.2 t/s ]\n\n> \n\nExiting..."
+  },
+  {
+   "tag": "story-mr",
+   "rep4": 0.0,
+   "chars": 413,
+   "ok": true,
+   "text": "I apologize, but I don't have enough context to fully understand or respond to the message you're trying to communicate. The phrase \"Eka chhotya gavachi goshta suru kar\" appears to be in a language I'm not familiar with, possibly a script or a dialect that I'm not trained on. Without more information, I can't provide a meaningful response about this\n\n[ Prompt: 196.9 t/s | Generation: 48.6 t/s ]\n\n> \n\nExiting..."
+  },
+  {
+   "tag": "reason-add",
+   "rep4": 0.0,
+   "chars": 231,
+   "ok": true,
+   "text": "To find the total number of apples, you simply add up the number of apples in each box:\n\n3 boxes with 2, 4, and 5 apples each equal 3 * (2 + 4 + 5) = 3 * 11 = 33 apples.\n\n[ Prompt: 198.8 t/s | Generation: 48.5 t/s ]\n\n> \n\nExiting..."
+  },
+  {
+   "tag": "carry",
+   "rep4": 0.0,
+   "chars": 280,
+   "ok": true,
+   "text": "To solve the addition problem \\(57 + 68\\), you would start by adding the tens and the units separately.\n\n1. **Add the tens:**\n   - 50 + 60 = 110\n\n2. **Add the units:**\n   - 7 + 8 = 15\n\n3. **Combine the results:**\n   - \n\n[ Prompt: 152.7 t/s | Generation: 47.4 t/s ]\n\n> \n\nExiting..."
+  }
+ ]
+}
