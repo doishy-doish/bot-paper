@@ -1,0 +1,104 @@
+name: halt-r-triage
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'halt-r/triage-eval.py'
+      - 'halt-r/exp1-queries.json'
+      - '.github/workflows/halt-r-triage.yml'
+permissions:
+  contents: write
+jobs:
+  sample:
+    name: triage sampling (slice ${{ matrix.slice }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        slice: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - name: install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake build-essential curl python3
+      - name: build llama-cli
+        run: |
+          git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/llama.cpp
+          cmake -S /tmp/llama.cpp -B /tmp/llama.cpp/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/llama.cpp/build --config Release -j --target llama-cli
+      - name: fetch donor
+        run: |
+          curl -sSL https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf -o /tmp/qwen.gguf
+          wc -c /tmp/qwen.gguf
+      - name: sample slice
+        run: |
+          set -o pipefail
+          mkdir -p out/triage
+          python3 halt-r/triage-eval.py --bin /tmp/llama.cpp/build --model /tmp/qwen.gguf --queries halt-r/exp1-queries.json --slice ${{ matrix.slice }} --nslice 4 --k 8 --out out/triage 2>&1 | tee out/triage/slice-${{ matrix.slice }}.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: triage-slice-${{ matrix.slice }}
+          path: out/triage/
+          retention-days: 30
+  collect:
+    name: merge + triage verdict
+    needs: sample
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: triage-slice-*
+          path: slices/
+      - name: triage verdict (Tier G v2 router kill-row 2)
+        run: |
+          python3 - <<'EOF' | tee /tmp/triage.md
+          import json, glob
+          rows = []
+          for f in sorted(glob.glob('slices/*/triage-slice-*.json')):
+              rows += json.load(open(f))['rows']
+          rows.sort(key=lambda r: r['id'])
+          n = len(rows)
+          excl = sum(r['excluded'] for r in rows)
+          if excl > 0:
+              md = '# Triage: VOID (harness gate)\n%d completions excluded. Run is void; refire with bigger cap. No gate evaluated.\n' % excl
+              json.dump({'void': True, 'excluded': excl, 'rows': rows}, open('/tmp/triage.json', 'w'), indent=1)
+              print(md)
+          else:
+              mv8 = sum(1 for r in rows if r['mv8']) / n
+              direct = [r for r in rows if r['direct']]
+              df = len(direct) / n
+              dacc = sum(1 for r in direct if r['mv8']) / len(direct) if direct else 0
+              passed = (df >= 0.5) and (dacc >= mv8 - 0.05)
+              md = '# Triage: Tier G v2 router signals (measured, CI)\nDonor Qwen2.5-0.5B Q4_K_M, 20 queries, K=8 + greedy, harness clean.\n\n'
+              md += '| metric | value |\n|---|---|\n| mv8 | %.3f |\n| directFrac | %.3f |\n| directAcc (MV8 on direct) | %.3f |\n\n' % (mv8, df, dacc)
+              md += 'PASS (build invoke-gate router)' if passed else 'KILL (triage saves nothing at matched acc; Tier G stays vote-only)'
+              md += ' — pre-reg: directFrac>=0.5 AND directAcc>=mv8-0.05.\n'
+              json.dump({'void': False, 'n': n, 'mv8': mv8, 'directFrac': df,
+                         'directAcc': dacc, 'passed': passed, 'rows': rows},
+                        open('/tmp/triage.json', 'w'), indent=1)
+              print(md)
+          EOF
+          cp /tmp/triage.json halt-r/triage.json
+          cp /tmp/triage.md halt-r/triage.md
+          cat halt-r/triage.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit triage back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/triage.json halt-r/triage.json
+            cp /tmp/triage.md halt-r/triage.md
+            git add halt-r/triage.json halt-r/triage.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: triage verdict $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
