@@ -1,0 +1,23 @@
+{
+ "date": "2026-11-14",
+ "task": "revbal-graft5-t200",
+ "preReg": "scratch/papers/revbal-graft5-t200-prereg-2026-11-14.md: T200 = 200 distinct queries, arith-revbal corpus. graft5 wins iff lam*>0 AND d>0.2ppl vs interp AND McNemar p<0.05.",
+ "interp": {
+  "acc": 0.295,
+  "ppl": 8.824648471192047,
+  "lam": 0.25,
+  "trials": 200
+ },
+ "graft5": {
+  "acc": 0.365,
+  "ppl": 8.293701447210719,
+  "lam": 0.25,
+  "trials": 200
+ },
+ "d": 0.5309470239813283,
+ "mcNemar": {
+  "b": 22,
+  "c": 8,
+  "p": 0.016124801710247993
+ }
+}
