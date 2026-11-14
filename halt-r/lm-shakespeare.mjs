@@ -223,7 +223,7 @@ if (process.argv[2] === 'decrypt'){
   const noEnc = a.includes('--no-encrypt');
   const noGen = a.includes('--no-gen'); // P-sweep: skip generation (costly, unneeded per-P)
   const dataPath = gv('data', null), outDir = gv('out', null);
-  if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100] [--proj raw|sim|sup|enc|enc2|ict|fsq|graft5] [--graftgguf <tinygpt.gguf>] [--no-gen]');
+  if (!dataPath || !outDir) fail('usage: --data <input.txt> --out <dir> [--W 32] [--P 8000] [--trials 100] [--proj raw|sim|sup|sup2|enc|enc2|ict|fsq|graft5|f2a|f2a5] [--graftgguf <tinygpt.gguf>] [--anchors 64|128|256|512] [--no-gen]');
   const W = parseInt(gv('W', DEF.W)), TR = parseInt(gv('trials', DEF.trials));
   let P = parseInt(gv('P', DEF.P));
   const P0 = P; // requested store size; P becomes Peff after B2 prune
@@ -247,9 +247,11 @@ if (process.argv[2] === 'decrypt'){
   if (PROV !== '0' && PROV !== '1') fail('usage: --prov 0|1');
   const TOK = gv('tok', 'char'); // H12 subword pilot: char (default, bit-identical), bpe (256 learned merges on train head)
   if (TOK !== 'char' && TOK !== 'bpe') fail('usage: --tok char|bpe');
+  const POOL = gv('pool', 'off'); // graftbpe compose: off (default, bit-identical; no-op under --tok char), mean (BPE token row = mean of its chars' donor rows)
+  if (POOL !== 'off' && POOL !== 'mean') fail('usage: --pool off|mean');
   const GRAFTGGUF = gv('graftgguf', null); // transplant: donor GGUF path (keys = frozen donor embeddings, zero training)
-  if ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5') && TOK !== 'char') fail('usage: --proj graft needs --tok char (donor V is char-level)');
-  if ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5') && !GRAFTGGUF) fail('usage: --proj graft needs --graftgguf <tinygpt.gguf>');
+  if ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5' || PROJ === 'f2a5') && TOK !== 'char' && !(TOK === 'bpe' && POOL === 'mean')) fail('usage: --proj graft needs --tok char (donor V is char-level; --tok bpe requires --pool mean)');
+  if ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5' || PROJ === 'f2a5') && !GRAFTGGUF) fail('usage: --proj graft needs --graftgguf <tinygpt.gguf>');
   const MIX = gv('mix', 'none'); // gmix: none (default, bit-identical), gpt (mix hop + tiny-GPT dists from q100-gpt file, joined on pos)
   if (MIX !== 'none' && MIX !== 'gpt') fail('usage: --mix none|gpt');
   const GPTQ = gv('gptq', null);
@@ -333,6 +335,7 @@ if (process.argv[2] === 'decrypt'){
     return toks;
   }
   let bpeMerges = 0, bpeMeanLen = 0;
+  let bpeVocab = null, bpeCh0 = null; // graftbpe: token strings + base-char order for donor-row pooling
   let trainIds = null, valIds = null;
   if (TOK === 'bpe') {
     const bt0 = Date.now();
@@ -345,6 +348,7 @@ if (process.argv[2] === 'decrypt'){
     bpeMeanLen = tl / tIds.length;
     console.log(`bpe merges=${bpeMerges} V=${vocab.length} meanTokLen=${bpeMeanLen.toFixed(2)} learnMs=${Date.now() - bt0}`);
     chars = vocab; V = vocab.length;
+    bpeVocab = vocab; bpeCh0 = ch0;
     trainIds = Uint32Array.from(tIds); valIds = Uint32Array.from(vIds);
   } else {
     trainIds = new Uint16Array(train.length);
@@ -386,13 +390,29 @@ if (process.argv[2] === 'decrypt'){
   let graftEmb = null, GE = 0, graftWhite = null, graftBind = null; // transplant: frozen donor token rows (zero training)
   const K5 = parseInt(gv('anchors', '512')); // graft5 anchor count (K-sweep 512/256/128/64; default 512 = bit-identical graft5; order of the 1-bit bound m>=594, D=K5)
   if (![64, 128, 256, 512].includes(K5)) fail('usage: --anchors 64|128|256|512');
-  if (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5'){
-    const g = readGraftEmb(GRAFTGGUF, V);
-    graftEmb = g.emb; GE = g.GE;
-    console.log(`graft donor=${GRAFTGGUF} V=${V} E=${GE} D=${W * GE}`);
+  if (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5' || PROJ === 'f2a5'){
+    const wantV = (TOK === 'bpe' && POOL === 'mean') ? bpeCh0.length : V;
+    const g = readGraftEmb(GRAFTGGUF, wantV);
+    GE = g.GE;
+    if (TOK === 'bpe' && POOL === 'mean'){
+      // graftbpe compose: BPE token row = mean of its chars' donor rows (zero training).
+      // Under --tok char POOL is a no-op (else branch) so the char path is bit-identical.
+      const ci = new Map(); bpeCh0.forEach((c, i) => ci.set(c, i));
+      const pemb = new Float32Array(V * GE);
+      for (let t = 0; t < V; t++){
+        const s = bpeVocab[t]; let n = 0;
+        for (const c of s){ const r = ci.get(c); if (r === undefined) continue; n++; for (let e = 0; e < GE; e++) pemb[t * GE + e] += g.emb[r * GE + e]; }
+        if (n > 0) for (let e = 0; e < GE; e++) pemb[t * GE + e] /= n;
+      }
+      graftEmb = pemb;
+      console.log(`graft donor=${GRAFTGGUF} Vchar=${wantV} Vbpe=${V} E=${GE} pool=mean D=${W * GE}`);
+    } else {
+      graftEmb = g.emb;
+      console.log(`graft donor=${GRAFTGGUF} V=${V} E=${GE} D=${W * GE}`);
+    }
   }
-  const D = PROJ === 'raw' ? Din : (PROJ === 'graft3' ? V : (PROJ === 'graft5' ? K5 : (((PROJ === 'graft' || PROJ === 'graft2') || PROJ === 'graft4') ? GE : H)));
-  const FW = PROJ === 'graft3' ? V : (PROJ === 'graft5' ? K5 : ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft4') ? GE : H)); // feature width: graft keys live in donor space (graft3: anchor space, graft5: probe-anchor space)
+  const D = PROJ === 'raw' ? Din : (PROJ === 'graft3' ? V : ((PROJ === 'graft5' || PROJ === 'f2a5') ? K5 : (((PROJ === 'graft' || PROJ === 'graft2') || PROJ === 'graft4') ? GE : H)));
+  const FW = PROJ === 'graft3' ? V : ((PROJ === 'graft5' || PROJ === 'f2a5') ? K5 : ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft4') ? GE : H)); // feature width: graft keys live in donor space (graft3: anchor space, graft5/f2a5: probe-anchor space)
   function gauss1(rr){ let u = 0, v = 0; while (!u) u = rr(); while (!v) v = rr(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
   function fsqQ(x){ // F1 finite-scalar quantization: L=8 uniform levels in [-3,3]; straight-through in training (grad passes as identity); pure, no CLI refs
     const B = 3, L = 8;
@@ -475,7 +495,7 @@ if (process.argv[2] === 'decrypt'){
     }
     console.log('graft4 zca+orth ready V=' + V + ' E=' + GE + ' W=' + W);
   }
-  if (PROJ === 'graft5'){ // anchor-energy transplant keys (math backtrack B2+B3 fused, zero training, deterministic):
+  if (PROJ === 'graft5' || PROJ === 'f2a5'){ // anchor-energy transplant keys (math backtrack B2+B3 fused, zero training, deterministic):
     // shared probes: K5 windows sampled from train (SEED+13), embedded as whitened-donor-row
     // sums (graft2 transform, campaign-best). Token key = RANKED cosine to anchors (rank-robust
     // a la Anchor Energy 2002.01615; isometry-invariant a la relative reps 2209.15430, so no
@@ -536,7 +556,7 @@ if (process.argv[2] === 'decrypt'){
   const r = rng(SEED), q = new Float32Array(D);
   let encLossFirst = 0, encLossLast = 0; // trunk contrastive metrics (0 unless proj=enc)
   let fsqCodes = 0, fsqReuse = 0; // F1 code-reuse diagnostic (distinct 64-bit-prefix patterns; 0 unless proj=fsq)
-  if (PROJ === 'sup' || PROJ === 'sup2'){ // sup2: per-(position,char) scales (strict generalization of sup)
+  if (PROJ === 'sup' || PROJ === 'sup2' || PROJ === 'f2a'){ // sup2: per-(position,char) scales (strict generalization of sup); f2a reuses sup keys (fast matrix is per-query, keys frozen)
     // H1 learned encoder: positions that predict the label get bigger projection
     // magnitude, so dots are dominated by predictive (usually suffix) positions and
     // partial matches concentrate instead of diffusing. Same random-direction code
@@ -1221,6 +1241,30 @@ if (process.argv[2] === 'decrypt'){
   // NOT from head-to-head comparison. We never mixed -- this rung adds the lam sweep.
   // Select lam on seed-2000 queries (same stream as the main eval above, so comparable),
   // lock it, report on fresh seed-2001 queries (honest generalization).
+  // F2a one-shot Hebbian fast weights (kill-row 3, doctrine ruling 2026-11-14):
+  // frozen keys (sup or graft5-K256), SMALL fast matrix F (DxV) rewritten per query
+  // by ONE outer-product pass over top-K=8 retrieved neighbors, predict from F.
+  // Zero gradients, weights discarded per query, store untouched. If fd equals the
+  // vote (agree diag near 1.0), the update is a reparameterized vote: structural fail.
+  function f2aDist(qq, w){
+    const F2K = 8;
+    const F = new Float64Array(D * V);
+    const idx = [...Array(w.length).keys()];
+    idx.sort((a, b) => w[b] - w[a]);
+    const kk = Math.min(F2K, idx.length);
+    let wmax = 0; for (let i = 0; i < kk; i++) if (w[idx[i]] > wmax) wmax = w[idx[i]];
+    if (!(wmax > 0)) return null;
+    for (let t = 0; t < kk; t++){
+      const i = idx[t], c = w[i] / wmax, off = i * D;
+      const nv = next[i];
+      for (let j = 0; j < D; j++) if (X[off + j]) F[j * V + nv] += c;
+    }
+    const fd = new Float64Array(V);
+    for (let c = 0; c < V; c++){ let s = 0; for (let j = 0; j < D; j++) if (qq[j] > 0) s += F[j * V + c]; fd[c] = s; }
+    let tot = 0; for (let c = 0; c < V; c++) tot += fd[c];
+    for (let c = 0; c < V; c++) fd[c] /= (tot + 1e-12 * V);
+    return fd;
+  }
   function hopBiDists(n, seed){
     const rr = rng(seed), qq = new Float32Array(D);
     const rows = [];
@@ -1249,7 +1293,7 @@ if (process.argv[2] === 'decrypt'){
       const bd = new Float64Array(V);
       for (let c = 0; c < V; c++) bd[c] = (bi[off + c] + 1) / rtot;
       let be = 0; for (let c = 0; c < V; c++){ const p = bd[c]; if (p > 0) be -= p * Math.log(p); } be /= Math.log(V);
-      rows.push({ pos, hd, bd, trueNext, g: wmax / (wsum || 1), h: ent, m: (wmax - w2) / (wsum || 1), k10: kth / (wsum || 1), cov, be });
+      rows.push({ pos, hd, bd, trueNext, g: wmax / (wsum || 1), h: ent, m: (wmax - w2) / (wsum || 1), k10: kth / (wsum || 1), cov, be, fd: (PROJ === 'f2a' || PROJ === 'f2a5') ? f2aDist(qq, w) : null });
     }
     return rows;
   }
@@ -1273,6 +1317,38 @@ if (process.argv[2] === 'decrypt'){
   for (const s of selStats) if (s.ppl < bestLam.ppl || (s.ppl === bestLam.ppl && s.acc > bestLam.acc)) bestLam = s;
   const repRows = hopBiDists(TR, 2001), repStats = lamStats(repRows);
   const repLocked = repStats[LAMBDAS.indexOf(bestLam.lam)];
+  // F2a select/report (same ppl-first lam discipline as interp; vote baseline = repHitI on the SAME rows, paired)
+  let f2aLamSel = -1, f2aAccSel = 0, f2aPplSel = 0, f2aAcc = 0, f2aPpl = 0, f2aAgree = -1, repHitF = '';
+  if (PROJ === 'f2a' || PROJ === 'f2a5'){
+    const f2aStats = (rows) => LAMBDAS.map(lam => {
+      let acc = 0, ce = 0;
+      for (const qr of rows){
+        const dd = qr.fd || qr.hd;
+        let bp = -1, bci = 0;
+        for (let c = 0; c < V; c++){ const p = lam * dd[c] + (1 - lam) * qr.bd[c]; if (p > bp){ bp = p; bci = c; } }
+        if (bci === qr.trueNext) acc++;
+        ce += -Math.log(Math.max(lam * dd[qr.trueNext] + (1 - lam) * qr.bd[qr.trueNext], 1e-12));
+      }
+      return { lam, acc: acc / rows.length, ppl: Math.exp(ce / rows.length) };
+    });
+    const selF = f2aStats(selRows);
+    let bestF = selF[0];
+    for (const s of selF) if (s.ppl < bestF.ppl || (s.ppl === bestF.ppl && s.acc > bestF.acc)) bestF = s;
+    f2aLamSel = bestF.lam; f2aAccSel = bestF.acc; f2aPplSel = bestF.ppl;
+    const repF = f2aStats(repRows);
+    const rf = repF[LAMBDAS.indexOf(bestF.lam)]; f2aAcc = rf.acc; f2aPpl = rf.ppl;
+    let ag = 0;
+    for (const qr of repRows){
+      let ip = -1, ici = 0;
+      for (let c = 0; c < V; c++){ const p = bestF.lam * (qr.fd || qr.hd)[c] + (1 - bestF.lam) * qr.bd[c]; if (p > ip){ ip = p; ici = c; } }
+      repHitF += ici === qr.trueNext ? '1' : '0';
+      let vp = -1, vci = 0;
+      for (let c = 0; c < V; c++){ const p = bestLam.lam * qr.hd[c] + (1 - bestLam.lam) * qr.bd[c]; if (p > vp){ vp = p; vci = c; } }
+      if (ici === vci) ag++;
+    }
+    f2aAgree = ag / repRows.length;
+    console.log(`f2a lam*=${f2aLamSel} report acc=${f2aAcc.toFixed(3)} ppl=${f2aPpl.toFixed(2)} agreeVote=${f2aAgree.toFixed(3)}`);
+  }
   // DTW rerank (screen verdict 2026-11-13: shift 0.74, rev 0.00 — rerank-only behind
   // the sup prefilter, K=50, tau=W fixed; costs one extra recall pass per query, disclosed)
   let dtwLamSel = -1, dtwAccSel = 0, dtwPplSel = 0, dtwAcc = 0, dtwPpl = 0, repHitD = '';
@@ -1594,7 +1670,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.mix = MIX; metrics.gptCover = gptCover; metrics.gptMixLamSel = gptMixLamSel;
   metrics.gptMixAccSel = gptMixAccSel; metrics.gptMixPplSel = gptMixPplSel;
   metrics.gptMixAcc = gptMixAcc; metrics.gptMixPpl = gptMixPpl;
-  metrics.tok = TOK; metrics.bpeMerges = bpeMerges; metrics.bpeMeanLen = bpeMeanLen;
+  metrics.tok = TOK; metrics.bpeMerges = bpeMerges; metrics.bpeMeanLen = bpeMeanLen; metrics.pool = POOL;
   metrics.encLossFirst = encLossFirst; metrics.encLossLast = encLossLast;
   // PARADIGM LADDER (user, 2026-11-13): every verdict carries its cost-class. Same
   // equation, different series: exact brute-force is linear-O(P·D) (whole) or
@@ -1608,7 +1684,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.conf = parseInt(CONF) || 0; metrics.confAbs = confAbs; metrics.confAcc = confAcc; metrics.confPpl = confPpl;
   metrics.orf = parseInt(ORF) || 0;
   metrics.rawfast = parseInt(RAWFAST) || 0;
-  metrics.graft = PROJ === 'graft5' ? 5 : (PROJ === 'graft4' ? 4 : (PROJ === 'graft3' ? 3 : (PROJ === 'graft2' ? 2 : (PROJ === 'graft' ? 1 : 0)))); metrics.graftE = PROJ === 'graft3' ? V : (PROJ === 'graft5' ? K5 : GE); metrics.graftFile = (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5') ? GRAFTGGUF : null;
+  metrics.graft = (PROJ === 'graft5' || PROJ === 'f2a5') ? 5 : (PROJ === 'graft4' ? 4 : (PROJ === 'graft3' ? 3 : (PROJ === 'graft2' ? 2 : (PROJ === 'graft' ? 1 : 0)))); metrics.graftE = PROJ === 'graft3' ? V : ((PROJ === 'graft5' || PROJ === 'f2a5') ? K5 : GE); metrics.graftFile = (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5' || PROJ === 'f2a5') ? GRAFTGGUF : null;
   metrics.c2d = parseInt(C2D) || 0; metrics.canRemDetail = canRemDetail; metrics.canEditDetail = canEditDetail;
   metrics.repHitH = repHitH;
   metrics.hedgeAcc = hedgeAcc; metrics.hedgePpl = hedgePpl; metrics.hedgeNeff = hedgeNeff;
@@ -1623,6 +1699,7 @@ if (process.argv[2] === 'decrypt'){
   if (split){ metrics.memAcc = split.memAcc; metrics.memBiAcc = split.memBi; metrics.memN = split.memN; metrics.novAcc = split.novAcc; metrics.novBiAcc = split.novBi; metrics.novN = split.novN; }
   metrics.h6 = parseInt(H6) || 0; metrics.h6LamSel = h6LamSel; metrics.h6AccSel = h6AccSel; metrics.h6PplSel = h6PplSel; metrics.h6Acc = h6Acc; metrics.h6Ppl = h6Ppl; metrics.h6AUC = h6AUC;
   metrics.fsq = PROJ === 'fsq' ? 1 : 0; metrics.fsqCodes = fsqCodes; metrics.fsqReuse = fsqReuse;
+  metrics.f2a = (PROJ === 'f2a' || PROJ === 'f2a5') ? 1 : 0; metrics.f2aLamSel = f2aLamSel; metrics.f2aAccSel = f2aAccSel; metrics.f2aPplSel = f2aPplSel; metrics.f2aAcc = f2aAcc; metrics.f2aPpl = f2aPpl; metrics.f2aAgree = f2aAgree; metrics.repHitF = repHitF;
   writeFileSync(outDir + '/metrics.json', JSON.stringify(metrics));
   let stxt = '';
   for (const s of samples) stxt += 'PROMPT: ' + JSON.stringify(s.prompt) + '\nHOP: ' + JSON.stringify(s.hop) + '\nBI: ' + JSON.stringify(s.bi) + '\nCITE: ' + JSON.stringify(s.cite || []) + '\n---\n';
