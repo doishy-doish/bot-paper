@@ -245,8 +245,8 @@ if (process.argv[2] === 'decrypt'){
   if (SPLIT !== '0' && SPLIT !== '1') fail('usage: --split 0|1');
   const PROV = gv('prov', '0'); // C3 provenance cites (0=off bit-identical, 1=attach top-3 store neighbors per sample)
   if (PROV !== '0' && PROV !== '1') fail('usage: --prov 0|1');
-  const TOK = gv('tok', 'char'); // H12 subword pilot: char (default, bit-identical), bpe (256 learned merges on train head)
-  if (TOK !== 'char' && TOK !== 'bpe') fail('usage: --tok char|bpe');
+  const TOK = gv('tok', 'char'); // H12 subword pilot: char (default, bit-identical), bpe (256 learned merges on train head), word (SEG-word 3a: whitespace words, vocab cap 2000)
+  if (TOK !== 'char' && TOK !== 'bpe' && TOK !== 'word') fail('usage: --tok char|bpe|word');
   const POOL = gv('pool', 'off'); // graftbpe compose: off (default, bit-identical; no-op under --tok char), mean (BPE token row = mean of its chars' donor rows)
   if (POOL !== 'off' && POOL !== 'mean') fail('usage: --pool off|mean');
   const GRAFTGGUF = gv('graftgguf', null); // transplant: donor GGUF path (keys = frozen donor embeddings, zero training)
@@ -335,6 +335,7 @@ if (process.argv[2] === 'decrypt'){
     return toks;
   }
   let bpeMerges = 0, bpeMeanLen = 0;
+  let wordVocab = 0, wordMeanLen = 0; // SEG-word (Track 3a): top-1999 + UNK provenance
   let bpeVocab = null, bpeCh0 = null; // graftbpe: token strings + base-char order for donor-row pooling
   let trainIds = null, valIds = null;
   if (TOK === 'bpe') {
@@ -350,6 +351,26 @@ if (process.argv[2] === 'decrypt'){
     chars = vocab; V = vocab.length;
     bpeVocab = vocab; bpeCh0 = ch0;
     trainIds = Uint32Array.from(tIds); valIds = Uint32Array.from(vIds);
+  } else if (TOK === 'word') {
+    // SEG-word (Track 3a): whitespace-delimited word tokens, W measured in words.
+    // Vocab capped 2000 (top-1999 by train frequency, lexicographic tiebreak;
+    // id 0 = OOV/UNK, mirroring char-path val-OOV handling). Symmetric
+    // store/query (same mapping both sides); default-off bit-identical.
+    const wt0 = Date.now();
+    const wfreq = new Map();
+    const tWords = train.split(/\s+/).filter(w => w.length);
+    for (const w of tWords) wfreq.set(w, (wfreq.get(w) || 0) + 1);
+    const wordOrder = [...wfreq.entries()].sort((a, b) => (b[1] - a[1]) || (a[0] < b[0] ? -1 : 1)).slice(0, 1999).map(e => e[0]);
+    const wToI = new Map(); wordOrder.forEach((w, i) => wToI.set(w, i + 1));
+    const wVocab = ['<unk>', ...wordOrder];
+    const wEnc = s => s.split(/\s+/).filter(w => w.length).map(w => wToI.get(w) || 0);
+    const tWIds = wEnc(train), vWIds = wEnc(val);
+    let wtl = 0; for (const id of tWIds) wtl += wVocab[id].length;
+    wordMeanLen = wtl / Math.max(1, tWIds.length);
+    wordVocab = wVocab.length;
+    console.log(`word tokens=${tWIds.length} V=${wVocab.length} meanTokLen=${wordMeanLen.toFixed(2)} learnMs=${Date.now() - wt0}`);
+    chars = wVocab; V = wVocab.length;
+    trainIds = Uint32Array.from(tWIds); valIds = Uint32Array.from(vWIds);
   } else {
     trainIds = new Uint16Array(train.length);
     for (let i = 0; i < train.length; i++) trainIds[i] = toI[train[i]];
@@ -357,7 +378,7 @@ if (process.argv[2] === 'decrypt'){
     for (let i = 0; i < val.length; i++) valIds[i] = toI[val[i]] !== undefined ? toI[val[i]] : 0;
   }
   if (V > 2000) fail('vocab blowup V=' + V);
-  console.log(`corpus chars=${raw.length} train=${train.length} val=${val.length} V=${V} W=${W} P=${P} proj=${PROJ}${PROJ === 'raw' ? '' : ' H=' + H} score=${SCORE} tok=${TOK}${TOK === 'bpe' ? ' merges=' + bpeMerges : ''}`);
+  console.log(`corpus chars=${raw.length} train=${train.length} val=${val.length} V=${V} W=${W} P=${P} proj=${PROJ}${PROJ === 'raw' ? '' : ' H=' + H} score=${SCORE} tok=${TOK}${TOK === 'bpe' ? ' merges=' + bpeMerges : ''}${TOK === 'word' ? ' wordV=' + wordVocab : ''}`);
   // baselines on full train
   const uni = new Float64Array(V);
   const tFreq = new Uint32Array(V); // H8: rare-char set = bottom-quartile train frequency (exact-match rescue signal)
@@ -1670,7 +1691,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.mix = MIX; metrics.gptCover = gptCover; metrics.gptMixLamSel = gptMixLamSel;
   metrics.gptMixAccSel = gptMixAccSel; metrics.gptMixPplSel = gptMixPplSel;
   metrics.gptMixAcc = gptMixAcc; metrics.gptMixPpl = gptMixPpl;
-  metrics.tok = TOK; metrics.bpeMerges = bpeMerges; metrics.bpeMeanLen = bpeMeanLen; metrics.pool = POOL;
+  metrics.tok = TOK; metrics.bpeMerges = bpeMerges; metrics.bpeMeanLen = bpeMeanLen; metrics.wordVocab = wordVocab; metrics.wordMeanLen = wordMeanLen; metrics.pool = POOL;
   metrics.encLossFirst = encLossFirst; metrics.encLossLast = encLossLast;
   // PARADIGM LADDER (user, 2026-11-13): every verdict carries its cost-class. Same
   // equation, different series: exact brute-force is linear-O(P·D) (whole) or
