@@ -7,12 +7,12 @@
 # fallback MV8 deterministic tie-break (lowest seed). Collect does McNemar.
 # Adaptive margin-2 simulated retrospectively: sequential seeds, stop at first prefix
 # with margin>=2 else 8; report meanStop + stop-majority acc vs MV8.
-# Harness gate mirrors exp1-vote.py (schema last-int, cap>=145 at -n 150, excluded
+# Harness gate mirrors exp1-vote.py (schema last-int, cap>=295 at -n 300, excluded
 # counted; collect voids run if excluded>0).
 # Usage: python3 halt-r/exp1b-vote.py --bin ... --model ... --queries ... --slice 0 --nslice 4 --k 8 --out out/exp1b
 import argparse, json, os, re, subprocess
 
-N_CAP = 150
+N_CAP = 300
 
 def run(cmd, timeout=900):
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
