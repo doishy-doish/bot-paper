@@ -33,7 +33,7 @@ def main():
     for q in mine:
         hits = []
         for s in range(a.k):
-            rc, out = run([cli, '-m', a.model, '-p', q['prompt'], '-n', '40',
+            rc, out = run([cli, '-m', a.model, '-p', q['prompt'], '-n', '150',
                            '-c', '2048', '--temp', '0.7', '--seed', str(s),
                            '-t', '4', '--no-display-prompt'])
             pred = last_int(out)
