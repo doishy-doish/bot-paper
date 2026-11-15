@@ -50,10 +50,11 @@ async function complete(ctx){
   const r = await fetch(A.server + '/completion', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt: ctx, n_predict: 1, n_probs: 100, temperature: 0, cache_prompt: true, post_sampling_probs: true }) });
   if (!r.ok) fail('server completion status ' + r.status);
-  const j = await r.json();
+  const raw = await r.text();
+  let j; try { j = JSON.parse(raw); } catch (e) { fail('server: bad JSON ' + raw.slice(0, 400)); }
   const cp0 = j.completion_probabilities && j.completion_probabilities[0];
   const probs = (cp0 && (cp0.probs || cp0.top_probs)) || null;
-  if (!probs || !probs.length) fail('server: no probs (keys: ' + Object.keys(cp0 || {}).join(',') + ')');
+  if (!probs || !probs.length) fail('server: no probs (keys: ' + Object.keys(cp0 || {}).join(',') + ') body: ' + raw.slice(0, 400));
   return probs;
 }
 await waitServer();
