@@ -209,7 +209,7 @@ function readGraftRowsHF(spec, chars){
   const bmap = gpt2ByteMap(), enc = new TextEncoder();
   const ids = chars.map(c => {
     const bytes = enc.encode(c);
-    const cands = bytes.length === 1 ? [c, bmap[bytes[0]]] : [c];
+    const cands = bytes.length === 1 ? [c, bmap[bytes[0]]] : [c, ...[...bytes].map(b => bmap[b])];
     for (const k of cands) if (vocab[k] !== undefined) return vocab[k];
     fail('graftemb: corpus char unmapped ' + JSON.stringify(c));
   });

@@ -48,11 +48,11 @@ async function waitServer(){
 }
 async function complete(ctx){
   const r = await fetch(A.server + '/completion', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt: ctx, n_predict: 1, n_probs: 100, temperature: 0, cache_prompt: true }) });
+    body: JSON.stringify({ prompt: ctx, n_predict: 1, n_probs: 100, temperature: 0, cache_prompt: true, post_sampling_probs: true }) });
   if (!r.ok) fail('server completion status ' + r.status);
   const j = await r.json();
   const probs = j.completion_probabilities && j.completion_probabilities[0] && j.completion_probabilities[0].probs;
-  if (!probs) fail('server: no probs (needs n_probs support)');
+  if (!probs) fail('server: no probs (keys: ' + Object.keys(j.completion_probabilities[0] || {}).join(',') + ')');
   return probs;
 }
 await waitServer();
@@ -66,7 +66,8 @@ for (let t = 0; t < TR; t++){
   const probs = await complete(ctx);
   const mass = {}; let tot = 0;
   for (const p of probs){
-    const c = pieceFirstChar(p.tok_str, toI);
+    if (p.token === undefined || typeof p.prob !== 'number') fail('server: prob shape changed (keys: ' + Object.keys(p || {}).join(',') + ')');
+    const c = pieceFirstChar(p.token, toI);
     if (c === null) continue;
     mass[c] = (mass[c] || 0) + p.prob; tot += p.prob;
   }
