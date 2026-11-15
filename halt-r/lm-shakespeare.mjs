@@ -1688,6 +1688,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.interpLambda = bestLam.lam;
   metrics.interpAccSel = bestLam.acc; metrics.interpPplSel = bestLam.ppl;
   metrics.interpAcc = repLocked.acc; metrics.interpPpl = repLocked.ppl;
+  metrics.committed = "interp"; // recompute rule: the committed verdict field (diagnostics: hop-alone acc/ppl above)
   metrics.mix = MIX; metrics.gptCover = gptCover; metrics.gptMixLamSel = gptMixLamSel;
   metrics.gptMixAccSel = gptMixAccSel; metrics.gptMixPplSel = gptMixPplSel;
   metrics.gptMixAcc = gptMixAcc; metrics.gptMixPpl = gptMixPpl;

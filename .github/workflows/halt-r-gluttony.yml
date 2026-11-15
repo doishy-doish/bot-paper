@@ -1,0 +1,134 @@
+name: halt-r-gluttony
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/halt-r-gluttony.yml'
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: gluttony revbal W16 ${{ matrix.arm }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include:
+          - arm: sup
+            proj: sup
+            ak: 256
+          - arm: graft5-K512
+            proj: graft5
+            ak: 512
+          - arm: graft5-K256
+            proj: graft5
+            ak: 256
+          - arm: graft5-K128
+            proj: graft5
+            ak: 128
+          - arm: graft5-K64
+            proj: graft5
+            ak: 64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: remake revbal corpus (deterministic, byte-identical)
+        run: |
+          python3 halt-r/make-arith-revbal.py --out /tmp/arith --W 16
+          wc -c /tmp/arith/arith-full.txt
+      - name: bench gluttony cell (frozen donor, never retrained)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: |
+          FLAGS="--W 16 --P 8000 --trials 200 --H 256 --no-gen --split 1 --hedge 1"
+          if [ "${{ matrix.proj }}" = sup ]; then
+            FLAGS="$FLAGS --proj sup --mix none"
+          else
+            FLAGS="$FLAGS --proj graft5 --anchors ${{ matrix.ak }} --graftgguf halt-r/tinygpt-arith-revbal.gguf --mix none"
+          fi
+          node halt-r/lm-shakespeare.mjs --data /tmp/arith/arith-full.txt --out out/gluttony-${{ matrix.arm }} --tag arith-revbal $FLAGS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gluttony-${{ matrix.arm }}
+          path: out/gluttony-${{ matrix.arm }}/metrics.json
+          retention-days: 30
+  collect:
+    name: collect gluttony verdict
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gluttony-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: gluttony verdict (K-sweep + banked strings)
+        run: |
+          node - <<'EOF' | tee /tmp/gluttony.md
+          const fs = require('node:fs'), path = require('node:path');
+          const mcP = (b, c) => { const n = b + c; if (!n) return 1; const lo = Math.min(b, c);
+            let pk = Math.pow(0.5, n), tail = pk;
+            for (let k = 1; k <= lo; k++){ pk = pk * (n - k + 1) / k; tail += pk; }
+            return Math.min(1, 2 * tail); };
+          const pair = (s1, s2) => { let b = 0, c = 0;
+            for (let i = 0; i < Math.min(s1.length, s2.length); i++){ const a = s1[i], d = s2[i];
+              if (a === 'x' || d === 'x') continue;
+              if (a === '1' && d === '0') b++; if (a === '0' && d === '1') c++; }
+            return {b, c, p: mcP(b, c)}; };
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          walk('models');
+          const runs = files.map(f => { const m = JSON.parse(fs.readFileSync(f, 'utf8')); m._art = f; return m; });
+          const cell = (proj, K) => runs.find(r => r.proj === proj && (r.graftE || 256) === K);
+          const sup = cell('sup', 256);
+          // banked raw strings per arm (recompute rule — never trust collect)
+          const bank = runs.map(r => ({proj: r.proj, K: (r.graftE || (r.proj === 'sup' ? 256 : null)), interpLambda: r.interpLambda, interpAcc: r.interpAcc, interpPpl: r.interpPpl, graftFile: r.graftFile || null, repHitI: r.repHitI || '', repHitB: r.repHitB || ''}));
+          fs.writeFileSync('/tmp/gluttony.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'gluttony-revbal', preReg: 'scratch/papers/gluttony-revbal-prereg-2026-11-15.md: K-sweep {512,256,128,64} graft5 vs same-run sup on arith-revbal W16, T200 same seeds as T200. Primary K=512 wins iff lam*>0 AND d>0.2ppl vs sup AND McNemar p<0.05. KILL LINE: K=512 NULL closes revbal.', removal: {donor: 'halt-r/tinygpt-arith-revbal.gguf (frozen, committed; never retrained, never forwarded at eval)', checks: ['REMOVAL-1 graftFile pinned in metrics', 'REMOVAL-2 zero donor forwards at eval (bench-flag audit)']}, runs: bank}, null, 1));
+          let md = '# GLUTTONY: ownership-pattern transplant at scale (measured, CI)\nArith-revbal W16, P=8000, T200 same seeds as T200, frozen donor (REMOVAL-1/2). Control = sup arm (T200 interp).\n\n| arm | interp acc/ppl (lam*) |\n|---|---|---|\n';
+          for (const r of bank) md += '| ' + r.proj + (r.proj === 'graft5' ? ' K=' + r.K : '') + ' | ' + r.interpAcc.toFixed(3) + '/' + r.interpPpl.toFixed(2) + ' (' + r.interpLambda + ') |\n';
+          const held = [];
+          for (const K of [512, 256, 128, 64]) {
+            const g = bank.find(r => r.proj === 'graft5' && r.K === K);
+            if (!sup || !g) { md += '\nK=' + K + ': cell MISSING.\n'; continue; }
+            const d = sup.interpPpl - g.interpPpl;
+            const pm = pair(g.repHitI, sup.repHitI);
+            const wins = g.interpLambda > 0 && d > 0.2 && pm.p < 0.05;
+            if (wins) held.push(K);
+            md += '\nK=' + K + ': sup ' + sup.interpPpl.toFixed(2) + ' vs graft5 ' + g.interpPpl.toFixed(2) + ' d=' + d.toFixed(2) + ' b/c=' + pm.b + '/' + pm.c + ' p=' + pm.p.toFixed(4) + (wins ? ' HOLDS.' : ' falls.') + '\n';
+          }
+          const primary = bank.find(r => r.proj === 'graft5' && r.K === 512);
+          const pd = sup && primary ? sup.interpPpl - primary.interpPpl : NaN;
+          const pp = sup && primary ? pair(primary.repHitI, sup.repHitI) : null;
+          const win = sup && primary && primary.interpLambda > 0 && pd > 0.2 && pp.p < 0.05;
+          md += '\nPRIMARY K=512: ' + (win ? 'WIN (gluttony holds at scale; transfer hook live).' : 'NULL — KILL LINE: revbal line closed, transfer unhooked.') + '\n';
+          md += '\nFIND: minimal K keeping the win = ' + (held.length ? Math.min(...held) : 'NONE') + ' (constant floor vs 2^N question).\n';
+          process.stdout.write(md);
+          EOF
+          cp /tmp/gluttony.json halt-r/gluttony.json
+          cp /tmp/gluttony.md halt-r/gluttony.md
+          cat halt-r/gluttony.md >> "$GITHUB_STEP_SUMMARY"
+      - name: commit gluttony back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/gluttony.json halt-r/gluttony.json
+            cp /tmp/gluttony.md halt-r/gluttony.md
+            git add halt-r/gluttony.json halt-r/gluttony.md
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: gluttony verdict $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1
