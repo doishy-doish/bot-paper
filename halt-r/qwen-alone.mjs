@@ -51,8 +51,9 @@ async function complete(ctx){
     body: JSON.stringify({ prompt: ctx, n_predict: 1, n_probs: 100, temperature: 0, cache_prompt: true, post_sampling_probs: true }) });
   if (!r.ok) fail('server completion status ' + r.status);
   const j = await r.json();
-  const probs = j.completion_probabilities && j.completion_probabilities[0] && j.completion_probabilities[0].probs;
-  if (!probs) fail('server: no probs (keys: ' + Object.keys(j.completion_probabilities[0] || {}).join(',') + ')');
+  const cp0 = j.completion_probabilities && j.completion_probabilities[0];
+  const probs = (cp0 && (cp0.probs || cp0.top_probs)) || null;
+  if (!probs || !probs.length) fail('server: no probs (keys: ' + Object.keys(cp0 || {}).join(',') + ')');
   return probs;
 }
 await waitServer();
