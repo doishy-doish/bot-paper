@@ -1,0 +1,77 @@
+{
+ "date": "2026-11-15",
+ "task": "gold-1",
+ "preReg": "scratch/papers/gold-prereg-2026-11-15.md",
+ "verdicts": "see gold.md",
+ "strata": {
+  "remap": {
+   "carry0": {
+    "n": 32,
+    "acc": 0.281
+   },
+   "carry1": {
+    "n": 40,
+    "acc": 0.25
+   },
+   "carry2": {
+    "n": 28,
+    "acc": 0.321
+   },
+   "lineMismatches": 0,
+   "floor": 0.154,
+   "verdict": "GO (competent on carry)"
+  },
+  "nat": {
+   "rareN": 0,
+   "rareAcc": 0,
+   "commonN": 100,
+   "commonAcc": 0.19,
+   "q1": 40,
+   "floor": 0.02,
+   "verdict": "VOID-competence"
+  }
+ },
+ "holdout": {
+  "date": "2026-11-15",
+  "n2000": 100,
+  "n2001": 100,
+  "lock2000_meas2001": {
+   "locked": 0.01,
+   "lockRep": {
+    "t": 0.01,
+    "cov": 0.39,
+    "acc": 1,
+    "util": 0.39,
+    "nAns": 39
+   },
+   "meas": {
+    "t": 0.01,
+    "cov": 0.41,
+    "acc": 1,
+    "util": 0.41,
+    "nAns": 41
+   },
+   "donorAcc": 0.69,
+   "donorUtil": 0.69
+  },
+  "lock2001_meas2000": {
+   "locked": 0.01,
+   "lockRep": {
+    "t": 0.01,
+    "cov": 0.41,
+    "acc": 1,
+    "util": 0.41,
+    "nAns": 41
+   },
+   "meas": {
+    "t": 0.01,
+    "cov": 0.39,
+    "acc": 1,
+    "util": 0.39,
+    "nAns": 39
+   },
+   "donorAcc": 0.61,
+   "donorUtil": 0.61
+  }
+ }
+}
