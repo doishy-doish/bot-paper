@@ -1,0 +1,308 @@
+name: halt-r-gold
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/workflows/halt-r-gold.yml'
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: gold ${{ matrix.corpus }} ${{ matrix.arm }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include:
+          - corpus: remap
+            arm: sup
+            flags: "--proj sup --mix none"
+          - corpus: remap
+            arm: graft
+            flags: "--proj graft5 --anchors 256 --graftemb hf,Qwen/Qwen2.5-0.5B-Instruct,model.safetensors --mix none"
+          - corpus: nat
+            arm: sup
+            flags: "--proj sup --mix none"
+          - corpus: nat
+            arm: graft
+            flags: "--proj graft5 --anchors 256 --graftemb hf,Qwen/Qwen2.5-0.5B-Instruct,model.safetensors --mix none"
+          - corpus: revbal
+            arm: sup
+            flags: "--proj sup --mix none"
+          - corpus: revbal
+            arm: tiny
+            flags: "--proj graft5 --anchors 256 --graftgguf halt-r/tinygpt-arith-revbal.gguf --mix none"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: build corpus (fail loud, per-corpus floor with provenance)
+        run: |
+          if [ "${{ matrix.corpus }}" = remap ]; then
+            python3 halt-r/make-arith-remap.py --out /tmp/remap --W 16
+            cp /tmp/remap/remap-full.txt /tmp/corpus.txt
+            FLOOR=50000
+          elif [ "${{ matrix.corpus }}" = nat ]; then
+            cp halt-r/c1nat-corpus.txt /tmp/corpus.txt
+            FLOOR=400000
+          else
+            python3 halt-r/make-arith-revbal.py --out /tmp/arith --W 16
+            cp /tmp/arith/arith-full.txt /tmp/corpus.txt
+            FLOOR=50000
+          fi
+          # provenance: remap/revbal floors <- generator assert len==54000 (deterministic LCG-1234); nat floor <- committed c1nat-corpus.txt 438746B
+          [ $(wc -c < /tmp/corpus.txt) -gt $FLOOR ] || (echo "FAIL corpus too small"; exit 1)
+          wc -c /tmp/corpus.txt
+      - name: bench gold cell (frozen donor rows, K=256 floor)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: |
+          node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/gold-${{ matrix.corpus }}-${{ matrix.arm }} --tag gold-${{ matrix.corpus }} --W 16 --P 8000 --trials 100 --H 256 --no-gen --split 1 --hedge 1 ${{ matrix.flags }} 2>&1 | tee /tmp/bench-${{ matrix.corpus }}-${{ matrix.arm }}.log; test ${PIPESTATUS[0]} -eq 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gold-${{ matrix.corpus }}-${{ matrix.arm }}
+          path: out/gold-${{ matrix.corpus }}-${{ matrix.arm }}/metrics.json
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: gold-benchlog-${{ matrix.corpus }}-${{ matrix.arm }}
+          path: /tmp/bench-${{ matrix.corpus }}-${{ matrix.arm }}.log
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: ${{ matrix.arm == 'sup' }}
+        with:
+          name: gold-corpus-${{ matrix.corpus }}
+          path: /tmp/corpus.txt
+          retention-days: 7
+  alone:
+    name: alone ${{ matrix.donor }} ${{ matrix.corpus }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include:
+          - donor: q05
+            corpus: remap
+            gguf: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+          - donor: q05
+            corpus: nat
+            gguf: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+          - donor: q05
+            corpus: revbal
+            gguf: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: build corpus (same provenance as bench)
+        run: |
+          if [ "${{ matrix.corpus }}" = remap ]; then
+            python3 halt-r/make-arith-remap.py --out /tmp/remap --W 16
+            cp /tmp/remap/remap-full.txt /tmp/corpus.txt
+            FLOOR=50000
+          elif [ "${{ matrix.corpus }}" = nat ]; then
+            cp halt-r/c1nat-corpus.txt /tmp/corpus.txt
+            FLOOR=400000
+          else
+            python3 halt-r/make-arith-revbal.py --out /tmp/arith --W 16
+            cp /tmp/arith/arith-full.txt /tmp/corpus.txt
+            FLOOR=50000
+          fi
+          [ $(wc -c < /tmp/corpus.txt) -gt $FLOOR ] || (echo "FAIL corpus too small"; exit 1)
+      - name: build llama.cpp server
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq cmake > /dev/null 2>&1 || true
+          git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/llama.cpp
+          cmake /tmp/llama.cpp -B /tmp/llama.cpp/build -DCMAKE_BUILD_TYPE=Release > /tmp/cmake.log 2>&1 || (tail -30 /tmp/cmake.log; exit 1)
+          cmake --build /tmp/llama.cpp/build --config Release -j4 > /tmp/build.log 2>&1 || (tail -30 /tmp/build.log; exit 1)
+          ls /tmp/llama.cpp/build/bin/llama-server
+      - name: fetch donor GGUF (fail loud)
+        run: |
+          curl -sSL --fail "${{ matrix.gguf }}" -o /tmp/donor.gguf
+          [ $(wc -c < /tmp/donor.gguf) -gt 100000000 ] || (echo "FAIL donor too small"; exit 1)
+      - name: start server
+        run: |
+          /tmp/llama.cpp/build/bin/llama-server -m /tmp/donor.gguf --port 8080 --ctx-size 64 > /tmp/server.log 2>&1 &
+          for i in $(seq 1 120); do curl -sf http://127.0.0.1:8080/health && break || sleep 5; done
+          curl -sf http://127.0.0.1:8080/health
+      - name: donor-alone queries (report stream, diagnostic-grade)
+        run: |
+          echo "--- smoke: raw /completion shape for one probe (self-identifies HEAD API drift) ---"
+          curl -sS -m 60 http://127.0.0.1:8080/completion -H 'Content-Type: application/json' -d '{"prompt":"ab","n_predict":1,"n_probs":100,"temperature":0,"post_sampling_probs":true}' | head -c 600
+          echo ""
+          echo "--- end smoke ---"
+          node halt-r/qwen-alone.mjs --server http://127.0.0.1:8080 --data /tmp/corpus.txt --W 16 --trials 100 --seed 2001 --donor ${{ matrix.donor }} --corpus ${{ matrix.corpus }} --out out/alone-${{ matrix.donor }}-${{ matrix.corpus }}/alone.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gold-alone-${{ matrix.donor }}-${{ matrix.corpus }}
+          path: out/alone-${{ matrix.donor }}-${{ matrix.corpus }}/alone.json
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: gold-serverlog-${{ matrix.donor }}-${{ matrix.corpus }}
+          path: /tmp/server.log
+          retention-days: 7
+  holdout:
+    name: verify abstain holdout recompute
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: recompute holdout from committed banked files (fail loud on mismatch)
+        run: |
+          node -e '
+          const fs = require("node:fs");
+          const j = JSON.parse(fs.readFileSync("halt-r/gold-q100.json", "utf8"));
+          const H = JSON.parse(fs.readFileSync("halt-r/gold-holdout.json", "utf8"));
+          const rows = s => j.streams[s].queries.map(q => {
+            let h = 0; for (const p of q.probs) if (p > 0) h -= p * Math.log(p);
+            h /= Math.log(q.probs.length);
+            let b = 0, bp = -1; q.probs.forEach((p, i) => { if (p > bp) { bp = p; b = i; } });
+            return { h, c: b === q.tn ? 1 : 0 };
+          });
+          const at = (R, t) => { const a = R.filter(r => r.h <= t);
+            return { cov: a.length / R.length, acc: a.length ? a.reduce((x, r) => x + r.c, 0) / a.length : 0, n: a.length }; };
+          const lock = (A, B) => { let ts = null;
+            for (let t = 0; t <= 1.0001; t += 0.01) { const r = at(A, t); if (r.acc === 1 && r.n > 0) { ts = t; break; } }
+            return { t: +ts.toFixed(2), m: at(B, ts) }; };
+          const A = rows("2000"), B = rows("2001");
+          const r1 = lock(A, B), r2 = lock(B, A);
+          const ok = Math.abs(r1.t - H.lock2000_meas2001.locked) < 1e-9 &&
+            Math.abs(r1.m.cov - H.lock2000_meas2001.meas.cov) < 1e-9 &&
+            Math.abs(r2.t - H.lock2001_meas2000.locked) < 1e-9 &&
+            Math.abs(r2.m.cov - H.lock2001_meas2000.meas.cov) < 1e-9;
+          console.log("recompute t=" + r1.t + " cov=" + r1.m.cov + " acc=" + r1.m.acc + " | t=" + r2.t + " cov=" + r2.m.cov + " acc=" + r2.m.acc);
+          if (!ok) { console.error("FAIL holdout mismatch vs committed gold-holdout.json"); process.exit(1); }
+          console.log("holdout VERIFIED: abstain-alone utility loses to donor (see gold-holdout.json)");
+          '
+  collect:
+    name: collect gold verdict
+    needs: [bench, alone, holdout]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gold-*
+          path: models/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: gold verdict (transfer cells + donor-floor strata + holdout gate)
+        run: |
+          node - <<'EOF' | tee /tmp/gold.md
+          const fs = require('node:fs'), path = require('node:path');
+          const mcP = (b, c) => { const n = b + c; if (!n) return 1; const lo = Math.min(b, c);
+            let pk = Math.pow(0.5, n), tail = pk;
+            for (let k = 1; k <= lo; k++){ pk = pk * (n - k + 1) / k; tail += pk; }
+            return Math.min(1, 2 * tail); };
+          const pair = (s1, s2) => { let b = 0, c = 0;
+            for (let i = 0; i < Math.min(s1.length, s2.length); i++){ const a = s1[i], d = s2[i];
+              if (a === 'x' || d === 'x') continue;
+              if (a === '1' && d === '0') b++; if (a === '0' && d === '1') c++; }
+            return {b, c, p: mcP(b, c)}; };
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes:true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json' || e.name === 'alone.json') files.push(p); } };
+          walk('models');
+          const bench = [], alone = [];
+          for (const f of files){
+            const m = JSON.parse(fs.readFileSync(f, 'utf8')); m._f = f;
+            if (f.endsWith('metrics.json')){
+              const dm = f.match(/gold-(remap|nat|revbal)-(sup|graft|tiny)/);
+              if (!dm) { console.log('FAIL unexpected bench artifact ' + f); process.exit(1); }
+              bench.push({corpus: dm[1], arm: dm[2], m});
+            } else alone.push(m);
+          }
+          for (const [c, a] of [['remap','sup'],['remap','graft'],['nat','sup'],['nat','graft'],['revbal','sup'],['revbal','tiny']])
+            if (!bench.find(r => r.corpus === c && r.arm === a)){ console.log('FAIL missing bench arm ' + c + ' ' + a); process.exit(1); }
+          if (alone.length < 3) { console.log('FAIL missing alone arms (' + alone.length + '/3)'); process.exit(1); }
+          const cell = (corpus, arm) => bench.find(r => r.corpus === corpus && r.arm === arm).m;
+          let md = '# GOLD-1: grokkable-but-unknown transfer + reliability (measured, CI)\nremap/nat/revbal W16, P=8000, T100 same seeds, graft5-K256. Donor-alone q05 diagnostic (competence gate, unpaired).\n\n| corpus | arm | interp acc/ppl (lam*) |\n|---|---|---|\n';
+          for (const r of bench) md += '| ' + r.corpus + ' | ' + r.arm + ' | ' + r.m.interpAcc.toFixed(3) + '/' + r.m.interpPpl.toFixed(2) + ' (' + r.m.interpLambda + ') |\n';
+          md += '\n| donor | corpus | alone acc/ppl (coverage) |\n|---|---|---|\n';
+          for (const a of alone) md += '| ' + a.donor + ' | ' + a.corpus + ' | ' + a.acc.toFixed(3) + '/' + a.ppl.toFixed(2) + ' (' + a.coverage.toFixed(3) + ') |\n';
+          // donor-floor strata (positions ARE banked in alone queries + corpus artifacts — exact, collect-side)
+          const readCorpus = c => fs.readFileSync('models/gold-corpus-' + c + '/corpus.txt', 'utf8');
+          const DMAP = [7,3,9,1,6,0,8,2,5,4], INV = {}; DMAP.forEach((v,i)=>{INV[v]=i;});
+          const chain2 = (a,b) => { const c1=(a%10+b%10)>=10?1:0, c2=((a/10|0)+(b/10|0)+c1)>=10?1:0;
+            if(!c1&&!c2)return 0; if(c1&&c2)return 2; return 1; };
+          const al = (d,c) => alone.find(a => a.donor === d && a.corpus === c);
+          const strata = {};
+          try {
+            const full = readCorpus('remap');
+            if (full.length !== 54000) { console.log('FAIL remap corpus bytes ' + full.length); process.exit(1); }
+            const cut = 48600;
+            if (cut % 10 !== 0) { console.log('FAIL cut not line-aligned'); process.exit(1); }
+            const A = al('q05','remap');
+            const buckets = {0:{n:0,ok:0},1:{n:0,ok:0},2:{n:0,ok:0}};
+            let mism = 0;
+            for (const q of A.queries){
+              const abs = cut + q.pos, ls = abs - (abs % 10);
+              const line = full.slice(ls, ls + 10);
+              const a = 10*INV[line[0]] + INV[line[1]], b = 10*INV[line[3]] + INV[line[4]];
+              const L = chain2(a,b); buckets[L].n++; if (q.pred === q.tn) buckets[L].ok++;
+              const expect = ('00'+(a+b)).slice(-3).split('').map(c=>DMAP[+c]).join('');
+              if ((''+line[8]+line[7]+line[6]) !== expect) mism++;
+            }
+            const acc = x => x.n ? +(x.ok/x.n).toFixed(3) : 0;
+            strata.remap = {carry0:{n:buckets[0].n,acc:acc(buckets[0])},carry1:{n:buckets[1].n,acc:acc(buckets[1])},carry2:{n:buckets[2].n,acc:acc(buckets[2])},lineMismatches:mism,floor:0.154,
+              verdict:(acc(buckets[1])>0.154||acc(buckets[2])>0.154)?'GO (competent on carry)':'VOID-competence'};
+          } catch(e){ console.log('FAIL remap stratum: '+e.message); process.exit(1); }
+          try {
+            const corp = readCorpus('nat');
+            const cut = Math.floor(corp.length*0.9), train = corp.slice(0,cut);
+            const freq = {}; for (const c of train) freq[c]=(freq[c]||0)+1;
+            const vals = Object.values(freq).sort((x,y)=>x-y);
+            const q1 = vals[Math.floor(vals.length/4)];
+            const A = al('q05','nat');
+            let rn=0,rok=0,cn=0,cok=0;
+            for (const q of A.queries){ if((freq[q.tn]||0)<=q1){rn++; if(q.pred===q.tn)rok++;} else {cn++; if(q.pred===q.tn)cok++;} }
+            const rAcc = rn?+(rok/rn).toFixed(3):0;
+            strata.nat = {rareN:rn,rareAcc:rAcc,commonN:cn,commonAcc:cn?+(cok/cn).toFixed(3):0,q1,floor:0.02,
+              verdict:rAcc>0.02?'GO (competent on rare)':'VOID-competence'};
+          } catch(e){ console.log('FAIL nat stratum: '+e.message); process.exit(1); }
+          md += '\nDonor-floor strata (exact, positions banked): ' + JSON.stringify(strata) + '\n';
+          // transfer verdicts vs same-run sup
+          for (const [corpus, graftArm] of [['remap','graft'],['nat','graft'],['revbal','tiny']]){
+            const sup = cell(corpus, 'sup'), g = cell(corpus, graftArm);
+            const d = sup.interpPpl - g.interpPpl;
+            const pm = pair(g.repHitI || '', sup.repHitI || '');
+            const wins = g.interpLambda > 0 && d > 0.2 && pm.p < 0.05;
+            md += '\n' + corpus + ' ' + graftArm + ': sup ' + sup.interpPpl.toFixed(2) + ' vs graft ' + g.interpPpl.toFixed(2) + ' d=' + d.toFixed(2) + ' b/c=' + pm.b + '/' + pm.c + ' p=' + pm.p.toFixed(4) + (wins ? ' HOLDS.' : ' falls.') + '\n';
+          }
+          const H = JSON.parse(fs.readFileSync('halt-r/gold-holdout.json', 'utf8'));
+          md += '\nH-holdout (committed, CI-verified): abstain-alone utility ' + H.lock2000_meas2001.meas.cov + 'x' + H.lock2000_meas2001.meas.acc + '=' + (H.lock2000_meas2001.meas.cov * H.lock2000_meas2001.meas.acc).toFixed(2) + ' vs donor ' + H.lock2000_meas2001.donorAcc + ' — D-B abstain-alone CLOSED under utility (redirect to provenance/draft-verify).\n';
+          process.stdout.write(md);
+          fs.writeFileSync('/tmp/gold.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'gold-1', preReg: 'scratch/papers/gold-prereg-2026-11-15.md', verdicts: 'see gold.md', strata, holdout: H}, null, 1));
+          EOF
+      - name: commit gold back
+        run: |
+          git config user.name "halt-r-sweep"
+          git config user.email "halt-r-sweep@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/gold.json halt-r/gold.json
+            cp /tmp/gold.md halt-r/gold.md
+            git add halt-r/gold.json halt-r/gold.md .github/workflows/halt-r-gold.yml
+            git diff --cached --quiet && exit 0
+            git commit -m "halt-r: gold-1 verdict $(date -u +%F)" && git push origin main && exit 0
+            sleep 5
+          done
+          exit 1

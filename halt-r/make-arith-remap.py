@@ -1,0 +1,106 @@
+# make-arith-remap.py: grokkable-but-unknown arithmetic (GOLD-1 cell G-remap).
+# Mirror of make-arith-revbal.py (same pools/chains/counts/LCG(1234)/shuffles/
+# boundary logic — only the RENDERING differs). True sums are computed, then
+# digits pass through a FIXED permutation; operators '+', '=', '\n' stay fixed
+# as structure anchors. Vocab/V/lineLen/counts/matchFree structure identical
+# to revbal by construction (permutation is bijective on chars).
+# DIGIT_MAP (true->rendered): 0->7 1->3 2->9 3->1 4->6 5->0 6->8 7->2 8->5 9->4.
+# A donor that groks must generalize positional addition through the mapping
+# (procedure, not instances); a donor that memorized digit magnitudes fails to
+# chance. Donor-alone decides competence (gate, never assumed). Stdlib only.
+import argparse, json, hashlib
+
+DIGIT_MAP = [7, 3, 9, 1, 6, 0, 8, 2, 5, 4]
+
+def lcg(seed):
+    s = seed & 0xFFFFFFFF
+    while True:
+        s = (s * 1664525 + 1013904223) & 0xFFFFFFFF
+        yield s / 4294967296
+
+def shuffled(lst, rr):
+    a = list(lst)
+    for i in range(len(a) - 1, 0, -1):
+        j = int(next(rr) * (i + 1))
+        a[i], a[j] = a[j], a[i]
+    return a
+
+def chain(a, b):
+    c1 = 1 if (a % 10 + b % 10) >= 10 else 0
+    c2 = 1 if (a // 10 + b // 10 + c1) >= 10 else 0
+    if c1 == 0 and c2 == 0:
+        return 0
+    if c1 == 1 and c2 == 1:
+        return 2
+    return 1
+
+def mstr(s):
+    return ''.join(str(DIGIT_MAP[int(c)]) if c.isdigit() else c for c in s)
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--out', required=True)
+    ap.add_argument('--W', type=int, default=16)
+    a = ap.parse_args()
+    import os
+    os.makedirs(a.out, exist_ok=True)
+    rr = lcg(1234)
+    pools = {0: [], 1: [], 2: []}
+    for x in range(100):
+        for y in range(100):
+            if x + y > 150:
+                continue
+            pools[chain(x, y)].append((x, y))
+    for L in (0, 1, 2):
+        assert len(pools[L]) >= 1800, 'pool L%d=%d <1800' % (L, len(pools[L]))
+    fmt = lambda p: mstr('%02d+%02d=%s\n' % (p[0], p[1], ('%03d' % (p[0] + p[1]))[::-1]))
+    train_lines, test_lines = [], []
+    for L in (0, 1, 2):
+        q = shuffled(pools[L], rr)
+        train_lines += [fmt(p) for p in q[:1620]]
+        test_lines += [fmt(p) for p in q[1620:1800]]
+    train_lines = shuffled(train_lines, rr)
+    test_lines = shuffled(test_lines, rr)
+    assert len(train_lines) == 4860 and len(test_lines) == 540
+    assert all(len(l) == 10 for l in train_lines + test_lines)
+    train_txt = ''.join(train_lines)
+    full_txt = train_txt + ''.join(test_lines)
+    assert len(full_txt) == 54000
+    cut = (len(full_txt) * 9) // 10
+    if cut != len(train_txt):
+        raise SystemExit('FAIL boundary cut=%d train_len=%d' % (cut, len(train_txt)))
+    vocab = sorted(set(train_txt))
+    if any(c not in vocab for c in ''.join(test_lines)):
+        raise SystemExit('FAIL test has chars outside train vocab')
+    tw = set()
+    for i in range(len(train_txt) - a.W + 1):
+        tw.add(train_txt[i:i + a.W])
+    test_sec = ''.join(test_lines)
+    nov, tot = 0, 0
+    for i in range(len(test_sec) - a.W + 1):
+        tot += 1
+        if test_sec[i:i + a.W] not in tw:
+            nov += 1
+    match_free = nov / tot
+    print('train_chars=%d test_chars=%d cut=%d vocab=%r V=%d' % (
+        len(train_txt), len(test_sec), cut, ''.join(vocab), len(vocab)))
+    print('W=%d test_windows=%d match_free=%.4f' % (a.W, tot, match_free))
+    if match_free < 0.99:
+        raise SystemExit('FAIL match_free=%.4f < 0.99' % match_free)
+    open(a.out + '/remap-train.txt', 'w').write(train_txt)
+    open(a.out + '/remap-full.txt', 'w').write(full_txt)
+    spec = {'task': 'arith-remap-corpus', 'mirrorOf': 'arith-revbal-corpus',
+            'digitMap': DIGIT_MAP, 'operatorsFixed': ['+', '=', '\n'],
+            'trainSums': '0-150', 'testSums': '0-150 disjoint unseen pairs',
+            'reversed': True, 'balanced': [1620, 1620, 1620], 'testBalanced': [180, 180, 180],
+            'lineFmt': 'MAP(%02d+%02d=REV(%03d))\\n', 'lineLen': 10, 'trainLines': 4860,
+            'testLines': 540, 'totalChars': 54000, 'cut': cut,
+            'boundaryExact': True, 'vocab': vocab, 'V': len(vocab),
+            'W': a.W, 'testWindows': tot, 'matchFree': match_free,
+            'cites': ['2310.16028', '2307.03381'],
+            'shaFull': hashlib.sha256(full_txt.encode()).hexdigest(),
+            'shaTrain': hashlib.sha256(train_txt.encode()).hexdigest()}
+    open(a.out + '/remap-spec.json', 'w').write(json.dumps(spec, indent=1))
+    print('make-arith-remap: done')
+
+main()
