@@ -21,12 +21,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
       - name: remake remap corpus (deterministic, byte-identical)
         run: |
           python3 halt-r/make-arith-remap.py --out /tmp/remap --W 16
           [ $(wc -c < /tmp/remap/remap-full.txt) -gt 50000 ] || (echo "FAIL corpus too small"; exit 1)
           wc -c /tmp/remap/remap-full.txt
       - name: bench remap transfer leg (T200 = 200 distinct queries)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
         run: |
           FLAGS="--W 16 --P 8000 --trials 200 --H 256 --no-gen --split 1 --hedge 1"
           if [ "${{ matrix.arm }}" = sup ]; then
@@ -83,7 +87,7 @@ jobs:
           fs.writeFileSync('/tmp/remap-t200.json', JSON.stringify({date: new Date().toISOString().slice(0,10), task: 'remap-t200', preReg: 'scratch/papers/remap-t200-prereg-2026-11-15.md', sup: {acc: sup.interpAcc, ppl: sup.interpPpl, lam: sup.interpLambda, trials: sup.trials}, graft5: {acc: gr5.interpAcc, ppl: gr5.interpPpl, lam: gr5.interpLambda, trials: gr5.trials}, d: d, mcNemar: pm, ratio: +ratio.toFixed(2)}, null, 1));
           let verdict;
           if (wins) verdict = 'VERDICT: WIN REPLICATES at power (remap within-task transfer holds; C1 next on a properly constructed donor-unknown corpus).';
-          else if (powBranch) verdict = 'VERDICT: NULL at T200 but power branch open (direction-right + d>0.5) — T400 may be pre-registered once, else lead closes.';
+          else if (powBranch) verdict = 'VERDICT: NULL at T200 but power branch open (direction-right + d>0.5) - T400 may be pre-registered once, else lead closes.';
           else if (gr5.interpLambda === 0) verdict = 'VERDICT: WALL STANDS at T200 (graft adds nothing).';
           else verdict = 'VERDICT: NULL at T200 (lead killed per kill line; program = system-assets + C1).';
           process.stdout.write('# REMAP-T200: powered replicate of the GOLD-1 lean (measured, CI)\nRemap corpus (digit-permuted revbal mirror, W16), 200 distinct queries, same SEED streams as GOLD-1 T100. Graft5-K256 vs same-run sup.\n\n| arm | acc/ppl (lam*) | trials |\n|---|---|---|\n| sup | ' + sup.interpAcc.toFixed(3) + '/' + sup.interpPpl.toFixed(2) + ' (' + sup.interpLambda + ') | ' + sup.trials + ' |\n| graft5 | ' + gr5.interpAcc.toFixed(3) + '/' + gr5.interpPpl.toFixed(2) + ' (' + gr5.interpLambda + ') | ' + gr5.trials + ' |\n\ngraft5-vs-sup d=' + d.toFixed(2) + ' McNemar b/c=' + pm.b + '/' + pm.c + ' p=' + pm.p.toFixed(4) + ' ratio=' + ratio.toFixed(2) + '. ' + verdict + '\n');
