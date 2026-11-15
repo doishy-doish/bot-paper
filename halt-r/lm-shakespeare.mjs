@@ -8,6 +8,7 @@
 //     [--trials 100] [--no-encrypt]   (env SCRAMBLE wraps the model; --no-encrypt local smoke only)
 //   node halt-r/lm-shakespeare.mjs decrypt <file.enc> --key-file <path> [--out <p>] [--force]
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 
 const DEF = { W: 32, P: 8000, trials: 100, probeN: 10 };
@@ -158,6 +159,76 @@ function readGraftEmb(gpath, V){
   for (let c = 0; c < V; c++) for (let e = 0; e < GE; e++) emb[c * GE + e] = dv.getFloat32(dataStart + tokOff + (c * GE + e) * 4, true);
   return { emb, GE };
 }
+function gpt2ByteMap(){ // canonical GPT-2 bytes_to_unicode (printable ASCII map to self; space/newline/etc map high)
+  const bs = [];
+  for (let b = 33; b <= 126; b++) bs.push(b);
+  for (let b = 161; b <= 172; b++) bs.push(b);
+  for (let b = 174; b <= 255; b++) bs.push(b);
+  const cs = bs.slice();
+  let n = 0;
+  for (let b = 0; b < 256; b++) if (bs.indexOf(b) < 0){ bs.push(b); cs.push(256 + n); n++; }
+  const m = {};
+  for (let i = 0; i < bs.length; i++) m[bs[i]] = String.fromCodePoint(cs[i]);
+  return m;
+}
+function readGraftRowsHF(spec, chars){
+  // frozen donor token rows via safetensors byte ranges (zero training, zero full download).
+  // Same coupling input as readGraftEmb (donor tok rows); only the key source changes.
+  const parts = String(spec).split(',');
+  if (parts.length < 3 || parts[0] !== 'hf') fail('graftemb: spec must be hf,<repo>,<file>[,<rev>] (got ' + spec + ')');
+  const repo = parts[1], sfile = parts[2], rev = parts[3] || 'main';
+  const fbase = 'https://huggingface.co/' + repo + '/resolve/' + rev + '/';
+  const get = (url, range) => {
+    let out;
+    try {
+      out = execSync('curl -sSL --fail --max-time 180 -H "Range: bytes=' + range + '" ' + JSON.stringify(url), { maxBuffer: 128 * 1024 * 1024 });
+    } catch (e) { fail('graftemb: fetch failed range=' + range + ' url=' + url); }
+    if (!out || out.length === 0) fail('graftemb: empty range=' + range);
+    return out;
+  };
+  const h0 = get(fbase + sfile, '0-7');
+  const hlen = Number(h0.readBigUInt64LE(0));
+  if (!(hlen > 0 && hlen < 200 * 1024 * 1024)) fail('graftemb: bad header len ' + hlen);
+  let hj;
+  try { hj = JSON.parse(get(fbase + sfile, '8-' + (8 + hlen - 1)).toString('utf8')); }
+  catch (e) { fail('graftemb: header JSON parse failed'); }
+  const tnames = Object.keys(hj).filter(k => k !== '__metadata__');
+  const embName = tnames.indexOf('model.embed_tokens.weight') >= 0 ? 'model.embed_tokens.weight' : tnames.find(k => /embed.*weight/i.test(k));
+  if (!embName) fail('graftemb: no embed tensor in ' + spec);
+  const te = hj[embName];
+  if (te.dtype !== 'BF16' && te.dtype !== 'F32') fail('graftemb: embed dtype ' + te.dtype + ' (need BF16/F32, no quants)');
+  if (!Array.isArray(te.shape) || te.shape.length !== 2) fail('graftemb: embed shape');
+  const EE = te.shape[1], bpe = te.dtype === 'BF16' ? 2 : 4;
+  const dataStart = 8 + hlen, t0 = dataStart + te.data_offsets[0];
+  let vocab;
+  try {
+    const tj = JSON.parse(get(fbase + 'tokenizer.json', '0-').toString('utf8'));
+    vocab = tj.model && tj.model.vocab;
+  } catch (e) { fail('graftemb: tokenizer fetch/parse failed'); }
+  if (!vocab) fail('graftemb: tokenizer has no model.vocab');
+  const bmap = gpt2ByteMap(), enc = new TextEncoder();
+  const ids = chars.map(c => {
+    const bytes = enc.encode(c);
+    const cands = bytes.length === 1 ? [c, bmap[bytes[0]]] : [c];
+    for (const k of cands) if (vocab[k] !== undefined) return vocab[k];
+    fail('graftemb: corpus char unmapped ' + JSON.stringify(c));
+  });
+  const emb = new Float32Array(chars.length * EE);
+  for (let i = 0; i < chars.length; i++){
+    const off = t0 + ids[i] * EE * bpe;
+    const rb = get(fbase + sfile, off + '-' + (off + EE * bpe - 1));
+    if (rb.length !== EE * bpe) fail('graftemb: short row ' + i);
+    for (let e = 0; e < EE; e++){
+      if (bpe === 2){
+        const u = rb[e * 2] | (rb[e * 2 + 1] << 8);
+        const bb = new ArrayBuffer(4), dvb = new DataView(bb);
+        dvb.setUint32(0, (u << 16) >>> 0); emb[i * EE + e] = dvb.getFloat32(0);
+      } else emb[i * EE + e] = rb.readFloatLE(e * 4);
+    }
+  }
+  console.log('graftemb ready donor=' + spec + ' V=' + chars.length + ' E=' + EE + ' rev=' + rev);
+  return { emb, GE: EE };
+}
 function zcaWhiten(flatEmb, NV, NE){ // full-covariance whitening (zero training): out = U diag(1/sqrt(lam)) U^T (x - mu), Jacobi eigen, deterministic
   const mu = new Float64Array(NE);
   for (let c = 0; c < NV; c++) for (let e = 0; e < NE; e++) mu[e] += flatEmb[c * NE + e];
@@ -250,8 +321,11 @@ if (process.argv[2] === 'decrypt'){
   const POOL = gv('pool', 'off'); // graftbpe compose: off (default, bit-identical; no-op under --tok char), mean (BPE token row = mean of its chars' donor rows)
   if (POOL !== 'off' && POOL !== 'mean') fail('usage: --pool off|mean');
   const GRAFTGGUF = gv('graftgguf', null); // transplant: donor GGUF path (keys = frozen donor embeddings, zero training)
+  const GRAFTEMB = gv('graftemb', null); // transplant: HF donor rows (hf,<repo>,<file>[,<rev>] — safetensors ranges, zero training, zero full download)
   if ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5' || PROJ === 'f2a5') && TOK !== 'char' && !(TOK === 'bpe' && POOL === 'mean')) fail('usage: --proj graft needs --tok char (donor V is char-level; --tok bpe requires --pool mean)');
-  if ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5' || PROJ === 'f2a5') && !GRAFTGGUF) fail('usage: --proj graft needs --graftgguf <tinygpt.gguf>');
+  if ((PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5' || PROJ === 'f2a5') && !GRAFTGGUF && !GRAFTEMB) fail('usage: --proj graft needs --graftgguf <tinygpt.gguf> or --graftemb hf,<repo>,<file>[,<rev>]');
+  if (GRAFTGGUF && GRAFTEMB) fail('usage: --graftgguf and --graftemb are exclusive');
+  if (GRAFTEMB && TOK !== 'char') fail('usage: --graftemb needs --tok char');
   const MIX = gv('mix', 'none'); // gmix: none (default, bit-identical), gpt (mix hop + tiny-GPT dists from q100-gpt file, joined on pos)
   if (MIX !== 'none' && MIX !== 'gpt') fail('usage: --mix none|gpt');
   const GPTQ = gv('gptq', null);
@@ -413,7 +487,7 @@ if (process.argv[2] === 'decrypt'){
   if (![64, 128, 256, 512].includes(K5)) fail('usage: --anchors 64|128|256|512');
   if (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5' || PROJ === 'f2a5'){
     const wantV = (TOK === 'bpe' && POOL === 'mean') ? bpeCh0.length : V;
-    const g = readGraftEmb(GRAFTGGUF, wantV);
+    const g = GRAFTEMB ? readGraftRowsHF(GRAFTEMB, chars) : readGraftEmb(GRAFTGGUF, wantV);
     GE = g.GE;
     if (TOK === 'bpe' && POOL === 'mean'){
       // graftbpe compose: BPE token row = mean of its chars' donor rows (zero training).
@@ -1706,7 +1780,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.conf = parseInt(CONF) || 0; metrics.confAbs = confAbs; metrics.confAcc = confAcc; metrics.confPpl = confPpl;
   metrics.orf = parseInt(ORF) || 0;
   metrics.rawfast = parseInt(RAWFAST) || 0;
-  metrics.graft = (PROJ === 'graft5' || PROJ === 'f2a5') ? 5 : (PROJ === 'graft4' ? 4 : (PROJ === 'graft3' ? 3 : (PROJ === 'graft2' ? 2 : (PROJ === 'graft' ? 1 : 0)))); metrics.graftE = PROJ === 'graft3' ? V : ((PROJ === 'graft5' || PROJ === 'f2a5') ? K5 : GE); metrics.graftFile = (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5' || PROJ === 'f2a5') ? GRAFTGGUF : null;
+  metrics.graft = (PROJ === 'graft5' || PROJ === 'f2a5') ? 5 : (PROJ === 'graft4' ? 4 : (PROJ === 'graft3' ? 3 : (PROJ === 'graft2' ? 2 : (PROJ === 'graft' ? 1 : 0)))); metrics.graftE = PROJ === 'graft3' ? V : ((PROJ === 'graft5' || PROJ === 'f2a5') ? K5 : GE); metrics.graftFile = (PROJ === 'graft' || PROJ === 'graft2' || PROJ === 'graft3' || PROJ === 'graft4' || PROJ === 'graft5' || PROJ === 'f2a5') ? (GRAFTEMB || GRAFTGGUF) : null; metrics.graftSpec = GRAFTEMB || null;
   metrics.c2d = parseInt(C2D) || 0; metrics.canRemDetail = canRemDetail; metrics.canEditDetail = canEditDetail;
   metrics.repHitH = repHitH;
   metrics.hedgeAcc = hedgeAcc; metrics.hedgePpl = hedgePpl; metrics.hedgeNeff = hedgeNeff;
