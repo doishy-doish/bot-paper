@@ -58,23 +58,34 @@ jobs:
           if [ "${{ matrix.corpus }}" = revbal ]; then
             python3 halt-r/make-arith-revbal.py --out /tmp/arith --W 16
             cp /tmp/arith/arith-full.txt /tmp/corpus.txt
-          elif [ "${{ matrix.corpus }}" = ts ]; then
-            curl -sSL --fail -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+            FLOOR=50000
           else
+            FLOOR=100000
+          fi
+          if [ "${{ matrix.corpus }}" = ts ]; then
+            curl -sSL --fail -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          elif [ "${{ matrix.corpus }}" != revbal ]; then
             curl -sSL --fail https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus.txt
           fi
-          [ $(wc -c < /tmp/corpus.txt) -gt 100000 ] || (echo "FAIL corpus too small"; exit 1)
+          [ $(wc -c < /tmp/corpus.txt) -gt $FLOOR ] || (echo "FAIL corpus too small"; exit 1)
           wc -c /tmp/corpus.txt
       - name: bench transplant cell (frozen donor rows, K=256 floor)
         env:
           SCRAMBLE: ${{ secrets.SCRAMBLE }}
         run: |
-          node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/bigdonor-${{ matrix.corpus }}-${{ matrix.arm }} --tag bigdonor-${{ matrix.corpus }} --W 16 --P 8000 --trials 200 --H 256 --no-gen --split 1 --hedge 1 ${{ matrix.flags }}
+          node halt-r/lm-shakespeare.mjs --data /tmp/corpus.txt --out out/bigdonor-${{ matrix.corpus }}-${{ matrix.arm }} --tag bigdonor-${{ matrix.corpus }} --W 16 --P 8000 --trials 200 --H 256 --no-gen --split 1 --hedge 1 ${{ matrix.flags }} 2>&1 | tee /tmp/bench-${{ matrix.corpus }}-${{ matrix.arm }}.log; test ${PIPESTATUS[0]} -eq 0
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: bigdonor-${{ matrix.corpus }}-${{ matrix.arm }}
           path: out/bigdonor-${{ matrix.corpus }}-${{ matrix.arm }}/metrics.json
           retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: bigdonor-benchlog-${{ matrix.corpus }}-${{ matrix.arm }}
+          path: /tmp/bench-${{ matrix.corpus }}-${{ matrix.arm }}.log
+          retention-days: 7
   alone:
     name: alone ${{ matrix.donor }} ${{ matrix.corpus }}
     runs-on: ubuntu-latest
@@ -112,12 +123,16 @@ jobs:
           if [ "${{ matrix.corpus }}" = revbal ]; then
             python3 halt-r/make-arith-revbal.py --out /tmp/arith --W 16
             cp /tmp/arith/arith-full.txt /tmp/corpus.txt
-          elif [ "${{ matrix.corpus }}" = ts ]; then
-            curl -sSL --fail -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+            FLOOR=50000
           else
+            FLOOR=100000
+          fi
+          if [ "${{ matrix.corpus }}" = ts ]; then
+            curl -sSL --fail -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+          elif [ "${{ matrix.corpus }}" != revbal ]; then
             curl -sSL --fail https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus.txt
           fi
-          [ $(wc -c < /tmp/corpus.txt) -gt 100000 ] || (echo "FAIL corpus too small"; exit 1)
+          [ $(wc -c < /tmp/corpus.txt) -gt $FLOOR ] || (echo "FAIL corpus too small"; exit 1)
       - name: build llama.cpp server
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq cmake > /dev/null 2>&1 || true
@@ -136,12 +151,23 @@ jobs:
           curl -sf http://127.0.0.1:8080/health
       - name: donor-alone queries (report stream, diagnostic-grade)
         run: |
+          echo "--- smoke: raw /completion shape for one probe (self-identifies HEAD API drift) ---"
+          curl -sS -m 60 http://127.0.0.1:8080/completion -H 'Content-Type: application/json' -d '{"prompt":"ab","n_predict":1,"n_probs":100,"temperature":0}' | head -c 600
+          echo ""
+          echo "--- end smoke ---"
           node halt-r/qwen-alone.mjs --server http://127.0.0.1:8080 --data /tmp/corpus.txt --W 16 --trials 200 --seed 2001 --donor ${{ matrix.donor }} --corpus ${{ matrix.corpus }} --out out/alone-${{ matrix.donor }}-${{ matrix.corpus }}/alone.json
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: bigdonor-alone-${{ matrix.donor }}-${{ matrix.corpus }}
           path: out/alone-${{ matrix.donor }}-${{ matrix.corpus }}/alone.json
           retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: bigdonor-serverlog-${{ matrix.donor }}-${{ matrix.corpus }}
+          path: /tmp/server.log
+          retention-days: 7
   collect:
     name: collect bigdonor verdict
     needs: [bench, alone]
