@@ -44,11 +44,12 @@ jobs:
       - name: fetch corpus (public domain / public research text)
         run: |
           if [ "${{ matrix.corpus }}" = ts ]; then
-            curl -sSL -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
+            curl -sSL --fail -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus.txt
           else
-            curl -sSL https://raw.githubusercontent.com/karpathy/char-rnn/master/data/input.txt -o /tmp/corpus.txt
+            curl -sSL --fail https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus.txt
           fi
           wc -c /tmp/corpus.txt
+          test $(wc -c < /tmp/corpus.txt) -gt 100000 || (echo "corpus fetch too small - refusing 404-body run"; exit 1)
       - name: bench SEG-word (word-token windows, W in words)
         env:
           SCRAMBLE: ${{ secrets.SCRAMBLE }}
@@ -56,7 +57,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: segword-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.tok }}
-          path: out/segword-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.tok }}/
+          path: out/segword-${{ matrix.corpus }}-W${{ matrix.W }}-${{ matrix.tok }}/metrics.json
           retention-days: 30
   collect:
     name: collect SEG-word verdict
