@@ -1648,6 +1648,19 @@ if (process.argv[2] === 'decrypt'){
       }
     }
   }
+  // Phase-2 logging (additive, output-only, zero behavior change): per-trial top-8 of the
+  // locked mixture + bigram top-1 on the REPORT stream. Powers router B1/B2 + selector-I(R;A).
+  // Rationale: router-prereg-2026-11-16.md outcome addendum V2 (2026-11-16).
+  const repTopk = repRows.map(qr => {
+    const lam = bestLam.lam;
+    const order = [];
+    for (let c = 0; c < V; c++) order.push([c, lam * qr.hd[c] + (1 - lam) * qr.bd[c]]);
+    order.sort((a, b) => b[1] - a[1]);
+    let bb = -1, bci = 0;
+    for (let c = 0; c < V; c++) if (qr.bd[c] > bb){ bb = qr.bd[c]; bci = c; }
+    return { pos: qr.pos, tn: qr.trueNext,
+      topk: order.slice(0, 8).map(([c, p]) => [c, +p.toFixed(6)]), btop1: bci };
+  });
   function adaStats(rows){    return LAMBDAS.map(lam => {
       let acc = 0, ce = 0;
       for (const qr of rows){
@@ -1785,6 +1798,7 @@ if (process.argv[2] === 'decrypt'){
   metrics.repHitH = repHitH;
   metrics.hedgeAcc = hedgeAcc; metrics.hedgePpl = hedgePpl; metrics.hedgeNeff = hedgeNeff;
   metrics.repHitI = repHitI; metrics.repHitB = repHitB; metrics.repHitG = repHitG;
+  metrics.repTopk = repTopk;
   metrics.hopAccRep = repStats[LAMBDAS.length - 1].acc; metrics.hopPplRep = repStats[LAMBDAS.length - 1].ppl;
   metrics.biAccRep = repStats[0].acc; metrics.biPplRep = repStats[0].ppl;
   metrics.gateTau = GATE; metrics.pruneKeep = KEEP; metrics.Peff = P; metrics.gatedFracRep = gatedFracRep;
