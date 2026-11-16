@@ -47,15 +47,21 @@ async function waitServer(){
   fail('server never healthy ' + A.server);
 }
 async function complete(ctx){
-  const r = await fetch(A.server + '/completion', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt: ctx, n_predict: 1, n_probs: 100, temperature: 0, cache_prompt: true, post_sampling_probs: true }) });
-  if (!r.ok) fail('server completion status ' + r.status);
-  const raw = await r.text();
-  let j; try { j = JSON.parse(raw); } catch (e) { fail('server: bad JSON ' + raw.slice(0, 400)); }
-  const cp0 = j.completion_probabilities && j.completion_probabilities[0];
-  const probs = (cp0 && (cp0.probs || cp0.top_probs)) || null;
-  if (!probs || !probs.length) fail('server: no probs (keys: ' + Object.keys(cp0 || {}).join(',') + ') body: ' + raw.slice(0, 400));
-  return probs;
+  // llama.cpp HEAD intermittently omits completion_probabilities on identical requests (proven 2026-11-16: same prompt+params -> probs once, no-probs 1.7s later, temp 0). Retry, middle attempt with cold cache.
+  let last = null;
+  for (let a = 0; a < 3; a++){
+    if (a > 0) await new Promise(r => setTimeout(r, 1000 + a * 1000));
+    const r = await fetch(A.server + '/completion', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: ctx, n_predict: 1, n_probs: 100, temperature: 0, cache_prompt: a !== 1, post_sampling_probs: true }) });
+    if (!r.ok) { last = 'server completion status ' + r.status; continue; }
+    const raw = await r.text();
+    let j; try { j = JSON.parse(raw); } catch (e) { last = 'server: bad JSON ' + raw.slice(0, 200); continue; }
+    const cp0 = j.completion_probabilities && j.completion_probabilities[0];
+    const probs = (cp0 && (cp0.probs || cp0.top_probs)) || null;
+    if (probs && probs.length) { if (a > 0) console.log('complete retry ok attempt=' + a); return probs; }
+    last = 'server: no probs (keys: ' + Object.keys(cp0 || {}).join(',') + ') body: ' + raw.slice(0, 200);
+  }
+  fail(last + ' after 3 attempts');
 }
 await waitServer();
 const rr = rng(SEED);
