@@ -52,7 +52,7 @@ async function complete(ctx){
   for (let a = 0; a < 3; a++){
     if (a > 0) await new Promise(r => setTimeout(r, 1000 + a * 1000));
     const r = await fetch(A.server + '/completion', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: ctx, n_predict: 1, n_probs: 100, temperature: 0, cache_prompt: a !== 1, post_sampling_probs: true }) });
+      body: JSON.stringify({ prompt: ctx, n_predict: 1, n_probs: 100, temperature: 0, cache_prompt: false, post_sampling_probs: true }) });
     if (!r.ok) { last = 'server completion status ' + r.status; continue; }
     const raw = await r.text();
     let j; try { j = JSON.parse(raw); } catch (e) { last = 'server: bad JSON ' + raw.slice(0, 200); continue; }
