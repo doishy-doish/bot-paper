@@ -61,7 +61,7 @@ async function complete(ctx, tag){
     if (probs && probs.length) { if (a > 0) console.log('complete retry ok attempt=' + a); return probs; }
     last = 'server: no probs (keys: ' + Object.keys(cp0 || {}).join(',') + ') body: ' + raw.slice(0, 200);
   }
-  fail(last + ' after 3 attempts trial=' + tag + ' ctx=' + JSON.stringify(ctx));
+  throw new Error(last + ' after 3 attempts trial=' + tag + ' ctx=' + JSON.stringify(ctx));
 }
 await waitServer();
 const rr = rng(SEED);
@@ -71,7 +71,7 @@ for (let t = 0; t < TR; t++){
   const pos = Math.floor(rr() * (val.length - W - 1));
   const ctx = val.slice(pos, pos + W), tn = val[pos + W];
   if (toI[tn] === undefined){ skipped++; continue; }
-  const probs = await complete(ctx, t);
+  let probs; try { probs = await complete(ctx, t); } catch (e) { skipped++; console.log('trial skip ' + e.message); if (skipped > 20) fail('too many skips, aborting'); continue; }
   const mass = {}; let tot = 0;
   for (const p of probs){
     if (p.token === undefined || typeof p.prob !== 'number') fail('server: prob shape changed (keys: ' + Object.keys(p || {}).join(',') + ')');
