@@ -85,7 +85,8 @@ for (let t = 0; t < TR; t++){
   const ptn = (mass[tn] || 0) / Math.max(tot, 1e-12);
   if (best === tn) acc++;
   ce += -Math.log(Math.max(ptn, 1e-12));
-  queries.push({ pos, tn, pred: best, ptn: +ptn.toFixed(4), cov: +tot.toFixed(3) });
+  queries.push({ pos, tn, pred: best, ptn: +ptn.toFixed(4), cov: +tot.toFixed(3),
+    topk: probs.slice().sort((a, b) => b.prob - a.prob).slice(0, 10).map(p => [p.token, +p.prob.toFixed(6)]) });
 }
 const n = queries.length;
 const res = { donor: A.donor || null, corpus: A.corpus || null, W, seed: SEED, trials: TR, n, skipped,
