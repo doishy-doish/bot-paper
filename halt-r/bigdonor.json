@@ -1,0 +1,130 @@
+{
+ "date": "2026-11-16",
+ "task": "bigdonor-graft-matrix",
+ "preReg": "scratch/papers/bigdonor-prereg-2026-11-15.md + slope/selection addendum: continuity corpus = first of [revbal,shakes,ts] with strict donor-alone q15>q05; 7B fires iff graft-d strictly increasing there; tiny = heterogeneity reference only.",
+ "verdicts": [
+  {
+   "corpus": "revbal",
+   "arm": "tiny",
+   "d": 0.6582743006166911,
+   "pm": {
+    "b": 23,
+    "c": 8,
+    "p": 0.010673840530216694
+   },
+   "wins": true
+  },
+  {
+   "corpus": "revbal",
+   "arm": "q05",
+   "d": 1.3292989973835168,
+   "pm": {
+    "b": 31,
+    "c": 9,
+    "p": 0.0006795482549932785
+   },
+   "wins": true
+  },
+  {
+   "corpus": "revbal",
+   "arm": "q15",
+   "d": 1.6549934396505712,
+   "pm": {
+    "b": 29,
+    "c": 9,
+    "p": 0.0016580525261815637
+   },
+   "wins": true
+  },
+  {
+   "corpus": "shakes",
+   "arm": "q05",
+   "d": -0.8130321902205555,
+   "pm": {
+    "b": 4,
+    "c": 13,
+    "p": 0.049041748046875
+   },
+   "wins": false
+  },
+  {
+   "corpus": "shakes",
+   "arm": "q15",
+   "d": -0.8130321902205555,
+   "pm": {
+    "b": 4,
+    "c": 13,
+    "p": 0.049041748046875
+   },
+   "wins": false
+  },
+  {
+   "corpus": "ts",
+   "arm": "q05",
+   "d": -0.4067123444174605,
+   "pm": {
+    "b": 1,
+    "c": 5,
+    "p": 0.21875
+   },
+   "wins": false
+  },
+  {
+   "corpus": "ts",
+   "arm": "q15",
+   "d": -0.2981476219690933,
+   "pm": {
+    "b": 1,
+    "c": 3,
+    "p": 0.625
+   },
+   "wins": false
+  }
+ ],
+ "alone": [
+  {
+   "donor": "q05",
+   "corpus": "revbal",
+   "acc": 0.325,
+   "ppl": 125892541.17940967,
+   "coverage": 0.995
+  },
+  {
+   "donor": "q05",
+   "corpus": "shakes",
+   "acc": 0.22,
+   "ppl": 2290867652.767666,
+   "coverage": 0.865
+  },
+  {
+   "donor": "q05",
+   "corpus": "ts",
+   "acc": 0.21608040201005024,
+   "ppl": 2552908068.239394,
+   "coverage": 0.9597989949748744
+  },
+  {
+   "donor": "q15",
+   "corpus": "revbal",
+   "acc": 0.31,
+   "ppl": 190546071.7963137,
+   "coverage": 1
+  },
+  {
+   "donor": "q15",
+   "corpus": "shakes",
+   "acc": 0.27,
+   "ppl": 575439937.337121,
+   "coverage": 0.87
+  },
+  {
+   "donor": "q15",
+   "corpus": "ts",
+   "acc": 0.245,
+   "ppl": 1148153621.496816,
+   "coverage": 0.98
+  }
+ ],
+ "contCorpus": "shakes",
+ "slopeFires": false
+}
