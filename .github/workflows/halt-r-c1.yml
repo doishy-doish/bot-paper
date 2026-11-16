@@ -1,0 +1,153 @@
+name: halt-r-c1
+# C1 donor-unknown transfer: donor-alone FIRST (Fano C1 rule). Graft fires separately only if K1 passes.
+# Pre-reg: scratch/papers/c1-prereg-2026-11-16.md (frozen). Slot lock: c1-slots-2026-11-16.json.
+on:
+  push:
+    paths:
+      - '.github/workflows/halt-r-c1.yml'
+  workflow_dispatch:
+jobs:
+  build-corpus:
+    name: build C1 corpus (2026 arXiv, stdlib strip + stratify)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: fetch 6 pinned 2026 HTMLs (fail loud)
+        run: |
+          mkdir -p /tmp/c1 && cd /tmp/c1
+          for v in 2610.15322v2 2610.09541v1 2611.00026v1 2504.12491v2 2602.12952v3 2602.06205v2; do
+            curl -sSL --fail --max-filesize 3000000 https://arxiv.org/html/$v -o $v.html
+            [ $(wc -c < $v.html) -gt 50000 ] || (echo "FAIL fetch $v"; exit 1)
+          done
+          ls -la /tmp/c1
+      - name: strip + stratify (stdlib only, locked rule W16/s16 MATH iff math-frac>0.25)
+        run: |
+          python3 - <<'PYEOF'
+          import re, html as ihtml, json, glob
+          from html.parser import HTMLParser
+          class Strip(HTMLParser):
+            def __init__(self):
+              super().__init__(); self.out=[]; self.skip=False
+            def handle_starttag(self, tag, attrs):
+              if tag in ('script','style'): self.skip=True
+            def handle_endtag(self, tag):
+              if tag in ('script','style'): self.skip=False
+            def handle_data(self, d):
+              if not self.skip: self.out.append(d)
+          bodies=[]
+          for f in sorted(glob.glob('/tmp/c1/*.html')):
+            raw=open(f,encoding='utf-8',errors='replace').read()
+            p=Strip(); p.feed(raw)
+            txt=ihtml.unescape(' '.join(p.out))
+            txt=re.sub(r'\s+',' ',txt).strip()
+            a=txt.find('1 Introduction'); b=txt.rfind('References')
+            body=txt[a:b] if (a>0 and b>a) else txt
+            bodies.append(body)
+          full='\n'.join(bodies)
+          W=16; mathset=set('^_{}$#&~')
+          def ismath(ch): return ord(ch)>=128 or ch in mathset
+          prose_wins=[]; math_wins=[]
+          for i in range(0,len(full)-W+1,W):
+            w=full[i:i+W]
+            m=sum(1 for ch in w if ismath(ch))/len(w)
+            (math_wins if m>0.25 else prose_wins).append(w)
+          open('/tmp/c1/corpus-prose.txt','w').write('\n'.join(prose_wins))
+          open('/tmp/c1/corpus-math.txt','w').write('\n'.join(math_wins))
+          stats={'windows':len(prose_wins)+len(math_wins),'prose':len(prose_wins),'math':len(math_wins),
+                 'prose_frac':round(len(prose_wins)/(len(prose_wins)+len(math_wins)),4),
+                 'V_all':len(set(full)),'chars':len(full)}
+          open('/tmp/c1/strata.json','w').write(json.dumps(stats,indent=1))
+          print(json.dumps(stats))
+          assert 15346<=stats['windows']<=15946, 'windows drift '+str(stats['windows'])
+          assert stats['prose_frac']>=0.93, 'prose frac drift '+str(stats['prose_frac'])
+          assert 175<=stats['V_all']<=185, 'vocab drift '+str(stats['V_all'])
+          print('CORPUS GATE PASS')
+          PYEOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: c1-corpus
+          path: |
+            /tmp/c1/corpus-prose.txt
+            /tmp/c1/corpus-math.txt
+            /tmp/c1/strata.json
+          retention-days: 30
+  alone:
+    name: alone ${{ matrix.donor }} c1-prose
+    needs: build-corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include:
+          - donor: q05
+            gguf: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+          - donor: q15
+            gguf: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@v4
+        with:
+          name: c1-corpus
+          path: /tmp/c1c
+      - name: build llama.cpp server (pinned)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq cmake > /dev/null 2>&1 || true
+          git clone https://github.com/ggml-org/llama.cpp /tmp/llama.cpp
+          git -C /tmp/llama.cpp checkout a68c6136bb980d35281ae68d275d6f5318accc4a # pinned 2026-11-16
+          git -C /tmp/llama.cpp rev-parse HEAD
+          cmake /tmp/llama.cpp -B /tmp/llama.cpp/build -DCMAKE_BUILD_TYPE=Release > /tmp/cmake.log 2>&1 || (tail -30 /tmp/cmake.log; exit 1)
+          cmake --build /tmp/llama.cpp/build --config Release -j4 > /tmp/build.log 2>&1 || (tail -30 /tmp/build.log; exit 1)
+          ls /tmp/llama.cpp/build/bin/llama-server
+      - name: fetch donor GGUF (fail loud)
+        run: |
+          curl -sSL --fail "${{ matrix.gguf }}" -o /tmp/donor.gguf
+          [ $(wc -c < /tmp/donor.gguf) -gt 100000000 ] || (echo "FAIL donor too small"; exit 1)
+      - name: start server
+        run: |
+          /tmp/llama.cpp/build/bin/llama-server -m /tmp/donor.gguf --port 8080 --ctx-size 64 > /tmp/server.log 2>&1 &
+          for i in $(seq 1 120); do curl -sf http://127.0.0.1:8080/health && break || sleep 5; done
+          curl -sf http://127.0.0.1:8080/health
+      - name: donor-alone queries (skip-tolerant client, seed 2001)
+        run: |
+          echo "--- smoke: raw /completion shape ---"
+          curl -sS -m 60 http://127.0.0.1:8080/completion -H 'Content-Type: application/json' -d '{"prompt":"ab","n_predict":1,"n_probs":100,"temperature":0,"cache_prompt":true,"post_sampling_probs":true}' -o /tmp/smoke.json
+          node -e "const r=require('/tmp/smoke.json'); const cp0=r.completion_probabilities&&r.completion_probabilities[0]; const p=(cp0&&(cp0.probs||cp0.top_probs))||[]; if(!p.length){console.error('SMOKE FAIL: no probs keys='+Object.keys(r).join(','), JSON.stringify(r).slice(0,400)); process.exit(1)}; console.log('smoke ok probs='+p.length)"
+          node halt-r/qwen-alone.mjs --server http://127.0.0.1:8080 --data /tmp/c1c/corpus-prose.txt --W 16 --trials 200 --seed 2001 --donor ${{ matrix.donor }} --corpus c1-prose --out out/alone-${{ matrix.donor }}-c1-prose/alone.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: c1-alone-${{ matrix.donor }}-prose
+          path: out/alone-${{ matrix.donor }}-c1-prose/alone.json
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: c1-serverlog-${{ matrix.donor }}-prose
+          path: /tmp/server.log
+          retention-days: 7
+  collect:
+    name: collect C1 donor-alone verdict (K1 gate)
+    needs: alone
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: c1-alone-*
+          path: /tmp/c1a
+          merge-multiple: true
+      - name: K1 verdict (e_d*n >= 20 both donors)
+        run: |
+          node -e "const fs=require('fs');const out={};let min=1e9;for(const d of ['q05','q15']){const j=JSON.parse(fs.readFileSync('/tmp/c1a/alone-'+d+'-c1-prose.json','utf8'));const ed=1-j.acc;out[d]={acc:j.acc,n:j.n,skipped:j.skipped||0,e_d:+ed.toFixed(4),headroom:Math.round(ed*j.n)};min=Math.min(min,ed*j.n);}out.K1=min>=20?'PASS':'CLOSE';out.K1min=+min.toFixed(1);fs.writeFileSync('/tmp/c1-verdict.json',JSON.stringify(out,null,1));console.log(JSON.stringify(out));"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: c1-alone-verdict
+          path: /tmp/c1-verdict.json
+          retention-days: 90
