@@ -152,7 +152,8 @@ jobs:
       - name: donor-alone queries (report stream, diagnostic-grade)
         run: |
           echo "--- smoke: raw /completion shape for one probe (self-identifies HEAD API drift) ---"
-          curl -sS -m 60 http://127.0.0.1:8080/completion -H 'Content-Type: application/json' -d '{"prompt":"ab","n_predict":1,"n_probs":100,"temperature":0,"post_sampling_probs":true}' | head -c 600
+          curl -sS -m 60 http://127.0.0.1:8080/completion -H 'Content-Type: application/json' -d '{"prompt":"ab","n_predict":1,"n_probs":100,"temperature":0,"post_sampling_probs":true}' -o /tmp/smoke.json
+          node -e "const r=require('/tmp/smoke.json'); const t=r.tokens||r.completion_token_ids||[]; if(!t.length){console.error('SMOKE FAIL: empty tokens', JSON.stringify(r).slice(0,400)); process.exit(1)}; console.log('smoke ok tokens='+t.length)"
           echo ""
           echo "--- end smoke ---"
           node halt-r/qwen-alone.mjs --server http://127.0.0.1:8080 --data /tmp/corpus.txt --W 16 --trials 200 --seed 2001 --donor ${{ matrix.donor }} --corpus ${{ matrix.corpus }} --out out/alone-${{ matrix.donor }}-${{ matrix.corpus }}/alone.json
