@@ -30,11 +30,6 @@ jobs:
           - stratum: prose
             data: halt-r/c1/corpus-prose.txt
             bytes: 263652
-            arm: tiny
-            flags: "--proj graft5 --anchors 256 --graftgguf halt-r/tinygpt-arith-revbal.gguf --mix none"
-          - stratum: prose
-            data: halt-r/c1/corpus-prose.txt
-            bytes: 263652
             arm: q05
             flags: "--proj graft5 --anchors 256 --graftemb hf,Qwen/Qwen2.5-0.5B-Instruct,model.safetensors --mix none"
           - stratum: prose
@@ -47,11 +42,6 @@ jobs:
             bytes: 5575
             arm: sup
             flags: "--proj sup --mix none"
-          - stratum: math
-            data: halt-r/c1/corpus-math.txt
-            bytes: 5575
-            arm: tiny
-            flags: "--proj graft5 --anchors 256 --graftgguf halt-r/tinygpt-arith-revbal.gguf --mix none"
           - stratum: math
             data: halt-r/c1/corpus-math.txt
             bytes: 5575
@@ -128,7 +118,7 @@ jobs:
             if (!dm) { console.error('FAIL unexpected artifact ' + f); process.exit(1); }
             cell[dm[1] + '/' + dm[2]] = m;
           }
-          const need = ['prose/sup','prose/tiny','prose/q05','prose/q15','math/sup','math/tiny','math/q05','math/q15'];
+          const need = ['prose/sup','prose/q05','prose/q15','math/sup','math/q05','math/q15'];
           for (const k of need) if (!cell[k]) { console.error('FAIL missing cell ' + k); process.exit(1); }
           // integrity: 200 trials, 200-char raws, graft engagement fields, bench exit-0 (self-key hard-gate in-process)
           for (const k of need){
@@ -136,7 +126,7 @@ jobs:
             if (m.trials !== 200) { console.error('FAIL trials ' + k + ' = ' + m.trials); process.exit(1); }
             for (const r of ['repHitI','repHitB']) if ((m[r] || '').length !== 200) { console.error('FAIL raw len ' + k + ' ' + r); process.exit(1); }
           }
-          for (const k of need.filter(k => /q05|q15|tiny/.test(k))){
+          for (const k of need.filter(k => /q05|q15/.test(k))){
             const m = cell[k];
             if (m.graft !== 5 || m.graftE !== 256 || !m.graftSpec) { console.error('FAIL graft fields ' + k); process.exit(1); }
           }
@@ -145,7 +135,7 @@ jobs:
           for (const st of ['prose','math']){
             const sup = cell[st + '/sup'];
             out.strata[st] = {sup: {interpAcc: sup.interpAcc, interpPpl: +sup.interpPpl.toFixed(2), lam: sup.interpLambda, P_fire: 1.0, coverage: '200/200'}};
-            for (const arm of ['tiny','q05','q15']){
+            for (const arm of ['q05','q15']){
               const g = cell[st + '/' + arm];
               const d_acc = g.interpAcc - sup.interpAcc, d_ppl = sup.interpPpl - g.interpPpl;
               const pm = pair(g.repHitI || '', sup.repHitI || '');
@@ -162,7 +152,7 @@ jobs:
           const mathWin = ['q05','q15'].some(a => mth[a].wins);
           out.kills = {K2_abstain: K2, K3_engagedButLoses: K3,
             K4_mathWinWithoutProse: (mathWin && !proseWin) ? true : false, proseWin, mathWin};
-          out.selfKey = 'green-by-construction: all 8 bench cells exit-0; self-key-retrieval is a hard in-process gate (lm-shakespeare.mjs check()) — any failure fails the cell before collect';
+          out.selfKey = 'green-by-construction: all 6 bench cells exit-0; self-key-retrieval is a hard in-process gate (lm-shakespeare.mjs check()) — any failure fails the cell before collect';
           out.calibration = 'no porting: thresholds at floor (same flags as bigdonor: hedge1/conf0/gate0); hedgeNeff~1 → P_fire=1.00 next to coverage 200/200 for every gate';
           out.K1 = 'PASS (run 43934266138, K1min=158)';
           console.log(JSON.stringify(out));
