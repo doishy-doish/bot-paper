@@ -1,0 +1,159 @@
+name: halt-r-p2log
+# Phase-2 data harvest (router B1/B2/I(R;A)): sup-only bench x 4 corpora with repTopk logging
+# + server-diagnostic (raw probs depth). Rationale: router-prereg-2026-11-16.md V2/V2.1 (2026-11-16).
+# Sup-only: local compute, no donor downloads. Bench code validated green by screen run 43945274622.
+on:
+  push:
+    paths:
+      - '.github/workflows/halt-r-p2log.yml'
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: p2log ${{ matrix.tag }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include:
+          - tag: c1-prose
+            data: halt-r/c1/corpus-prose.txt
+            bytes: 263652
+          - tag: c1-math
+            data: halt-r/c1/corpus-math.txt
+            bytes: 5575
+          - tag: ts
+            data: /tmp/corpus-ts.txt
+            bytes: 0
+          - tag: shakes
+            data: /tmp/corpus-shakes.txt
+            bytes: 0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fetch or verify corpus
+        run: |
+          if [ "${{ matrix.tag }}" = ts ]; then
+            curl -sSL --fail -r 0-3000000 --max-filesize 6000000 https://huggingface.co/datasets/roneneldan/TinyStories/resolve/main/TinyStoriesV2-GPT4-train.txt -o /tmp/corpus-ts.txt
+            [ $(wc -c < /tmp/corpus-ts.txt) -gt 100000 ] || (echo "FAIL ts too small"; exit 1)
+          elif [ "${{ matrix.tag }}" = shakes ]; then
+            curl -sSL --fail https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt -o /tmp/corpus-shakes.txt
+            [ $(wc -c < /tmp/corpus-shakes.txt) -gt 100000 ] || (echo "FAIL shakes too small"; exit 1)
+          else
+            [ $(wc -c < "${{ matrix.data }}") -eq ${{ matrix.bytes }} ] || (echo "FAIL corpus drift ${{ matrix.tag }}"; exit 1)
+          fi
+          wc -c "${{ matrix.data }}"
+      - name: bench sup with repTopk logging (same flags as C1 sup cells)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: |
+          node halt-r/lm-shakespeare.mjs --data "${{ matrix.data }}" --out out/p2log-${{ matrix.tag }} --tag p2log-${{ matrix.tag }} --W 16 --P 8000 --trials 200 --H 256 --no-gen --split 1 --hedge 1 --proj sup --mix none 2>&1 | tee /tmp/bench-${{ matrix.tag }}.log; test ${PIPESTATUS[0]} -eq 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p2log-${{ matrix.tag }}
+          path: out/p2log-${{ matrix.tag }}/metrics.json
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: p2log-benchlog-${{ matrix.tag }}
+          path: /tmp/bench-${{ matrix.tag }}.log
+          retention-days: 7
+  server-diag:
+    name: server probs-depth diagnostic (report-only, never fails the run)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: build llama.cpp server (pinned)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq cmake > /dev/null 2>&1 || true
+          git clone https://github.com/ggml-org/llama.cpp /tmp/llama.cpp
+          git -C /tmp/llama.cpp checkout a68c6136bb980d35281ae68d275d6f5318accc4a
+          cmake /tmp/llama.cpp -B /tmp/llama.cpp/build -DCMAKE_BUILD_TYPE=Release > /tmp/cmake.log 2>&1 || (tail -30 /tmp/cmake.log; exit 1)
+          cmake --build /tmp/llama.cpp/build --config Release -j4 > /tmp/build.log 2>&1 || (tail -30 /tmp/build.log; exit 1)
+      - name: fetch donor GGUF
+        run: |
+          curl -sSL --fail "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf" -o /tmp/donor.gguf
+          [ $(wc -c < /tmp/donor.gguf) -gt 100000000 ] || (echo "FAIL donor too small"; exit 1)
+      - name: probe probs depth (5 prompts x 3 bodies)
+        run: |
+          /tmp/llama.cpp/build/bin/llama-server -m /tmp/donor.gguf --port 8080 --ctx-size 64 > /tmp/server.log 2>&1 &
+          for i in $(seq 1 120); do curl -sf http://127.0.0.1:8080/health && break || sleep 5; done
+          node - <<'EOF' | tee /tmp/diag-report.json
+          const report = [];
+          const bodies = [
+            p => ({prompt: p, n_predict: 1, n_probs: 100, temperature: 0, cache_prompt: true}),
+            p => ({prompt: p, n_predict: 1, n_probs: 100, temperature: 0}),
+            p => ({prompt: p, n_predict: 1, n_probs: 100, temperature: 0, cache_prompt: true, post_sampling_probs: true}),
+          ];
+          const prompts = ["ab", "the cat sat", "1 Introduction 2", "To be or not", "arith 2+2="];
+          (async () => {
+            for (const p of prompts) for (let b = 0; b < bodies.length; b++) {
+              const r = await fetch("http://127.0.0.1:8080/completion", {method: "POST",
+                headers: {"Content-Type": "application/json"}, body: JSON.stringify(bodies[b](p))});
+              const j = await r.json();
+              const cp = j.completion_probabilities && j.completion_probabilities[0];
+              const probs = (cp && (cp.probs || cp.top_probs)) || [];
+              report.push({prompt: p.slice(0, 12), body: b, nProbs: probs.length,
+                top3: probs.slice(0, 3).map(x => [x.tok_str || x.token, x.prob])});
+            }
+            console.log(JSON.stringify(report));
+          })();
+          EOF
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p2log-server-diag
+          path: /tmp/diag-report.json
+          retention-days: 30
+  collect:
+    name: collect repTopk manifest (data check, no bars)
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: p2log-*
+          path: /tmp/p2g
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: repTopk presence + shape check
+        run: |
+          ls -R /tmp/p2g
+          node - <<'EOF' | tee /tmp/p2log-verdict.json
+          const fs = require('fs'), path = require('path');
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes: true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          walk('/tmp/p2g');
+          const need = ['c1-prose','c1-math','ts','shakes'];
+          const out = {};
+          for (const k of need){
+            const f = files.find(f => f.includes('p2log-' + k + '/') || f.includes('p2log-' + k + '\\'));
+            if (!f) { console.error('FAIL missing cell ' + k); process.exit(1); }
+            const m = JSON.parse(fs.readFileSync(f, 'utf8'));
+            if (!m.repTopk || m.repTopk.length !== 200) { console.error('FAIL repTopk len ' + k); process.exit(1); }
+            for (const t of m.repTopk){
+              if (!t.topk || t.topk.length !== 8 || t.btop1 === undefined || t.pos === undefined || t.tn === undefined){ console.error('FAIL repTopk shape ' + k); process.exit(1); }
+            }
+            out[k] = {acc: m.interpAcc, ppl: +m.interpPpl.toFixed(2), lam: m.interpLambda, repTopk: m.repTopk.length, V: m.V};
+          }
+          out.status = 'HARVEST-COMPLETE';
+          console.log(JSON.stringify(out));
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2log-verdict
+          path: /tmp/p2log-verdict.json
+          retention-days: 90
