@@ -46,7 +46,7 @@ async function waitServer(){
   }
   fail('server never healthy ' + A.server);
 }
-async function complete(ctx){
+async function complete(ctx, tag){
   // llama.cpp HEAD intermittently omits completion_probabilities on identical requests (proven 2026-11-16: same prompt+params -> probs once, no-probs 1.7s later, temp 0). Retry, middle attempt with cold cache.
   let last = null;
   for (let a = 0; a < 3; a++){
@@ -61,7 +61,7 @@ async function complete(ctx){
     if (probs && probs.length) { if (a > 0) console.log('complete retry ok attempt=' + a); return probs; }
     last = 'server: no probs (keys: ' + Object.keys(cp0 || {}).join(',') + ') body: ' + raw.slice(0, 200);
   }
-  fail(last + ' after 3 attempts');
+  fail(last + ' after 3 attempts trial=' + tag + ' ctx=' + JSON.stringify(ctx));
 }
 await waitServer();
 const rr = rng(SEED);
@@ -71,7 +71,7 @@ for (let t = 0; t < TR; t++){
   const pos = Math.floor(rr() * (val.length - W - 1));
   const ctx = val.slice(pos, pos + W), tn = val[pos + W];
   if (toI[tn] === undefined){ skipped++; continue; }
-  const probs = await complete(ctx);
+  const probs = await complete(ctx, t);
   const mass = {}; let tot = 0;
   for (const p of probs){
     if (p.token === undefined || typeof p.prob !== 'number') fail('server: prob shape changed (keys: ' + Object.keys(p || {}).join(',') + ')');
