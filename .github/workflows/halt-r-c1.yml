@@ -142,10 +142,10 @@ jobs:
         with:
           pattern: c1-alone-*
           path: /tmp/c1a
-          merge-multiple: true
       - name: K1 verdict (e_d*n >= 20 both donors)
         run: |
-          node -e "const fs=require('fs');const out={};let min=1e9;for(const d of ['q05','q15']){const j=JSON.parse(fs.readFileSync('/tmp/c1a/alone-'+d+'-c1-prose.json','utf8'));const ed=1-j.acc;out[d]={acc:j.acc,n:j.n,skipped:j.skipped||0,e_d:+ed.toFixed(4),headroom:Math.round(ed*j.n)};min=Math.min(min,ed*j.n);}out.K1=min>=20?'PASS':'CLOSE';out.K1min=+min.toFixed(1);fs.writeFileSync('/tmp/c1-verdict.json',JSON.stringify(out,null,1));console.log(JSON.stringify(out));"
+          ls -R /tmp/c1a
+          node -e "const fs=require('fs');const out={};let min=1e9;for(const d of ['q05','q15']){const j=JSON.parse(fs.readFileSync('/tmp/c1a/c1-alone-'+d+'-prose/alone.json','utf8'));const ed=1-j.acc;out[d]={acc:j.acc,n:j.n,skipped:j.skipped||0,e_d:+ed.toFixed(4),headroom:Math.round(ed*j.n)};min=Math.min(min,ed*j.n);}out.K1=min>=20?'PASS':'CLOSE';out.K1min=+min.toFixed(1);fs.writeFileSync('/tmp/c1-verdict.json',JSON.stringify(out,null,1));console.log(JSON.stringify(out));"
       - uses: actions/upload-artifact@v4
         with:
           name: c1-alone-verdict
