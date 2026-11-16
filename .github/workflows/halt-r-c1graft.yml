@@ -2,7 +2,7 @@ name: halt-r-c1graft
 # C1 graft-vs-sup on donor-UNKNOWN corpus (frozen, committed to repo — NO fetch at fire time).
 # Pre-reg: scratch/papers/c1-prereg-2026-11-16.md (frozen). K1 PASSED (run 43934266138,
 # K1min=158 both donors) → this graft fire is authorized. Framing: store-generality+router, NOT transplant.
-# Corpus: halt-r/c1/corpus-prose.txt (260566B, 15330 windows, V179+nl) + corpus-math.txt (5457B, 321 windows).
+# Corpus: halt-r/c1/corpus-prose.txt (263652B, 15330 windows, V179+nl) + corpus-math.txt (5575B, 321 windows).
 # Deviations banked: CI split 15325/321 vs pilot slot-lock 15022/624 (same totals/V); 51 windows with
 # astral-length lines + 9 short lines (0.4%, cosmetic, bench re-windows raw text as in bigdonor precedent).
 on:
@@ -24,42 +24,42 @@ jobs:
         include:
           - stratum: prose
             data: halt-r/c1/corpus-prose.txt
-            bytes: 260566
+            bytes: 263652
             arm: sup
             flags: "--proj sup --mix none"
           - stratum: prose
             data: halt-r/c1/corpus-prose.txt
-            bytes: 260566
+            bytes: 263652
             arm: tiny
             flags: "--proj graft5 --anchors 256 --graftgguf halt-r/tinygpt-arith-revbal.gguf --mix none"
           - stratum: prose
             data: halt-r/c1/corpus-prose.txt
-            bytes: 260566
+            bytes: 263652
             arm: q05
             flags: "--proj graft5 --anchors 256 --graftemb hf,Qwen/Qwen2.5-0.5B-Instruct,model.safetensors --mix none"
           - stratum: prose
             data: halt-r/c1/corpus-prose.txt
-            bytes: 260566
+            bytes: 263652
             arm: q15
             flags: "--proj graft5 --anchors 256 --graftemb hf,Qwen/Qwen2.5-1.5B-Instruct,model.safetensors --mix none"
           - stratum: math
             data: halt-r/c1/corpus-math.txt
-            bytes: 5457
+            bytes: 5575
             arm: sup
             flags: "--proj sup --mix none"
           - stratum: math
             data: halt-r/c1/corpus-math.txt
-            bytes: 5457
+            bytes: 5575
             arm: tiny
             flags: "--proj graft5 --anchors 256 --graftgguf halt-r/tinygpt-arith-revbal.gguf --mix none"
           - stratum: math
             data: halt-r/c1/corpus-math.txt
-            bytes: 5457
+            bytes: 5575
             arm: q05
             flags: "--proj graft5 --anchors 256 --graftemb hf,Qwen/Qwen2.5-0.5B-Instruct,model.safetensors --mix none"
           - stratum: math
             data: halt-r/c1/corpus-math.txt
-            bytes: 5457
+            bytes: 5575
             arm: q15
             flags: "--proj graft5 --anchors 256 --graftemb hf,Qwen/Qwen2.5-1.5B-Instruct,model.safetensors --mix none"
     steps:
