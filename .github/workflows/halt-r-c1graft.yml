@@ -1,0 +1,174 @@
+name: halt-r-c1graft
+# C1 graft-vs-sup on donor-UNKNOWN corpus (frozen, committed to repo — NO fetch at fire time).
+# Pre-reg: scratch/papers/c1-prereg-2026-11-16.md (frozen). K1 PASSED (run 43934266138,
+# K1min=158 both donors) → this graft fire is authorized. Framing: store-generality+router, NOT transplant.
+# Corpus: halt-r/c1/corpus-prose.txt (260566B, 15330 windows, V179+nl) + corpus-math.txt (5457B, 321 windows).
+# Deviations banked: CI split 15325/321 vs pilot slot-lock 15022/624 (same totals/V); 51 windows with
+# astral-length lines + 9 short lines (0.4%, cosmetic, bench re-windows raw text as in bigdonor precedent).
+on:
+  push:
+    paths:
+      - '.github/workflows/halt-r-c1graft.yml'
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: c1graft ${{ matrix.stratum }} ${{ matrix.arm }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include:
+          - stratum: prose
+            data: halt-r/c1/corpus-prose.txt
+            bytes: 260566
+            arm: sup
+            flags: "--proj sup --mix none"
+          - stratum: prose
+            data: halt-r/c1/corpus-prose.txt
+            bytes: 260566
+            arm: tiny
+            flags: "--proj graft5 --anchors 256 --graftgguf halt-r/tinygpt-arith-revbal.gguf --mix none"
+          - stratum: prose
+            data: halt-r/c1/corpus-prose.txt
+            bytes: 260566
+            arm: q05
+            flags: "--proj graft5 --anchors 256 --graftemb hf,Qwen/Qwen2.5-0.5B-Instruct,model.safetensors --mix none"
+          - stratum: prose
+            data: halt-r/c1/corpus-prose.txt
+            bytes: 260566
+            arm: q15
+            flags: "--proj graft5 --anchors 256 --graftemb hf,Qwen/Qwen2.5-1.5B-Instruct,model.safetensors --mix none"
+          - stratum: math
+            data: halt-r/c1/corpus-math.txt
+            bytes: 5457
+            arm: sup
+            flags: "--proj sup --mix none"
+          - stratum: math
+            data: halt-r/c1/corpus-math.txt
+            bytes: 5457
+            arm: tiny
+            flags: "--proj graft5 --anchors 256 --graftgguf halt-r/tinygpt-arith-revbal.gguf --mix none"
+          - stratum: math
+            data: halt-r/c1/corpus-math.txt
+            bytes: 5457
+            arm: q05
+            flags: "--proj graft5 --anchors 256 --graftemb hf,Qwen/Qwen2.5-0.5B-Instruct,model.safetensors --mix none"
+          - stratum: math
+            data: halt-r/c1/corpus-math.txt
+            bytes: 5457
+            arm: q15
+            flags: "--proj graft5 --anchors 256 --graftemb hf,Qwen/Qwen2.5-1.5B-Instruct,model.safetensors --mix none"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: verify frozen corpus (byte-exact, no fetch)
+        run: |
+          [ $(wc -c < "${{ matrix.data }}") -eq ${{ matrix.bytes }} ] || (echo "FAIL corpus drift ${{ matrix.data }}"; exit 1)
+          wc -c "${{ matrix.data }}"
+      - name: bench graft-vs-sup cell (P8000 W16 T200 seed7, same as bigdonor paired cells)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: |
+          node halt-r/lm-shakespeare.mjs --data "${{ matrix.data }}" --out out/c1graft-${{ matrix.stratum }}-${{ matrix.arm }} --tag c1graft-c1-${{ matrix.stratum }} --W 16 --P 8000 --trials 200 --H 256 --no-gen --split 1 --hedge 1 ${{ matrix.flags }} 2>&1 | tee /tmp/bench-${{ matrix.stratum }}-${{ matrix.arm }}.log; test ${PIPESTATUS[0]} -eq 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: c1graft-${{ matrix.stratum }}-${{ matrix.arm }}
+          path: out/c1graft-${{ matrix.stratum }}-${{ matrix.arm }}/metrics.json
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: c1graft-benchlog-${{ matrix.stratum }}-${{ matrix.arm }}
+          path: /tmp/bench-${{ matrix.stratum }}-${{ matrix.arm }}.log
+          retention-days: 7
+  collect:
+    name: collect C1 graft verdict (K2/K3/K4)
+    needs: bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: c1graft-*
+          path: /tmp/c1g
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: graft-vs-sup verdict (bars from frozen pre-reg; McNemar recomputed from banked raws)
+        run: |
+          ls -R /tmp/c1g
+          node - <<'EOF' | tee /tmp/c1graft-verdict.json
+          const fs = require('fs'), path = require('path');
+          const mcP = (b, c) => { const n = b + c; if (!n) return 1; const lo = Math.min(b, c);
+            let pk = Math.pow(0.5, n), tail = pk;
+            for (let k = 1; k <= lo; k++){ pk = pk * (n - k + 1) / k; tail += pk; }
+            return Math.min(1, 2 * tail); };
+          const pair = (s1, s2) => { let b = 0, c = 0;
+            for (let i = 0; i < Math.min(s1.length, s2.length); i++){ const a = s1[i], d = s2[i];
+              if (a === 'x' || d === 'x') continue;
+              if (a === '1' && d === '0') b++; if (a === '0' && d === '1') c++; }
+            return {b, c, p: mcP(b, c)}; };
+          const files = [];
+          const walk = d => { for (const e of fs.readdirSync(d, {withFileTypes: true})) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (e.name === 'metrics.json') files.push(p); } };
+          walk('/tmp/c1g');
+          const cell = {};
+          for (const f of files){
+            const m = JSON.parse(fs.readFileSync(f, 'utf8'));
+            const dm = f.match(/c1graft-(prose|math)-(sup|tiny|q05|q15)/);
+            if (!dm) { console.error('FAIL unexpected artifact ' + f); process.exit(1); }
+            cell[dm[1] + '/' + dm[2]] = m;
+          }
+          const need = ['prose/sup','prose/tiny','prose/q05','prose/q15','math/sup','math/tiny','math/q05','math/q15'];
+          for (const k of need) if (!cell[k]) { console.error('FAIL missing cell ' + k); process.exit(1); }
+          // integrity: 200 trials, 200-char raws, graft engagement fields, bench exit-0 (self-key hard-gate in-process)
+          for (const k of need){
+            const m = cell[k];
+            if (m.trials !== 200) { console.error('FAIL trials ' + k + ' = ' + m.trials); process.exit(1); }
+            for (const r of ['repHitI','repHitB']) if ((m[r] || '').length !== 200) { console.error('FAIL raw len ' + k + ' ' + r); process.exit(1); }
+          }
+          for (const k of need.filter(k => /q05|q15|tiny/.test(k))){
+            const m = cell[k];
+            if (m.graft !== 5 || m.graftE !== 256 || !m.graftSpec) { console.error('FAIL graft fields ' + k); process.exit(1); }
+          }
+          if (cell['prose/sup'].proj !== 'sup') { console.error('FAIL sup proj'); process.exit(1); }
+          const out = {strata: {}};
+          for (const st of ['prose','math']){
+            const sup = cell[st + '/sup'];
+            out.strata[st] = {sup: {interpAcc: sup.interpAcc, interpPpl: +sup.interpPpl.toFixed(2), lam: sup.interpLambda, P_fire: 1.0, coverage: '200/200'}};
+            for (const arm of ['tiny','q05','q15']){
+              const g = cell[st + '/' + arm];
+              const d_acc = g.interpAcc - sup.interpAcc, d_ppl = sup.interpPpl - g.interpPpl;
+              const pm = pair(g.repHitI || '', sup.repHitI || '');
+              out.strata[st][arm] = {lam: g.interpLambda, d_acc: +d_acc.toFixed(3), d_ppl: +d_ppl.toFixed(2),
+                mcNemar: pm, wins: g.interpLambda > 0 && d_acc > 0 && d_ppl > 0.2 && pm.p < 0.05,
+                P_fire: 1.0, coverage: '200/200', acc: g.interpAcc, ppl: +g.interpPpl.toFixed(2)};
+            }
+          }
+          // KILL LINES (pre-reg binding)
+          const p = out.strata.prose, mth = out.strata.math;
+          const K2 = ['q05','q15'].filter(a => p[a].lam === 0);
+          const K3 = ['q05','q15'].filter(a => p[a].lam > 0 && !(p[a].d_acc > 0 && p[a].d_ppl > 0.2));
+          const proseWin = ['q05','q15'].some(a => p[a].wins);
+          const mathWin = ['q05','q15'].some(a => mth[a].wins);
+          out.kills = {K2_abstain: K2, K3_engagedButLoses: K3,
+            K4_mathWinWithoutProse: (mathWin && !proseWin) ? true : false, proseWin, mathWin};
+          out.selfKey = 'green-by-construction: all 8 bench cells exit-0; self-key-retrieval is a hard in-process gate (lm-shakespeare.mjs check()) — any failure fails the cell before collect';
+          out.calibration = 'no porting: thresholds at floor (same flags as bigdonor: hedge1/conf0/gate0); hedgeNeff~1 → P_fire=1.00 next to coverage 200/200 for every gate';
+          out.K1 = 'PASS (run 43934266138, K1min=158)';
+          console.log(JSON.stringify(out));
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: c1graft-verdict
+          path: /tmp/c1graft-verdict.json
+          retention-days: 90
