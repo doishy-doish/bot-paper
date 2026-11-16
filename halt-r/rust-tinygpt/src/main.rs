@@ -7,6 +7,7 @@
 // under the fail bar (warn bar is informational; f32 summation order differs
 // from torch, so tiny diffs are expected and reported, not hidden).
 use std::collections::HashMap;
+use std::env;
 use std::fs;
 
 fn rd_u32(d: &[u8], o: &mut usize) -> u32 {
@@ -253,7 +254,7 @@ fn main() {
         let nd = rd_u32(&d, &mut o);
         let mut dims = Vec::new();
         for _ in 0..nd {
-            dims.push(rd_u64(&d, &mut o));
+            dims.push(rd_u64(&d, &mut o) as usize);
         }
         let ty = rd_u32(&d, &mut o);
         assert_eq!(ty, 0, "only F32 supported");
