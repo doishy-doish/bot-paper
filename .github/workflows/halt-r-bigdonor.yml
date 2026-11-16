@@ -136,7 +136,9 @@ jobs:
       - name: build llama.cpp server
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq cmake > /dev/null 2>&1 || true
-          git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/llama.cpp
+          git clone https://github.com/ggml-org/llama.cpp /tmp/llama.cpp
+          git -C /tmp/llama.cpp checkout a68c6136bb980d35281ae68d275d6f5318accc4a # pinned 2026-11-16; green runs used floating HEAD pre-pin
+          git -C /tmp/llama.cpp rev-parse HEAD
           cmake /tmp/llama.cpp -B /tmp/llama.cpp/build -DCMAKE_BUILD_TYPE=Release > /tmp/cmake.log 2>&1 || (tail -30 /tmp/cmake.log; exit 1)
           cmake --build /tmp/llama.cpp/build --config Release -j4 > /tmp/build.log 2>&1 || (tail -30 /tmp/build.log; exit 1)
           ls /tmp/llama.cpp/build/bin/llama-server
