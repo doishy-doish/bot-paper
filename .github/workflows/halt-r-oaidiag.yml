@@ -34,47 +34,32 @@ jobs:
           /tmp/llama.cpp/build/bin/llama-server -m /tmp/donor.gguf --port 8080 --ctx-size 64 > /tmp/server.log 2>&1 &
           for i in $(seq 1 120); do curl -sf http://127.0.0.1:8080/health && break || sleep 5; done
           node - <<'EOF' | tee /tmp/oa-diag-report.json
-          const report = [];
-          const prompts = ["ab", "the cat sat", "1 Introduction 2", "To be or not", "arith 2+2="];
-          const bodies = [
-            {kind: "completion-baseline", path: "/completion", body: p => ({prompt: p, n_predict: 1, n_probs: 100, temperature: 0, cache_prompt: true})},
-            {kind: "oai-logprobs", path: "/v1/completions", body: p => ({prompt: p, max_tokens: 1, temperature: 0, logprobs: 10, echo: false})},
-            {kind: "oai-logprobs-echo", path: "/v1/completions", body: p => ({prompt: p, max_tokens: 1, temperature: 0, logprobs: 10, echo: true})},
-            {kind: "oai-logprobs-5", path: "/v1/completions", body: p => ({prompt: p, max_tokens: 1, temperature: 0, logprobs: 5})},
-          ];
+          const prompts = ["ab", "the cat sat"];
           (async () => {
-            for (const p of prompts) for (const v of bodies) {
-              const row = {prompt: p.slice(0, 12), kind: v.kind, status: 0, depth: 0, degenerate: null, top3: [], keys: [], note: ""};
-              try {
-                const r = await fetch("http://127.0.0.1:8080" + v.path, {method: "POST",
-                  headers: {"Content-Type": "application/json"}, body: JSON.stringify(v.body(p))});
-                row.status = r.status;
-                const j = await r.json().catch(() => null);
-                if (!j) { row.note = "non-json"; report.push(row); continue; }
-                if (v.path === "/completion") {
-                  const cp = j.completion_probabilities && j.completion_probabilities[0];
-                  const probs = (cp && (cp.probs || cp.top_probs)) || [];
-                  row.depth = probs.length;
-                  row.top3 = probs.slice(0, 3).map(x => [x.tok_str || x.token, x.prob]);
-                  row.degenerate = probs.length === 1 && probs[0].prob === 1;
-                  row.keys = Object.keys(j).slice(0, 8);
-                } else {
-                  const ch = j.choices && j.choices[0];
-                  row.keys = ch && ch.logprobs ? Object.keys(ch.logprobs).slice(0, 10) : [];
-                  const tl = ch && ch.logprobs;
-                  const top0 = tl && tl.top_logprobs && tl.top_logprobs[0];
-                  const toks = top0 ? Object.keys(top0) : [];
-                  row.depth = toks.length;
-                  row.top3 = toks.slice(0, 3).map(t => [t, top0[t]]);
-                  const vals = toks.map(t => top0[t]);
-                  row.degenerate = toks.length === 1;
-                  row.note = "text=" + JSON.stringify((ch && ch.text || "").slice(0, 12));
-                  void vals;
-                }
-              } catch (e) { row.note = "fetch-err:" + String(e).slice(0, 80); }
-              report.push(row);
+            const out = [];
+            for (const p of prompts) {
+              const r = await fetch("http://127.0.0.1:8080/v1/completions", {method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({prompt: p, max_tokens: 1, temperature: 0, logprobs: 10, echo: false})});
+              const j = await r.json();
+              const ch = j.choices && j.choices[0];
+              const lp = ch && ch.logprobs;
+              const row = {prompt: p, status: r.status,
+                topKeys: j ? Object.keys(j).slice(0,10) : [],
+                chKeys: ch ? Object.keys(ch).slice(0,12) : [],
+                lpKeys: lp ? Object.keys(lp).slice(0,12) : null,
+                lpType: Array.isArray(lp) ? "array" : typeof lp,
+                rawSlice: JSON.stringify(lp).slice(0, 600)};
+              if (lp && lp.content && lp.content[0]) {
+                const c0 = lp.content[0];
+                row.c0Keys = Object.keys(c0).slice(0,12);
+                const tl = c0.top_logprobs || c0.top_logprobs_compat || [];
+                row.topN = Array.isArray(tl) ? tl.length : Object.keys(tl||{}).length;
+                row.top3 = (Array.isArray(tl) ? tl.slice(0,3) : []).map(x => [x.token || x.tok_str, x.logprob]);
+              }
+              out.push(row);
             }
-            console.log(JSON.stringify(report));
+            console.log(JSON.stringify(out));
           })();
           EOF
       - uses: actions/upload-artifact@v4
