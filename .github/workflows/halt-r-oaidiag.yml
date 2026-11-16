@@ -1,0 +1,85 @@
+name: halt-r-oaidiag
+# OpenAI-compat logprobs diagnostic (report-only, never fails the run).
+# Rationale: router-prereg V3 (2026-11-16, user go) — donor-side /completion is
+# degenerate on pin a68c6136 (0 probs w/o post_sampling, 1 degenerate w/ it);
+# this probes /v1/completions with logprobs for real distributions.
+# If depth >= 10 real -> donor-side re-opens; else closure stands.
+on:
+  push:
+    paths:
+      - '.github/workflows/halt-r-oaidiag.yml'
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  oa-diag:
+    name: openai-compat logprobs probe (report-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: build llama.cpp server (pinned)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq cmake > /dev/null 2>&1 || true
+          git clone https://github.com/ggml-org/llama.cpp /tmp/llama.cpp
+          git -C /tmp/llama.cpp checkout a68c6136bb980d35281ae68d275d6f5318accc4a
+          cmake /tmp/llama.cpp -B /tmp/llama.cpp/build -DCMAKE_BUILD_TYPE=Release > /tmp/cmake.log 2>&1 || (tail -30 /tmp/cmake.log; exit 1)
+          cmake --build /tmp/llama.cpp/build --config Release -j4 > /tmp/build.log 2>&1 || (tail -30 /tmp/build.log; exit 1)
+      - name: fetch donor GGUF
+        run: |
+          curl -sSL --fail "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf" -o /tmp/donor.gguf
+          [ $(wc -c < /tmp/donor.gguf) -gt 100000000 ] || (echo "FAIL donor too small"; exit 1)
+      - name: probe openai-compat logprobs (5 prompts x 4 bodies)
+        run: |
+          /tmp/llama.cpp/build/bin/llama-server -m /tmp/donor.gguf --port 8080 --ctx-size 64 > /tmp/server.log 2>&1 &
+          for i in $(seq 1 120); do curl -sf http://127.0.0.1:8080/health && break || sleep 5; done
+          node - <<'EOF' | tee /tmp/oa-diag-report.json
+          const report = [];
+          const prompts = ["ab", "the cat sat", "1 Introduction 2", "To be or not", "arith 2+2="];
+          const bodies = [
+            {kind: "completion-baseline", path: "/completion", body: p => ({prompt: p, n_predict: 1, n_probs: 100, temperature: 0, cache_prompt: true})},
+            {kind: "oai-logprobs", path: "/v1/completions", body: p => ({prompt: p, max_tokens: 1, temperature: 0, logprobs: 10, echo: false})},
+            {kind: "oai-logprobs-echo", path: "/v1/completions", body: p => ({prompt: p, max_tokens: 1, temperature: 0, logprobs: 10, echo: true})},
+            {kind: "oai-logprobs-5", path: "/v1/completions", body: p => ({prompt: p, max_tokens: 1, temperature: 0, logprobs: 5})},
+          ];
+          (async () => {
+            for (const p of prompts) for (const v of bodies) {
+              const row = {prompt: p.slice(0, 12), kind: v.kind, status: 0, depth: 0, degenerate: null, top3: [], keys: [], note: ""};
+              try {
+                const r = await fetch("http://127.0.0.1:8080" + v.path, {method: "POST",
+                  headers: {"Content-Type": "application/json"}, body: JSON.stringify(v.body(p))});
+                row.status = r.status;
+                const j = await r.json().catch(() => null);
+                if (!j) { row.note = "non-json"; report.push(row); continue; }
+                if (v.path === "/completion") {
+                  const cp = j.completion_probabilities && j.completion_probabilities[0];
+                  const probs = (cp && (cp.probs || cp.top_probs)) || [];
+                  row.depth = probs.length;
+                  row.top3 = probs.slice(0, 3).map(x => [x.tok_str || x.token, x.prob]);
+                  row.degenerate = probs.length === 1 && probs[0].prob === 1;
+                  row.keys = Object.keys(j).slice(0, 8);
+                } else {
+                  const ch = j.choices && j.choices[0];
+                  row.keys = ch && ch.logprobs ? Object.keys(ch.logprobs).slice(0, 10) : [];
+                  const tl = ch && ch.logprobs;
+                  const top0 = tl && tl.top_logprobs && tl.top_logprobs[0];
+                  const toks = top0 ? Object.keys(top0) : [];
+                  row.depth = toks.length;
+                  row.top3 = toks.slice(0, 3).map(t => [t, top0[t]]);
+                  const vals = toks.map(t => top0[t]);
+                  row.degenerate = toks.length === 1;
+                  row.note = "text=" + JSON.stringify((ch && ch.text || "").slice(0, 12));
+                  void vals;
+                }
+              } catch (e) { row.note = "fetch-err:" + String(e).slice(0, 80); }
+              report.push(row);
+            }
+            console.log(JSON.stringify(report));
+          })();
+          EOF
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oaidiag-report
+          path: /tmp/oa-diag-report.json
+          retention-days: 30
