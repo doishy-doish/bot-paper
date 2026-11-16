@@ -1,0 +1,321 @@
+{P_{m_{i}}^{k}\}
+{k}(p_{m_{i}},p_
+{m_{j}})=\left[p
+^{k}_{m_{i}}-p^{
+k}_{m_{j}},\;p^{
+k}_{m_{i}}\cdot 
+p^{k}_{m_{j}},\;
+p^{k}_{m_{i}},\;
+p^{k}_{m_{j}}\ri
+ℝ 20 . H(p_{m_{i
+}},p_{m_{j}})\in
+\mathbb{R}^{20}.
+(m_{i})=\sum_{j\
+_{\left(f(m_{i},
+a_{X}^{\top} Ω Y
+ ⊤ \Omega_{Y}^{\
+a_{Z}^{\top} Ω X
+1 M \{X_{m}\}_{m
+cal{L}_{\text{pa
+m_{m<n}\|X_{m}-X
+_{n}\Omega_{m\le
+a_{m}\Omega_{n}^
+{m=1}^{M}\|X_{m}
+\Omega_{m}-U\|_{
+ac{1}{M}\sum_{m=
+1}^{M}X_{m}\Omeg
+− Ω m ​ y ‖ = ‖ 
+_{m}x-\Omega_{m}
+j { Φ m } ⁡ ‖ X 
+{\{\Phi_{m}\}}\s
+um_{i<j}\|X_{i}\
+Phi_{i}-X_{j}\Ph
+i_{j}\|_{F}^{2}\
+quad\sum_{m=1}^{
+M}\Phi_{m}^{\top
+m_{m=1}^{M}\hat{
+\{\hat{u}_{m,i}\
+}_{m=1}^{M}\subs
+M}\sum_{m=1}^{M}
+^{M}\hat{u}_{m,i
+gle\hat{u}_{m,i}
+,\hat{u}_{n,i}\r
+m=1}^{M}\hat{u}_
+m X_{m}^{\star}=
+X_{m}\Omega_{m} 
+hat{u}_{m,i}),c_
+a_{m}\Omega_{M+1
+}^{\top}, (9) Ω 
+_{M+1}\Omega_{m}
+) (z_{i}^{I},z_{
+i}^{T},z_{i}^{A}
+ystyle d_{i}^{+}
+Big(d(z_{i}^{I},
+z_{i}^{T})+d(z_{
+i}^{I},z_{i}^{A}
+)+d(z_{i}^{T},z_
+{i}^{A})\Big), Δ
+m_{i=1}^{N}d_{i}
+\big(z_{i}^{I}+z
+_{i}^{T}+z_{i}^{
+A \theta_{A}^{\e
+ll}+\tau_{A}^{\e
+^{d_{\mathrm{out
+tau_{B}^{\ell}\i
+n\mathbb{R}^{d_{
+ℓ \theta_{B}^{\e
+ll}+\tau_{B}^{\e
+thrm{in},A}^{(\e
+R}^{N\times L^{A
+in},B}^{(\ell)} 
+},B}},\quad H_{\
+mathrm{out},B}^{
+b{R}^{N\times L^
+},B},d_{\mathrm{
+t}}=H_{\mathrm{i
+n}}\theta^{\top}
+tau_{A}^{\top}. 
+thrm{out},A}H_{\
+mathrm{out},A}^{
+_{A})}_{ij} meas
+B}}\;{\left\|H_{
+au_{A}^{\top}H_{
+m{in},B}\tau_{B}
+^{\top}H_{\mathr
+m{out},B}^{\top}
+\right\|}_{F}^{2
+ta_{A},\theta_{A
+tau_{A}^{l}\left
+ {\{H_{in,h},H_{
+out,h}\}}_{h\in\
+\min\{L^{A},L^{B
+in,A}^{\top}H_{i
+out,A}^{\top}H_{
+​ n ⊤ C_{in}=U_{
+in}\Sigma_{in}V_
+{in}^{\top} , C 
+​ u ​ t ​ Σ o ​ 
+​ t ⊤ C_{out}=U_
+}V_{out}^{\top} 
+​ u ​ t ⊤ T_{in}
+}V_{in}^{\top},\
+{out}^{\top} 8: 
+_{B}^{l}\leftarr
+ow T_{out}\tau_{
+A}^{l}T_{in}^{\t
+α ​ τ B \theta_{
+min_{T_{\mathrm{
+thrm{in},A}T_{\m
+athrm{in}}-H_{\m
+athrm{in},B}\|_{
+mathrm{in}}T_{\m
+athrm{in}}^{\top
+}=I_{d_{\mathrm{
+thrm{out}}} ‖ H 
+{out},A}T_{\math
+rm{out}}-H_{\mat
+hrm{out},B}\|_{F
+}^{2}\quad\text{
+athrm{out}}T_{\m
+athrm{out}}^{\to
+p}=I_{d_{\mathrm
+mathbb{R}^{d_{\m
+thbb{R}^{d_{\mat
+athrm{in}}=H_{\m
+athrm{in},A}^{\t
+athrm{out}}=H_{\
+mathrm{out},A}^{
+thrm{in}}=U_{\ma
+{\mathrm{in}}V_{
+\mathrm{in}}^{\t
+thrm{out}}=U_{\m
+a_{\mathrm{out}}
+V_{\mathrm{out}}
+m{in}}=U_{\mathr
+m{in}}V_{\mathrm
+{in}}^{\top},\qu
+t}}=U_{\mathrm{o
+ut}}V_{\mathrm{o
+ut}}^{\top}. (7)
+}T_{\mathrm{out}
+_{B}}\left\|H_{\
+u_{A}^{\top}H_{\
+mathrm{out},A}^{
+m{in},A}T_{\math
+rm{in}})\tau_{B}
+^{\top}{(H_{\mat
+hrm{out},A}T_{\m
+athrm{out}})}^{\
+⊤ . \min_{\tau_{
+_{F}^{2},\quad E
+:=\tau_{A}^{\top
+}-T_{\mathrm{in}
+}\tau_{B}^{\top}
+T_{\mathrm{out}}
+_{\mathrm{out}}\
+tau_{A}T_{\mathr
+m{in}}^{\top}. (
+au_{B}\|_{F}=\|T
+_{\mathrm{out}}\
+tau_{A}T_{\mathr
+m{in}}^{\top}\|_
+{F}=\|\tau_{A}\|
+T_{\mathrm{out}}
+_{B}+\tau_{A}^{\
+_{B}^{\text{rand
+_{A}^{\text{rand
+heta_{B}+\tau_{\
+_{B}+\tau_{A}^{\
+{B}+\tau_{\text{
+au_{A}^{\text{ra
+_{\mathrm{in},B}
+}=H_{\mathrm{in}
+,A}^{\top}H_{\ma
+athbb{R}^{d_{\ma
+t}}=H_{\mathrm{o
+ut},A}^{\top}H_{
+in\mathbb{R}^{d_
+_{A}^{\text{rand
+eta_{B}+\tau_{B}
+eta_{B}+\tau_{B}
+ta_{B_{i}^{\prim
+{B_{i}}+0.5\,\th
+eta_{B_{i+1}} , 
+ U_{\mathrm{CP}}
+le=s_{(\hat{k})}
+p_{j}=(1+\#\{i:Y
+_{i}=0,\,s_{i}\g
+eq s_{j}\})/(n_{
+{\star}_{0} , wh
+ ⌉ , a^{\star}_{
+\geq a^{\star}_{
+_{\mathrm{CP}}(0
+1 a_{0}^{\star}=
+{k}{n_{0}+1}\Big
+}{\alpha\,(n_{0}
+π 0 > α \pi_{0}>
+_{\mathrm{fire}}
+_{\mathrm{cal}} 
+at{\pi}_{0} : tr
+^{\mathrm{held}}
+}} at 0.75 ​ π ^
+at{\pi}_{0} 0.75
+t{\pi}_{0} α = π
+{\pi}_{0} 0.75 ​
+\pi}_{0} α = π ^
+pi}_{0} 0.75 ​ π
+l}} π ^ 0 \hat{\
+pi}_{0} π 0 held
+ \pi_{0}^{\mathr
+_{\mathrm{fire}}
+104 a_{0}^{\star
+ 1 } q_{j}\in\{0
+ α , δ ) q_{j}\,
+n\geq c\,a_{0}^{
+… j=j_{0},j_{0}+
+​ π 0 0.5\pi_{0}
+≤ δ P_{\mathrm{f
+ ) a_{0}^{\star}
+_{\mathrm{fire}}
+s}\}_{s=1}^{K} b
+athcal{A}_{s}=\{
+a_{i}\}_{i=1}^{n
+_{m}^{(\ell_{m})
+× d s H_{s}^{(\e
+bb{R}^{n_{s}\tim
+s × d h H_{h}^{(
+thbb{R}^{n_{s}\t
+ − 𝟏 ​ c m ⊤ ) ​
+ h } . u_{m}(a_{
+i})=\frac{h_{m}^
+{(\ell_{m})}(a_{
+i})-\mu_{m}}{\ma
+^{(\ell_{m})}(a_
+{i})-\mu_{m}\|_{
+1}c_{m}^{\top})P
+a i ) u_{m}(a_{i
+thbb{R}^{d_{m}\t
+r P_{m}^{\top}P_
+{m}=I_{r} . The 
+​ V ⊤ . R_{s}^{*
+top}R=I_{r}}{\ar
+_{h}\|_{F}^{2},\
+qquad Z_{s}^{\to
+_{s}^{*}=LV^{\to
+ ∗ \widehat{Z}_{
+s\to h}=Z_{s}R_{
+) S_{s}(\ell_{s}
+ll_{s}^{*}(\ell_
+ell_{s}}{\arg\ma
+x}\,S_{s}(\ell_{
+uad\ell_{h}^{*}=
+m_{s=1}^{K}w_{s}
+l_{s}^{*}(\ell_{
+=1}^{K}w_{s}=1. 
+ ℓ h ∗ \ell_{h}^
+r ℓ s ∗ \ell_{s}
+ R_{s}^{*} for e
+ ∗ \ell_{h}^{*} 
+ehat{z}_{s\to h}
+(a_{i})=z_{s}(a_
+{i})R_{s}^{*},\q
+z}_{s\to h}(a_{i
+})P_{h}^{\top}+c
+{s\to h}(a_{i}) 
+e{h}_{s\to h}(a_
+{i})=\mu_{h}+\|h
+_{h}(a_{i})-\mu_
+{h}\|_{2}\frac{b
+_{s\to h}(a_{i})
+b_{s\to h}(a_{i}
+) h_{h}(a_{i}) i
+ ℓ h ∗ \ell_{h}^
+a_{s}(a_{i})=\wi
+ h}(a_{i})-h_{h}
+(a_{i}),\Delta_{
+hbb{R}^{d_{h}}. 
+\Delta_{s}(a_{i}
+elta}_{i,t}=W_{\
+mathrm{up}}q_{i,
+ime}_{i,t}=h_{i,
+t{\Delta}_{i,t}.
+}\in\mathbb{R}^{
+hrm{tr}}_{s} be 
+m{tr}}_{s}|d_{h}
+}\sum_{a_{i}\in\
+hrm{tr}}_{s}}\|\
+Delta_{s}(a_{i})
+\|_{2}^{2}},\qqu
+ac{1}{Nd_{h}}\su
+m_{i=1}^{N}\left
+{\Delta}_{i,p_{i
+}}-\Delta_{s_{i}
+}(a_{i})}{\max(\
+rho_{s_{i}},\eps
+}{N}\sum_{i=1}^{
+hcal{T}_{i}|}\su
+T}_{i}}\log p_{\
+id a_{i},y_{i,<t
+cal{L}_{\mathrm{
+_{\mathrm{inc}}=
+_{\mathrm{task}}
+\,e(x)^{\top}p_{
+ \max_{g}R_{g}(\
+u)-\min_{g}C_{g}
+l_{(1)}-\ell_{(2
+2 ​ δ s_{\beta}=
+2 | \max_{g}|A_{
+g}-\tfrac{1}{2}|
+_{g}(\tfrac{1}{2
+ ) C_{g}(\tau_{c
+t_{0}^{1}\bigl(c
+-C_{g}(\tau_{c})
+ac{1}{2}-A_{g}\b
+\max_{g}\{c-C_{g
+}(\tau_{c})\} is
+g ) . \int_{0}^{
+thcal{T}=\{(x_{i
+},y_{i},g_{i})\}
+ ^ i \hat{y}_{i}
+},R_{g}\}_{g},\D
+t{y}_{i},y_{i},g
