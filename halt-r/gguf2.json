@@ -1,0 +1,104 @@
+{
+ "date": "2026-11-16",
+ "task": "gguf2-rust-parity",
+ "runs": [
+  {
+   "file": "models/gguf2-shakes/parity-shakes.txt",
+   "refs": 5,
+   "worst": 4.50176,
+   "fails": 5,
+   "pass": "FAIL",
+   "per": [
+    {
+     "ref": 0,
+     "n": 65,
+     "got": 52,
+     "want": 32,
+     "diff": 3.121356,
+     "ok": "FAIL"
+    },
+    {
+     "ref": 1,
+     "n": 65,
+     "got": 1,
+     "want": 1,
+     "diff": 2.505377,
+     "ok": "FAIL"
+    },
+    {
+     "ref": 2,
+     "n": 65,
+     "got": 39,
+     "want": 39,
+     "diff": 0.882088,
+     "ok": "FAIL"
+    },
+    {
+     "ref": 3,
+     "n": 65,
+     "got": 46,
+     "want": 17,
+     "diff": 4.50176,
+     "ok": "FAIL"
+    },
+    {
+     "ref": 4,
+     "n": 65,
+     "got": 43,
+     "want": 43,
+     "diff": 1.103989,
+     "ok": "FAIL"
+    }
+   ]
+  },
+  {
+   "file": "models/gguf2-ts/parity-ts.txt",
+   "refs": 5,
+   "worst": 6.172836,
+   "fails": 5,
+   "pass": "FAIL",
+   "per": [
+    {
+     "ref": 0,
+     "n": 79,
+     "got": 48,
+     "want": 48,
+     "diff": 3.658444,
+     "ok": "FAIL"
+    },
+    {
+     "ref": 1,
+     "n": 79,
+     "got": 59,
+     "want": 59,
+     "diff": 1.831662,
+     "ok": "FAIL"
+    },
+    {
+     "ref": 2,
+     "n": 79,
+     "got": 64,
+     "want": 64,
+     "diff": 1.421447,
+     "ok": "FAIL"
+    },
+    {
+     "ref": 3,
+     "n": 79,
+     "got": 49,
+     "want": 1,
+     "diff": 6.172836,
+     "ok": "FAIL"
+    },
+    {
+     "ref": 4,
+     "n": 79,
+     "got": 1,
+     "want": 1,
+     "diff": 3.237064,
+     "ok": "FAIL"
+    }
+   ]
+  }
+ ]
+}
