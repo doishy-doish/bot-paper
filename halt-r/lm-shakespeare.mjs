@@ -1193,7 +1193,7 @@ if (process.argv[2] === 'decrypt'){
   console.log(`probe best acc beta=${best.beta} acc=${best.acc.toFixed(3)} ppl=${best.ppl.toFixed(2)} | best ppl beta=${bestPpl.beta} acc=${bestPpl.acc.toFixed(3)} ppl=${bestPpl.ppl.toFixed(2)}`);
   runQueries.beta = BSEL === 'ppl' ? bestPpl.beta : best.beta;
   const e = runQueries(TR, QSEED);
-  const biE = bigramEval(TR, 2000), uniE = uniEval(TR, 2000);
+  const biE = bigramEval(TR, QSEED), uniE = uniEval(TR, QSEED);
   const split = SPLIT === '1' ? splitEval(TR, QSEED + 2) : null;
   // ---- C1+C2 canary: implanted facts, edit flips, exact forget (store surgery, zero gradients) ----
   let canRemember = -1, canEditFlip = -1, canForgetLeak = -1, collatBase = -1, collatAfter = -1;
