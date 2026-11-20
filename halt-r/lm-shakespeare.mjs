@@ -301,6 +301,7 @@ if (process.argv[2] === 'decrypt'){
   const GATE = parseFloat(gv('gate', 0)), KEEP = parseFloat(gv('pruneKeep', 1)); // B1 confidence gate, B2 store prune
   const tag = gv('tag', 'shakes');
   const PROJ = gv('proj', 'raw'), H = parseInt(gv('H', 256));
+  const QSEED = parseInt(gv('qseed', '2000'), 10); // query-stream base seed (default bit-identical 2000/2001/2002)
   const BSEL = gv('betaSel', 'acc');
   if (BSEL !== 'acc' && BSEL !== 'ppl') fail('usage: --betaSel acc|ppl');
   const ADA = gv('ada', '0'); // H4/H5 adaptive-lambda: 0=off(fixed lam), 1=L=lam*top1frac(g), 2=L=lam*negentropy(1-h); default 0
@@ -1191,9 +1192,9 @@ if (process.argv[2] === 'decrypt'){
   }
   console.log(`probe best acc beta=${best.beta} acc=${best.acc.toFixed(3)} ppl=${best.ppl.toFixed(2)} | best ppl beta=${bestPpl.beta} acc=${bestPpl.acc.toFixed(3)} ppl=${bestPpl.ppl.toFixed(2)}`);
   runQueries.beta = BSEL === 'ppl' ? bestPpl.beta : best.beta;
-  const e = runQueries(TR, 2000);
+  const e = runQueries(TR, QSEED);
   const biE = bigramEval(TR, 2000), uniE = uniEval(TR, 2000);
-  const split = SPLIT === '1' ? splitEval(TR, 2002) : null;
+  const split = SPLIT === '1' ? splitEval(TR, QSEED + 2) : null;
   // ---- C1+C2 canary: implanted facts, edit flips, exact forget (store surgery, zero gradients) ----
   let canRemember = -1, canEditFlip = -1, canForgetLeak = -1, collatBase = -1, collatAfter = -1;
   let canRemDetail = '', canEditDetail = '';
@@ -1236,7 +1237,7 @@ if (process.argv[2] === 'decrypt'){
     keep.forEach((s, i) => { cX.set(X.subarray(s * D, s * D + D), i * D); cN[i] = next[s]; cS[i] = spos[s]; });
     X = cX; next = cN; spos = cS; P = keep.length;
     canForgetLeak = askRare(cpos);
-    collatAfter = runQueries(TR, 2000).acc;
+    collatAfter = runQueries(TR, QSEED).acc;
   }
   const evalMs = Date.now() - t1;
   console.log(`eval beta=${best.beta} hopfield acc=${e.acc.toFixed(3)} ppl=${e.ppl.toFixed(2)} steps=${e.avgSteps.toFixed(2)} ms=${evalMs} rss=${rssMB()}MB`);
@@ -1334,8 +1335,8 @@ if (process.argv[2] === 'decrypt'){
   // kNN-LM prescription (Khandelwal et al 2019, "Generalization through Memorization"):
   // the paper's SOTA (-2.9 ppl, no extra training) comes from p = lam*p_kNN + (1-lam)*p_LM,
   // NOT from head-to-head comparison. We never mixed -- this rung adds the lam sweep.
-  // Select lam on seed-2000 queries (same stream as the main eval above, so comparable),
-  // lock it, report on fresh seed-2001 queries (honest generalization).
+  // Select lam on select-stream queries (same stream as the main eval above, so comparable),
+  // lock it, report on fresh report-stream queries (honest generalization).
   // F2a one-shot Hebbian fast weights (kill-row 3, doctrine ruling 2026-11-14):
   // frozen keys (sup or graft5-K256), SMALL fast matrix F (DxV) rewritten per query
   // by ONE outer-product pass over top-K=8 retrieved neighbors, predict from F.
@@ -1405,12 +1406,12 @@ if (process.argv[2] === 'decrypt'){
       return { lam, acc: acc / rows.length, ppl: Math.exp(ce / rows.length) };
     });
   }
-  const selRows = hopBiDists(TR, 2000), selStats = lamStats(selRows);
+  const selRows = hopBiDists(TR, QSEED), selStats = lamStats(selRows);
   // ppl-guarded: minimize select-set ppl first (kNN-LM tunes for ppl), tie-break higher acc.
   // acc-first selection picked lam=1 overconfident stores whose ppl exploded on fresh queries.
   let bestLam = selStats[0];
   for (const s of selStats) if (s.ppl < bestLam.ppl || (s.ppl === bestLam.ppl && s.acc > bestLam.acc)) bestLam = s;
-  const repRows = hopBiDists(TR, 2001), repStats = lamStats(repRows);
+  const repRows = hopBiDists(TR, QSEED + 1), repStats = lamStats(repRows);
   const repLocked = repStats[LAMBDAS.indexOf(bestLam.lam)];
   // F2a select/report (same ppl-first lam discipline as interp; vote baseline = repHitI on the SAME rows, paired)
   let f2aLamSel = -1, f2aAccSel = 0, f2aPplSel = 0, f2aAcc = 0, f2aPpl = 0, f2aAgree = -1, repHitF = '';
@@ -1513,13 +1514,13 @@ if (process.argv[2] === 'decrypt'){
     let bestHyb = null;
     for (const a of [0.25, 0.5]){
       hybAlpha = a;
-      const hSel = hopBiDists(TR, 2000), hSelStats = lamStats(hSel);
+      const hSel = hopBiDists(TR, QSEED), hSelStats = lamStats(hSel);
       let b = hSelStats[0];
       for (const s of hSelStats) if (s.ppl < b.ppl || (s.ppl === b.ppl && s.acc > b.acc)) b = s;
       if (!bestHyb || b.ppl < bestHyb.ppl || (b.ppl === bestHyb.ppl && b.acc > bestHyb.acc)) bestHyb = { a, ...b };
     }
     hybAlpha = bestHyb.a; hybA = bestHyb.a; hybLamSel = bestHyb.lam; hybAccSel = bestHyb.acc; hybPplSel = bestHyb.ppl;
-    const hRep = hopBiDists(TR, 2001), hRepStats = lamStats(hRep);
+    const hRep = hopBiDists(TR, QSEED + 1), hRepStats = lamStats(hRep);
     const hr = hRepStats[LAMBDAS.indexOf(bestHyb.lam)]; hybAcc = hr.acc; hybPpl = hr.ppl;
     for (const qr of hRep){ const lam = bestHyb.lam; let ip = -1, ici = 0; for (let c = 0; c < V; c++){ const p = lam * qr.hd[c] + (1 - lam) * qr.bd[c]; if (p > ip){ ip = p; ici = c; } } repHitH += ici === qr.trueNext ? '1' : '0'; }
     console.log(`hyb select alpha=${bestHyb.a} lam=${bestHyb.lam} acc=${bestHyb.acc.toFixed(3)} ppl=${bestHyb.ppl.toFixed(2)} report acc=${hr.acc.toFixed(3)} ppl=${hr.ppl.toFixed(2)}`);
