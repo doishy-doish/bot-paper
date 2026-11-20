@@ -1,0 +1,70 @@
+name: halt-r-phase3
+# Phase-3 D-B wiring (harness-only, no bench edits, no training).
+# Pre-reg: scratch/papers/phase3-wiring-prereg-2026-11-20.md (frozen).
+# W1 fidelity-exact (19/20 repro) + W2 D-B-split (Fisher p<0.05) + W3 scope-honesty.
+on:
+  push:
+    paths:
+      - '.github/workflows/halt-r-phase3.yml'
+      - 'halt-r/phase3-wiring.mjs'
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  wiring-banked:
+    name: wiring banked c1-math
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: run wiring on committed banked files
+        run: |
+          node halt-r/phase3-wiring.mjs --sup halt-r/phase3-banked-sup-c1-math.json --donor halt-r/phase3-banked-donor-c1-math.json --out out/phase3-verdict-banked.json
+          cat out/phase3-verdict-banked.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase3-verdict-banked
+          path: out/phase3-verdict-banked.json
+          retention-days: 30
+  wiring-fresh:
+    name: wiring fresh sup c1-math
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: fresh sup bench c1-math (same flags as C1 sup cells)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: |
+          node halt-r/lm-shakespeare.mjs --data halt-r/c1/corpus-math.txt --out out/phase3-fresh-sup --tag phase3-fresh-sup --W 16 --P 8000 --trials 200 --H 256 --no-gen --split 1 --hedge 1 --proj sup --mix none 2>&1 | tee /tmp/bench-fresh.log; test ${PIPESTATUS[0]} -eq 0
+      - name: run wiring on fresh sup + committed donor
+        run: |
+          node halt-r/phase3-wiring.mjs --sup out/phase3-fresh-sup/metrics.json --donor halt-r/phase3-banked-donor-c1-math.json --out out/phase3-verdict-fresh.json
+          cat out/phase3-verdict-fresh.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase3-verdict-fresh
+          path: out/phase3-verdict-fresh.json
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase3-fresh-sup-metrics
+          path: out/phase3-fresh-sup/metrics.json
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: phase3-benchlog-fresh
+          path: /tmp/bench-fresh.log
+          retention-days: 7
