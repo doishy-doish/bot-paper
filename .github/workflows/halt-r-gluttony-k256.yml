@@ -1,0 +1,70 @@
+name: halt-r-gluttony-k256
+# K256 confirm (ONE shot, user go "both" 2026-11-20): K=256 graft5 vs same-run sup on
+# arith-revbal W16, FRESH query streams (--qseed 3000). Pre-reg:
+# scratch/papers/gluttony-k256-confirm-2026-11-20.md (frozen; PASS confirms K-floor=256
+# mechanism only, transfer stays unhooked; FAIL = selection noise, line stays closed).
+# Includes a bit-identity cell (sup, default qseed) that must reproduce banked T200 sup
+# repHitI exactly, else the QSEED bench change is rejected and the harvest is void.
+on:
+  push:
+    paths:
+      - '.github/workflows/halt-r-gluttony-k256.yml'
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  bench:
+    name: k256confirm ${{ matrix.arm }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include:
+          - arm: sup-3000
+            proj: sup
+            ak: 256
+            qseed: 3000
+          - arm: graft5-K256-3000
+            proj: graft5
+            ak: 256
+            qseed: 3000
+          - arm: sup-2000-validate
+            proj: sup
+            ak: 256
+            qseed: 2000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: check wrap key present
+        run: if [ -z "${{ secrets.SCRAMBLE }}" ]; then echo "SCRAMBLE secret missing - refusing plaintext save"; exit 1; fi
+      - name: remake revbal corpus (deterministic, byte-identical)
+        run: |
+          python3 halt-r/make-arith-revbal.py --out /tmp/arith --W 16
+          wc -c /tmp/arith/arith-full.txt
+      - name: bench k256confirm cell (frozen donor, never retrained)
+        env:
+          SCRAMBLE: ${{ secrets.SCRAMBLE }}
+        run: |
+          FLAGS="--W 16 --P 8000 --trials 200 --H 256 --no-gen --split 1 --hedge 1 --qseed ${{ matrix.qseed }}"
+          if [ "${{ matrix.proj }}" = sup ]; then
+            FLAGS="$FLAGS --proj sup --mix none"
+          else
+            FLAGS="$FLAGS --proj graft5 --anchors ${{ matrix.ak }} --graftgguf halt-r/tinygpt-arith-revbal.gguf --mix none"
+          fi
+          node halt-r/lm-shakespeare.mjs --data /tmp/arith/arith-full.txt --out out/k256confirm-${{ matrix.arm }} --tag arith-revbal $FLAGS 2>&1 | tee /tmp/bench-${{ matrix.arm }}.log; test ${PIPESTATUS[0]} -eq 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k256confirm-${{ matrix.arm }}
+          path: out/k256confirm-${{ matrix.arm }}/metrics.json
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: k256confirm-benchlog-${{ matrix.arm }}
+          path: /tmp/bench-${{ matrix.arm }}.log
+          retention-days: 7
